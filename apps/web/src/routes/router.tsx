@@ -7,6 +7,7 @@ import {
   redirect,
 } from "@tanstack/react-router";
 import { ApiStatusBanner } from "../components/ApiStatusBanner";
+import { LocalSessionDevHarness } from "../components/LocalSessionDevHarness";
 
 function RootLayout() {
   return (
@@ -42,10 +43,13 @@ function SessionsPage() {
   return (
     <>
       <ApiStatusBanner />
-      <PlaceholderPage
-        title="Sessions"
-        description="Organizer session list. Create and open live sessions from here."
-      />
+      <section className="rounded-lg border border-border bg-white p-6 shadow-sm">
+        <h1 className="text-2xl font-semibold">Sessions</h1>
+        <p className="mt-2 text-muted-foreground">
+          Organizer session list. Create and open live sessions from here.
+        </p>
+        {import.meta.env.DEV ? <LocalSessionDevHarness /> : null}
+      </section>
     </>
   );
 }
