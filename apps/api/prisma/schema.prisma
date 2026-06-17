@@ -7,4 +7,184 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-// Business models land in Phase 2 per docs/specs/backend/domain-model.md
+model Organization {
+  id        String   @id
+  name      String
+  timezone  String   @default("Asia/Manila")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  playerProfiles PlayerProfile[]
+  sessions       Session[]
+}
+
+model PlayerProfile {
+  id                 String   @id
+  organizationId     String
+  displayName        String
+  phone              String   @default("")
+  defaultSkillRating Float    @default(3.0)
+  notes              String   @default("")
+  isActive           Boolean  @default(true)
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id])
+  checkIns       CheckIn[]
+}
+
+model Session {
+  id                       String    @id
+  organizationId           String
+  name                     String
+  venueName                String
+  startsAt                 DateTime
+  endsAt                   DateTime?
+  status                   String
+  feeAmount                Int
+  currency                 String    @default("PHP")
+  queueMode                String    @default("suggested")
+  requirePaymentBeforePlay Boolean   @default(false)
+  ratingMode               String    @default("casual")
+  serverVersion            Int       @default(0)
+  createdAt                DateTime  @default(now())
+  updatedAt                DateTime  @updatedAt
+
+  organization  Organization @relation(fields: [organizationId], references: [id])
+  courts        Court[]
+  checkIns      CheckIn[]
+  queueLanes    QueueLane[]
+  queuedMatches QueuedMatch[]
+  matches       Match[]
+}
+
+model Court {
+  id             String   @id
+  sessionId      String
+  name           String
+  status         String   @default("open")
+  sortOrder      Int      @default(0)
+  currentMatchId String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  session Session @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  matches Match[]
+}
+
+model CheckIn {
+  id                   String   @id
+  sessionId            String
+  playerProfileId      String
+  arrivalOrder         Int
+  checkedInAt          DateTime
+  queueStatus          String   @default("waiting")
+  sessionSkillRating   Float
+  paymentStatus        String   @default("unpaid")
+  paymentAmountDue     Int
+  paymentAmountPaid    Int      @default(0)
+  paymentMethod        String   @default("none")
+  paymentNotes         String   @default("")
+  suggestionExcluded   Boolean  @default(false)
+  suggestionExcludeNote String?
+  matchesPlayedInSession Int    @default(0)
+  lastMatchEndedAt     DateTime?
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  session       Session       @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  playerProfile PlayerProfile @relation(fields: [playerProfileId], references: [id])
+
+  @@unique([sessionId, playerProfileId])
+}
+
+model QueueLane {
+  id        String   @id
+  sessionId String
+  name      String
+  status    String   @default("active")
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  session       Session       @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  queuedMatches QueuedMatch[]
+}
+
+model QueuedMatch {
+  id          String   @id
+  sessionId   String
+  queueLaneId String
+  status      String   @default("draft")
+  sortOrder   Int      @default(0)
+  createdFrom String   @default("manual")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  session      Session                  @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  queueLane    QueueLane                @relation(fields: [queueLaneId], references: [id], onDelete: Cascade)
+  participants QueuedMatchParticipant[]
+}
+
+model QueuedMatchParticipant {
+  id              String @id @default(cuid())
+  queuedMatchId   String
+  playerProfileId String
+  checkInId       String
+  team            String
+  slotOrder       Int
+
+  queuedMatch QueuedMatch @relation(fields: [queuedMatchId], references: [id], onDelete: Cascade)
+
+  @@unique([queuedMatchId, checkInId])
+}
+
+model Match {
+  id           String    @id
+  sessionId    String
+  courtId      String
+  status       String    @default("assigned")
+  startedAt    DateTime?
+  endedAt      DateTime?
+  teamOneScore Int?
+  teamTwoScore Int?
+  outcome      String?
+  winningTeam  String?
+  completedAt  DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  session      Session            @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  court        Court              @relation(fields: [courtId], references: [id])
+  participants MatchParticipant[]
+}
+
+model MatchParticipant {
+  id              String @id @default(cuid())
+  matchId         String
+  playerProfileId String
+  checkInId       String
+  team            String
+  ratingBefore    Float
+  ratingAfter     Float?
+  ratingDelta     Float?
+
+  match Match @relation(fields: [matchId], references: [id], onDelete: Cascade)
+
+  @@unique([matchId, checkInId])
+}
+
+model SyncActionLog {
+  id             String   @id @default(cuid())
+  organizationId String
+  deviceId       String
+  actionId       String
+  actionType     String
+  entityType     String
+  entityId       String
+  status         String
+  resultJson     Json?
+  appliedAt      DateTime @default(now())
+
+  @@unique([organizationId, deviceId, actionId])
+}

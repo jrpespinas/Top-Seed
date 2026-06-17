@@ -32,7 +32,14 @@ Optional PostgreSQL:
 
 ```bash
 docker compose up -d
-pnpm db:generate
+pnpm --filter @top-seed/api db:push
+pnpm --filter @top-seed/api db:seed
+```
+
+Integration tests (golden sync chain) need Postgres running and `DATABASE_URL` in `.env`:
+
+```bash
+RUN_DB_TESTS=1 pnpm --filter @top-seed/api test
 ```
 
 ## Scripts

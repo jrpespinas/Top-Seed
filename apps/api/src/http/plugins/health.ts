@@ -1,6 +1,6 @@
 import type { FastifyInstance } from "fastify";
 import { healthResponseSchema } from "@top-seed/contracts";
-import { buildMeta } from "../errors.js";
+import { buildMeta } from "../../shared/http/meta.js";
 
 export async function registerHealthRoutes(app: FastifyInstance) {
   app.get("/api/v1/health", async (_request, reply) => {

@@ -41,6 +41,9 @@ importers:
       '@top-seed/contracts':
         specifier: workspace:*
         version: link:../../packages/contracts
+      '@top-seed/domain':
+        specifier: workspace:*
+        version: link:../../packages/domain
       fastify:
         specifier: ^5.2.0
         version: 5.8.5
