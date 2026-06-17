@@ -257,9 +257,10 @@ Storage guidance:
 Sync outbox rules:
 
 - Every offline-capable mutation writes local state first and creates a sync action.
+- Sync action names and payloads must come from `docs/specs/backend/sync-actions.md`.
 - Each sync action needs a client-generated ID.
 - Retry failed actions with backoff when connectivity returns.
-- Preserve failed actions until the organizer retries, resolves, exports, or intentionally discards them.
+- Preserve failed actions until the organizer retries or resolves them via `SyncReviewPanel`.
 - Sync acknowledgement should mark local records as synced without replacing unsaved in-progress form state.
 
 PWA and network rules:
@@ -268,7 +269,12 @@ PWA and network rules:
 - Show an offline state when network requests fail or browser connectivity is unavailable.
 - Do not block live session actions only because the backend is unreachable.
 - Warn the organizer when unsynced local changes exist before risky actions such as clearing local data.
-- Provide a path to export local session backup data in a future implementation if sync remains failed.
+
+### Local backup export (deferred)
+
+MVP v1: **no** export/download implementation. Aligns with `design-system.md` and `sync-review-panel.md`.
+
+Future: optional export of local session snapshot + outbox when sync remains failed for an extended period. Define format in a dedicated spec before UI ships.
 
 Testing expectations:
 

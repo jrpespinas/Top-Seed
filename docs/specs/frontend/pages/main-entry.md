@@ -52,8 +52,8 @@ Send the organizer to the simplest useful starting point.
 
 ## API Endpoints
 
-- `GET /api/organizations/current`
-- `GET /api/sessions`
+- `GET /api/v1/organizations/current`
+- `GET /api/v1/sessions`
 
 ## Acceptance Criteria
 

@@ -67,9 +67,9 @@ Know current session status, upcoming match, and next relevant action.
 
 ## API Endpoints
 
-- `GET /api/sessions/:sessionId`
-- `GET /api/sessions/:sessionId/check-ins`
-- `GET /api/sessions/:sessionId/matches`
+- `GET /api/v1/sessions/:sessionId`
+- `GET /api/v1/sessions/:sessionId/check-ins`
+- `GET /api/v1/sessions/:sessionId/matches`
 
 ## Acceptance Criteria
 

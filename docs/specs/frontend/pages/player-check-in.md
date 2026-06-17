@@ -65,9 +65,9 @@ Join a badminton session from a QR code or shared link without needing organizer
 
 ## API Endpoints
 
-- `GET /api/sessions/:sessionId`
-- `GET /api/players`
-- `POST /api/sessions/:sessionId/check-ins`
+- `GET /api/v1/sessions/:sessionId`
+- `GET /api/v1/players`
+- `POST /api/v1/sessions/:sessionId/check-ins`
 
 ## Acceptance Criteria
 

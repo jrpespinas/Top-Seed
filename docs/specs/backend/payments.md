@@ -63,37 +63,47 @@ Suggested payment methods:
 
 The organizer should be able to:
 
-- Mark one player as paid from the live dashboard.
-- Edit amount paid.
-- Add a note such as reference number or collector name.
+- Mark one player as paid from the live dashboard or payments page.
+- Mark partial payment with amount and method.
+- Edit amount paid, method, and notes.
 - Mark as waived.
-- Filter unpaid players.
+- Mark as **refunded** when cash was returned outside the app (after `paid` or `partial`).
+- **Reset to unpaid** to correct a mistaken status change (not for real cash returns).
+- Filter by payment status including refunded.
 - See session totals.
 
 Session totals should include:
 
 - Total expected.
-- Total collected.
+- Total collected (`paid` and `partial` amounts only).
 - Total unpaid.
 - Total waived.
-- Count by payment status.
+- Total refunded (amounts marked refunded — reduces net collected view).
+- Count by payment status (all five statuses).
 
 ## Queue Interaction
 
-The default MVP should allow organizers to decide whether unpaid players can be queued.
+MVP v1 payment tracking is **informational only**. It does not gate queueing, suggestions, or court assignment.
 
-Session setting:
+Rules:
 
-- `requirePaymentBeforePlay`: boolean.
+- Unpaid and partial players **may** appear in auto-suggestions and be staged or sent to court like any other checked-in player.
+- Show payment status inline (`PaymentBadge`) so the organizer can collect money, but do not block play programmatically.
+- Optional UI warnings such as `Ana is unpaid` are allowed as reminders; they must not prevent accept or send-to-court without a separate future setting.
 
-If enabled:
+### Future: `requirePaymentBeforePlay`
 
-- `unpaid` and `partial` players are excluded from auto-suggestions.
-- Organizer can still manually assign them with an explicit override.
+Deferred past MVP v1. Do not expose this toggle in session setup or dashboard for now.
 
-If disabled:
+When implemented in a future version:
 
-- Payment status is visible but does not affect queue suggestions.
+- Session setting: `requirePaymentBeforePlay`: boolean.
+- If enabled: `unpaid` and `partial` players are excluded from auto-suggestions; organizer may still manually assign with explicit override.
+
+MVP implementation:
+
+- Persist `requirePaymentBeforePlay` as `false` on all sessions, or omit the field from MVP create/update payloads.
+- Do not build queue-blocking logic until this future spec is activated.
 
 ## Audit Expectations
 
@@ -110,7 +120,7 @@ Minimum audit fields:
 
 Rules:
 
-- Marking a player as paid, partial, waived, unpaid, or refunded creates a local pending sync action when offline.
+- Marking a player as paid, partial, waived, unpaid, or refunded creates an `UPDATE_PAYMENT` sync action from `docs/specs/backend/sync-actions.md` when offline.
 - Payment totals should update immediately from local state.
 - Payment rows with unsynced changes should show pending sync state.
 - If sync fails, preserve the local payment change and show a recoverable error.
@@ -124,4 +134,5 @@ Rules:
 - `paid` requires `paymentAmountPaid >= paymentAmountDue` unless amount due is zero.
 - `partial` requires `paymentAmountPaid > 0` and `< paymentAmountDue`.
 - `waived` can have zero amount paid.
-- `refunded` should preserve previous amount notes if known.
+- `refunded` applies when the organizer returned payment outside the app after `paid` or `partial`. Preserve prior amount and method in `paymentNotes` when useful. Excludes the row from collected totals.
+- **Reset to unpaid** is a correction path: sets `unpaid` and clears paid amount; use for mistaken marks, not for real refunds.

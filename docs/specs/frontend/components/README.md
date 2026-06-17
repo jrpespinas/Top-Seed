@@ -31,5 +31,5 @@ Reusable components should not:
 
 - Decide which page they appear on.
 - Fetch session data directly.
-- Encode organizer permissions directly unless the permission state is passed in.
+- Encode role-based permissions in MVP. Pass optional `sessionMode` (`live` vs `ended`) when an action should be disabled for completed/cancelled sessions. See `docs/specs/mvp-access.md`.
 - Invent one-off colors, spacing, labels, or loading patterns.

@@ -12,6 +12,7 @@ Provides focused side-task editing without leaving the current page or losing da
 ## When To Use
 
 - Use for player details, payment updates, check-in forms, rating adjustments, and match details.
+- Player session + profile editing: compose `PlayerDetailDrawer` inside `Drawer` per `features/organizer/player-detail-drawer.md`.
 
 ## When Not To Use
 

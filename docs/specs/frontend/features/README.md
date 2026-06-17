@@ -9,6 +9,15 @@ Read first:
 - `docs/specs/frontend/frontend-technical-standards.md`
 - Relevant reusable component specs in `docs/specs/frontend/components/`
 
+MVP organizer queue and detail behavior is specified in:
+
+- `docs/specs/frontend/organizer-components.md` — **canonical component registry** (names, aliases, composition tree)
+- `docs/specs/frontend/features/organizer/next-queue-panel.md`
+- `docs/specs/frontend/features/organizer/queue-lane-management.md`
+- `docs/specs/frontend/features/organizer/player-pool.md`
+- `docs/specs/frontend/features/organizer/player-detail-drawer.md`
+- `docs/specs/frontend/features/organizer/sync-review-panel.md`
+
 ## Feature Responsibilities
 
 Feature components should:

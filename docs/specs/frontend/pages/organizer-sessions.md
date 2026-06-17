@@ -60,7 +60,7 @@ Find, create, open, or resume badminton sessions.
 
 ## API Endpoints
 
-- `GET /api/sessions`
+- `GET /api/v1/sessions`
 
 ## Acceptance Criteria
 

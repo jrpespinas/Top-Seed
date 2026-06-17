@@ -9,6 +9,7 @@ Shows one badminton court as a spatial container with Team A and Team B player s
 - `docs/specs/frontend/design-system.md`
 - `docs/specs/frontend/frontend-technical-standards.md`
 - `docs/specs/backend/domain-model.md`
+- `docs/specs/backend/state-transitions.md`
 
 ## When To Use
 
@@ -38,6 +39,23 @@ Shows one badminton court as a spatial container with Team A and Team B player s
 ## States
 
 - `open`, `partiallyFilled`, `occupied`, `inProgress`, `paused`, `unavailable`, selected, loading action, pending sync, and error.
+
+`partiallyFilled` and `inProgress` are derived UI labels, not separate backend court statuses:
+
+| Backend `court.status` | `match.status` | UI state |
+|------------------------|----------------|----------|
+| `open` | none | `open` |
+| `occupied` | `assigned` with incomplete roster | `partiallyFilled` |
+| `occupied` | `assigned` with full roster | `occupied` |
+| `occupied` | `in_progress` | `inProgress` |
+| `paused` | any | `paused` |
+| `unavailable` | any | `unavailable` |
+
+Primary actions by match state:
+
+- `assigned` with full roster: `Start match`
+- `in_progress`: `Finish match` or record result
+- `open`: accept drop or assignment actions
 
 ## Accessibility
 

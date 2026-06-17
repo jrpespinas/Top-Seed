@@ -4,7 +4,9 @@
 
 Top Seed should feel like a calm courtside control board for badminton organizers. The interface should help a queue master answer the next operational question quickly: who is here, who has paid, which court is free, who plays next, and what just finished.
 
-The product should not feel like a generic SaaS dashboard with sports words pasted onto it. It should feel practical, warm, and specific to badminton open play: clear enough for a tired player checking their phone, dense enough for an organizer running six courts, and steady enough to use while people are asking questions in person.
+The product should not feel like a generic SaaS dashboard with sports words pasted onto it. It should feel practical, warm, and specific to badminton open play: readable on a phone in a bright hall, dense enough for an organizer running six courts, and steady enough to use while people are asking questions in person.
+
+MVP v1 is organizer-only. See **Future version: player surfaces** below for deferred player UI guidance.
 
 For implementation details such as CSS units, typography tokens, spacing tokens, breakpoints, touch targets, styling conventions, motion, and formatting, use `docs/specs/frontend/frontend-technical-standards.md`.
 
@@ -18,26 +20,43 @@ Design personality:
 
 ## Audience Context
 
-Organizer context:
+### Organizer context (MVP v1)
 
-- Often standing near courts with a phone or tablet.
+The queue master may run a live session from **phone, tablet, or desktop**. Do not assume they have a laptop. Many organizers will use only a phone at the hall.
+
+Design for all three as **co-primary** live-session devices:
+
+| Device | Typical use | Layout expectation |
+|--------|-------------|-------------------|
+| **Phone** (portrait) | Courtside default when no tablet or PC | Single column; pegboard zones via tabs or focused sections (see Mobile live dashboard) |
+| **Tablet** (landscape) | Preferred pegboard view when available | `CourtBoard` and `NextQueuePanel` visible together when possible |
+| **Desktop** | Full live operation or wider review at home/venue desk | Same workflows as phone/tablet; use extra width for context, not different features |
+
+Organizer needs:
+
+- Often standing near courts with a phone or tablet in hand.
 - Switching between queueing, payment collection, player questions, and match results.
-- Needs names, court numbers, and next actions to be readable at arm's length.
-- Needs confidence that the app is fair, but still wants manual control.
-
-Player context:
-
-- Wants to know whether they are checked in, waiting, assigned, or done.
-- May only glance at the app between rallies.
-- Cares about partner, opponents, court, payment status, and history.
-- Should never need to understand the queue algorithm to use the player screens.
+- Names, court numbers, and next actions readable at arm's length.
+- Confidence that the app is fair, but still wants manual control.
+- Large touch targets and one clear primary action per section on phone.
 
 Environmental context:
 
 - Badminton halls can be bright, noisy, and crowded.
 - Network quality may be inconsistent.
 - Touch targets matter more than pixel-perfect density.
-- Tablet landscape is the primary organizer surface; mobile portrait is the primary player surface.
+
+**MVP rule:** optimize organizer workflows first on phone and tablet. Desktop must remain fully responsive and support the same live session operations; do not treat desktop as the only “real” dashboard.
+
+### Future version: player surfaces
+
+Not in MVP v1. When player self-service is added:
+
+- Players may glance at status between rallies.
+- They care about partner, opponents, court, payment status, and history.
+- They should never need to understand the queue algorithm.
+
+Do not design MVP organizer layouts around future player phone flows.
 
 ## Human-Centered Design Rules
 
@@ -53,19 +72,41 @@ Environmental context:
 
 The live session dashboard should be inspired by physical badminton pegboard systems. This is workflow evidence, not decoration. Pegboards work because they make the organizer's operating model visible:
 
-- `Available`: players waiting, resting, unpaid, or newly added.
-- `Next`: lined-up matches ready to move onto an open court.
+- `Available`: players with `waiting` or organizer-marked `resting`. Players with `assigned` or `playing` appear on Next-lane and court cards instead.
+- `Next`: one or more queue lanes with lined-up matches ready to move onto an open court.
 - `Now`: courts with occupied team slots and current match state.
+
+Players return to `waiting` in Available immediately after match completion. `resting` is organizer-initiated only and is not applied automatically after a match ends.
 
 Players should feel like movable tokens. Courts should feel like spatial containers with Team A and Team B slots. The next queue should feel like a staging lane, not a hidden algorithm result.
 
 Rules:
 
-- Keep `CourtBoard`, `NextQueue`, and `PlayerPool` visible together on tablet and desktop when possible.
+- On **tablet and desktop**, keep `CourtBoard`, `NextQueuePanel`, and `PlayerPool` visible together when possible.
+- On **phone**, the full pegboard cannot fit on one screen. Use **Mobile live dashboard** (below); do not cram three pegboard zones into one unreadable scroll.
 - Court cards must show players by team slot, not as a flat list.
-- Next queue should show multiple lined-up matches when space allows.
-- Drag-and-drop may be supported on desktop, but every drag action needs an accessible button/menu alternative.
+- Next queue should show multiple lined-up matches and multiple queue lanes when space allows.
+- Drag-and-drop may be supported on desktop; every drag action needs an accessible button/menu alternative on phone and tablet.
 - Use court layout, queue movement, and player-token behavior as the badminton context. Avoid decorative shuttle graphics as the main visual identity.
+
+### Mobile live dashboard (organizer phone)
+
+When the organizer has only a phone, recommend **bottom tabs** so each pegboard zone stays glanceable:
+
+| Tab | Pegboard zone | Default? | Why |
+|-----|---------------|----------|-----|
+| **Now** | Courts, start/finish match | **Yes** | Active courts are the first question: who is playing, who is free, what needs finishing |
+| **Next** | Queue lanes, send to court, add suggestion to queue | No | Staging the next games; second-most frequent courtside task |
+| **Available** | Player pool, check-in, waiting/resting | No | Walk-ins and queue adjustments |
+| **More** | Payments, sync issues, recent matches, session actions | No | Exceptions and review; not the main loop |
+
+Rules:
+
+- Default to **Now** when opening the live dashboard on phone.
+- Show offline/sync banner above tabs when relevant; it must not block court actions.
+- Do not require drag-and-drop on phone. Use explicit buttons: `Send to court`, `Start match`, `Add to next match`.
+- Keep one primary action visible per tab section (for example `Finish match` on Now, `Send to court` on Next).
+- If MVP ships without tabs, use a single-column stack in this order: sync state → **Courts (Now)** → **Next queue** → quick check-in → player pool → payment exceptions → recent matches. Prefer adding tabs before adding more single-scroll density.
 
 ## Anti-Patterns
 
@@ -114,7 +155,7 @@ Target qualities:
 Operational mapping:
 
 - `Available`: light cards, compact player-token rows, payment/wait metadata.
-- `Next`: warm-highlighted queue lane, staged match cards, visible auto-fill controls.
+- `Next`: warm-highlighted queue lanes, staged match cards, visible **Add to [lane]** on the suggestion strip.
 - `Now`: deep green or court-line inspired court containers with Team A / Team B slots.
 - `Needs attention`: warm warning treatment for unpaid, sync failed, or incomplete match slots.
 
@@ -167,29 +208,35 @@ Rules:
 
 ## Spacing And Layout
 
-Mobile:
+All breakpoints must support the **full organizer live session** (check-in, queue, courts, payments, results). MVP is not a “phone-lite” subset.
 
-- Single-column flows.
+Mobile (organizer phone):
+
+- Co-primary device; assume no laptop at the hall.
+- Single-column flows or bottom-tab pegboard zones (see Mobile live dashboard).
 - One primary action per screen section.
 - Use drawers or bottom sheets for short forms.
 - Avoid dense grids and wide tables.
+- Player names and court numbers must stay readable in portrait.
 
-Tablet:
+Tablet (organizer):
 
-- Primary organizer layout.
-- Keep `CourtBoard` and `SuggestedMatchPanel` visible together when possible.
+- Co-primary device; ideal pegboard layout.
+- Keep `CourtBoard` and `NextQueuePanel` visible together when possible.
 - Use multi-column dashboard zones for courts, queue, payments, and recent matches.
 - Make touch targets comfortable enough for standing use.
 
-Desktop:
+Desktop (organizer):
 
-- Use extra width to show more context, not to add new workflows.
-- Let summaries, history, and payment panels sit beside operational panels.
+- Co-primary device; same live workflows as phone and tablet.
+- Must remain responsive; do not design desktop-only features for MVP live operation.
+- Use extra width to show more context side by side, not to add different workflows.
+- Let summaries, history, and payment panels sit beside operational panels when width allows.
 
 Dashboard layout should prioritize:
 
 1. `Now`: court state and occupied players.
-2. `Next`: lined-up matches ready for assignment.
+2. `Next`: queue lanes and lined-up matches ready for assignment.
 3. `Available`: waiting/resting players and quick check-in.
 4. Payment exceptions.
 5. Recent match history.
@@ -269,6 +316,39 @@ Rules:
 - Avoid vanity metrics in the MVP.
 - Link or filter to the relevant detail when tapped.
 
+### DataList
+
+Purpose: compact term/value rows in drawers and detail panels.
+
+Spec: `docs/specs/frontend/components/primitives/data-list.md`.
+
+Use for:
+
+- Player detail drawer read-only rows.
+- Sync review action metadata.
+- Match detail summaries.
+
+Rules:
+
+- Pair with `FormField` when the row becomes editable.
+- Use section headings when there are more than eight rows.
+
+### DropdownMenu
+
+Purpose: overflow menus for secondary lane, court, and row actions.
+
+Spec: `docs/specs/frontend/components/primitives/dropdown-menu.md`.
+
+Use for:
+
+- Queue lane header actions.
+- Court card overflow actions.
+- Compact player row menus.
+
+Rules:
+
+- Do not hide the only path to a critical action inside a menu without a visible alternative.
+
 ### CourtCard
 
 Purpose: show one court's current state and next available action.
@@ -320,6 +400,8 @@ Rules:
 - Team pairing must be visually obvious.
 - Active match actions should be faster to reach than historical details.
 - Cancelled matches should not look like completed results.
+- Draws should read as neutral competitive outcomes, not wins for both teams.
+- Unscored results should read as completed without competitive result.
 
 ### PaymentBadge
 
@@ -330,7 +412,7 @@ Rules:
 - `unpaid` and `partial` should be easy to spot.
 - `paid` should be calm and low-friction.
 - `waived` should look intentional, not like an error.
-- Payment badges should link to payment details when the organizer has permission.
+- Payment badges should link to payment details in live sessions; disable in ended sessions.
 
 ### EmptyState
 
@@ -423,6 +505,13 @@ Match statuses:
 - `in_progress`: In Progress
 - `completed`: Completed
 - `cancelled`: Cancelled
+
+Match outcomes:
+
+- `team_one_win`: Team A Won
+- `team_two_win`: Team B Won
+- `draw`: Draw
+- `unscored`: Unscored
 
 Connection and sync statuses:
 
@@ -544,7 +633,27 @@ Offline copy should reassure and guide:
 - Do not block organizer actions only because the app is offline.
 - Avoid modal interruption for normal offline mode.
 - Use stronger warning treatment only when a sync action fails or local storage is at risk.
-- Keep failed sync recovery actionable: review, retry, export backup, or dismiss only when safe.
+- Keep failed sync recovery actionable: review and retry via `SyncReviewPanel`.
+- **Export session backup** is deferred past MVP v1 (see Local backup below).
+- Warn before clearing browser data when unsynced changes exist.
+
+### Local backup (MVP stance)
+
+MVP v1 does **not** ship an organizer-facing export/download button.
+
+Rules:
+
+- Recovery path: fix connectivity → **Retry** / **Retry all failed** in `SyncReviewPanel`.
+- Do not promise export in UI copy until a backup format is specified.
+- `OfflineBanner` and sync review must not show **Export backup** in MVP.
+- Future versions may add a downloadable JSON (or similar) snapshot of local session + outbox; spec the format before exposing the control.
+
+When export ships later:
+
+- Include session entities, check-ins, matches, payments, outbox, and sync cursor metadata.
+- Exclude secrets; use same IDs as sync replay for reconciliation.
+
+See `docs/specs/frontend/features/organizer/sync-review-panel.md`.
 
 ## Reference Screenshot Workflow
 

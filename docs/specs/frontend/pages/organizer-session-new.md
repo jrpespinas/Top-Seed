@@ -19,13 +19,15 @@ Create a badminton open-play session with courts, fee, and queue settings.
 ## Data Dependencies
 
 - Default organizer workspace.
-- Defaults for venue, currency, fee, rating, and queue rules.
+- Defaults for venue, currency, fee, rating mode, and queue rules.
 
 ## Component Composition
 
 - Session setup form.
 - Court setup section.
-- Payment requirement setting.
+- Session fee and currency (for payment tracking only).
+- Queue mode: **Suggested matches** (default on) maps to `queueMode: suggested`; **Manual queue only** maps to `manual`.
+- Rating mode setting: `Casual` or `Rated`.
 - `FormField`, `Select`, `Button`, and `ConfirmAction` where needed.
 
 ## Page States
@@ -56,12 +58,16 @@ Create a badminton open-play session with courts, fee, and queue settings.
 
 ## API Endpoints
 
-- `POST /api/sessions`
-- `POST /api/sessions/:sessionId/courts`
+- `POST /api/v1/sessions`
+- `POST /api/v1/sessions/:sessionId/courts`
 
 ## Acceptance Criteria
 
 - Required fields are validated near inputs.
 - Defaults reduce typing for repeated badminton sessions.
+- Rating mode defaults to `Casual`.
+- Queue mode defaults to **Suggested matches** (`suggested`).
+- **Manual queue only** hides the suggestion strip on the dashboard; lanes and manual staging still work.
+- `Rated` mode explains that wins and draws can change player ratings; unscored and cancelled matches do not.
 - Created sessions are immediately discoverable in the session list.
 - No login is required for MVP v1.

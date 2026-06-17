@@ -4,17 +4,29 @@
 
 Build a responsive organizer-only web app that lets badminton organizers run sessions from tablets and phones. The organizer dashboard is the primary MVP surface. Player self-service screens are future-version work, not MVP v1.
 
+MVP access rules: `docs/specs/mvp-access.md`. Match assignment pipeline: `docs/specs/backend/queueing-and-ratings.md` (Match Assignment Pipeline).
+
+**Do not use deprecated aliases** such as `SuggestedMatchPanel`, `NextQueue`, `Magic Queue`, or `onAutoFillQueue`.
+
+## MVP Access Summary
+
+- No login, no roles, and no permission-denied UI in MVP v1.
+- The only lock is session mode: `completed` and `cancelled` sessions are read-only.
+- Accept suggestion stages in Next lanes; direct court assignment is a labeled override.
+
 ## Layout Priorities
 
-Primary target:
+Primary targets (co-primary for MVP live session):
 
-- Tablet landscape for live session operation beside courts.
-- The live dashboard should preserve a pegboard mental model: `Available` players, `Next` queued matches, and `Now` active courts.
+- **Phone portrait** when the organizer has only a phone at the hall.
+- **Tablet landscape** for the ideal pegboard view beside courts.
+- **Desktop** for the same live workflows with more side-by-side context.
 
-Secondary targets:
+The live dashboard preserves a pegboard mental model: `Available` players, `Next` queued matches, and `Now` active courts. On phone, use tabs or a courts-first stack per `docs/specs/frontend/design-system.md`.
 
-- Mobile portrait for quick organizer actions.
-- Desktop for setup and review tasks.
+Secondary emphasis:
+
+- Quick organizer actions on any device size.
 
 ## Dashboard Composition Model
 
@@ -24,18 +36,19 @@ Desktop composition:
 
 - Left: `PlayerPool`, combining quick check-in, search, waiting/resting players, and payment badges.
 - Center: `CourtBoard`, showing courts as spatial containers with Team A / Team B slots.
-- Right: `NextQueue`, showing multiple lined-up matches and auto-fill/manual assignment actions.
+- Right: `NextQueuePanel`, showing one or more queue lanes, multiple lined-up matches, and accept/manual assignment actions.
 - Bottom/supporting area: recent matches, payment exceptions, and leaderboard shortcut.
 
 Tablet composition:
 
-- Keep `CourtBoard` and `NextQueue` visible together.
+- Keep `CourtBoard` and `NextQueuePanel` visible together.
 - Place `PlayerPool` below or beside them depending on available width.
 - Keep recent matches and payment exceptions secondary.
 
 Mobile composition:
 
-- Stack by urgency: offline/sync state, next queue, courts, quick add/check-in, player pool, payments, recent matches.
+- Use bottom tabs on phone when possible: **Now** (default) | **Next** | **Available** | **More**.
+- Fallback single-column stack: sync → courts → next queue → check-in → player pool → payments → recent matches.
 - Do not require drag-and-drop on mobile; provide assign, swap, and move buttons.
 
 ## App Areas
@@ -98,7 +111,7 @@ Stack-aware organization:
 - `components/ui`: custom styled primitives built from Tailwind tokens and Radix behavior primitives.
 - `components/forms`: form field wrappers, validation messages, and Zod-integrated form helpers.
 - `components/layout`: shells, panel grids, responsive dashboard layout primitives.
-- `features/organizer`: badminton-specific composition such as court board, next queue, player pool, payments, and match history.
+- `features/organizer`: badminton-specific composition such as court board, queue lane management, next queue, player pool, payments, and match history.
 - `lib/local-db`: Dexie schema and local-first persistence helpers.
 - `lib/sync`: outbox creation, retry logic, sync status derivation, and TanStack Query sync calls.
 - `lib/validation`: Zod schemas for forms, local records, and sync payloads.
@@ -118,6 +131,7 @@ When implementing a page, read the page spec first, then the referenced feature 
 Component responsibilities:
 
 - Route components fetch initial data and coordinate access boundaries. MVP v1 has no login, but routes should stay easy to protect later.
+- Route and data hooks should consume API envelopes, cursor pagination, and dashboard snapshot contracts from `docs/specs/backend/api-contracts.md`.
 - Route components initialize local session state, connection status, and sync outbox state.
 - Feature components receive domain-shaped data and emit actions.
 - UI components remain domain-agnostic.
@@ -129,12 +143,12 @@ Do not let low-level UI components call session APIs directly.
 
 Server state:
 
-- Sessions, courts, check-ins, matches, payments, ratings, leaderboard.
+- Sessions, courts, queue lanes, queued matches, check-ins, matches, payments, ratings, leaderboard.
 
 Local-first state:
 
 - Local session snapshot.
-- Local player/court/check-in/match/payment records.
+- Local player/court/queue-lane/queued-match/check-in/match/payment records.
 - Sync outbox actions.
 - Connection status.
 - Last successful sync timestamp.
@@ -145,6 +159,7 @@ Client UI state:
 - Selected court.
 - Open modal.
 - Filter tabs.
+- Selected queue lane.
 - Pending form input.
 - Suggested match preview.
 
@@ -171,7 +186,7 @@ Keep derived state close to the component that renders it unless multiple featur
 
 - Every organizer mutation should show immediate feedback.
 - Dangerous actions such as cancelling a match or completing a session require confirmation.
-- Common actions such as mark paid, start match, finish match, and accept suggestion should be one tap from the dashboard.
+- Common actions such as mark paid, start match, finish match, and add suggestion to Next queue should be one tap from the dashboard.
 - Empty states should explain the next action.
 - Error states should preserve entered data.
 
@@ -188,8 +203,8 @@ Keep derived state close to the component that renders it unless multiple featur
 Frontend tests should cover:
 
 - Dashboard renders court, queue, payment, and suggestion states.
-- Organizer can accept a suggested match.
-- Organizer can manually assign a match.
+- Organizer can accept a suggested match into a Next lane.
+- Organizer can promote a ready queued match to court or use labeled direct court assignment.
 - Payment status updates reflect in summaries.
 - Organizer-managed player add/check-in handles returning and new players.
 - Responsive behavior for key dashboard sections.

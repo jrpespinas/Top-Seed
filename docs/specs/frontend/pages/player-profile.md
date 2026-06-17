@@ -63,8 +63,8 @@ Review personal badminton history, current rating, attendance, and recent form.
 
 ## API Endpoints
 
-- `GET /api/players/:playerId`
-- `GET /api/players/:playerId/history`
+- `GET /api/v1/players/:playerId`
+- `GET /api/v1/players/:playerId/history`
 
 ## Acceptance Criteria
 

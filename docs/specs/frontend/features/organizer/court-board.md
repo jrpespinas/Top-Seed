@@ -26,8 +26,8 @@ The board should feel like the court section of a physical pegboard, where each 
 
 ## Actions Emitted
 
-- `onAssignCourt`
-- `onMoveNextMatchToCourt`
+- `onAssignCourt` (direct override: `CREATE_MATCH`; show skipped-queue messaging)
+- `onMoveNextMatchToCourt` (default promote from Next lane)
 - `onSetCourtPlayers`
 - `onClearCourtSlot`
 - `onStartMatch`
@@ -37,9 +37,12 @@ The board should feel like the court section of a physical pegboard, where each 
 - `onCancelMatch`
 - `onAddCourt`
 
-## Permissions
+## Session Mode
 
-- Court actions require organizer permission.
+MVP v1 has no login or role checks. See `docs/specs/mvp-access.md`.
+
+- Court actions are available in live sessions.
+- Hide court actions when the session is `completed` or `cancelled`.
 
 ## States
 
@@ -65,6 +68,7 @@ The board should feel like the court section of a physical pegboard, where each 
 - Occupied courts show players by team pair, not as a flat list.
 - Paused or unavailable courts are excluded from auto-assignment.
 - Open courts make moving the next queued match onto the court easy.
+- Direct court assignment shows `Assigned directly — skipped Next queue` messaging.
 - Add court, pause/reopen court, and set players actions are visible without leaving the board.
 - Add, pause, reopen, unavailable, assign, start, and finish actions update local state immediately and can sync later.
 - Drag-and-drop may be supported, but button/menu alternatives are required.

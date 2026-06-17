@@ -22,7 +22,7 @@ Match history should show locally completed matches immediately, even before bac
 ## Data Dependencies
 
 - Session detail.
-- Completed and cancelled matches.
+- Completed, draw, unscored, and cancelled matches.
 - Match participants.
 - Rating impact history if available.
 - Local unsynced match completions or corrections.
@@ -47,6 +47,7 @@ Match history should show locally completed matches immediately, even before bac
 - Offline cached history.
 - Pending match history sync.
 - Failed correction sync.
+- Rated-session correction with rating recompute warning.
 
 ## Primary Actions
 
@@ -55,7 +56,7 @@ Match history should show locally completed matches immediately, even before bac
 
 ## Secondary Actions
 
-- Filter completed, cancelled, or unscored matches.
+- Filter completed, draw, cancelled, or unscored matches.
 - Return to dashboard.
 
 ## Responsive Layout
@@ -69,14 +70,16 @@ Match history should show locally completed matches immediately, even before bac
 
 ## API Endpoints
 
-- `GET /api/sessions/:sessionId/matches`
-- `PATCH /api/sessions/:sessionId/matches/:matchId/result`
-- `POST /api/sync/actions`
+- `GET /api/v1/sessions/:sessionId/matches`
+- `PATCH /api/v1/sessions/:sessionId/matches/:matchId/result`
+- `POST /api/v1/sync/actions`
 
 ## Acceptance Criteria
 
 - Cancelled matches are visually distinct.
+- Draw and unscored matches are distinct from winner/loser results.
 - Result correction is organizer-only.
-- Rating recalculation requirement is surfaced when implemented.
+- Rated-session result correction explains that affected players are recomputed from the corrected match forward.
+- Casual-session result correction explains that stats/history change without rating changes.
 - Player-owned match history is future-version behavior.
 - Locally completed and corrected matches remain visible while pending sync.

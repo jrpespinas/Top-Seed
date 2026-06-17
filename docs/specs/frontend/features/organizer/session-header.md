@@ -4,11 +4,16 @@
 
 Help the organizer identify the active session and access high-level session actions.
 
+MVP access rules: `docs/specs/mvp-access.md`.
+
 ## Data Required
 
 - Session name, venue, date/time, status, fee, and court count.
-- Current organizer permission level.
 - Connection status, sync status, pending action count, failed action count, and last synced time.
+
+Do not require in MVP v1:
+
+- Organizer permission level or role badge.
 
 ## Child Components
 
@@ -17,19 +22,26 @@ Help the organizer identify the active session and access high-level session act
 - `OfflineBanner`
 - `SyncStatusBadge`
 - `StatusBadge`
+- `SyncReviewPanel`
 
 ## Actions Emitted
 
 - `onEditSession`
-- `onShareSession`
 - `onCompleteSession`
 - `onCancelSession`
 - `onRetrySync`
-- `onReviewSyncIssues`
+- `onReviewSyncIssues` → opens `SyncReviewPanel`
 
-## Permissions
+Do not emit in MVP v1:
 
-- Only `owner` and `organizer` can edit, complete, or cancel sessions.
+- `onShareSession` (future player link / QR check-in; hidden in MVP)
+
+## Session Mode
+
+| Session status | Header behavior |
+|----------------|-----------------|
+| `draft`, `open`, `active` | Show live actions: edit, complete, cancel |
+| `completed`, `cancelled` | Read-only; hide live operation actions |
 
 ## States
 
@@ -37,7 +49,6 @@ Help the organizer identify the active session and access high-level session act
 - Active session.
 - Draft/open session.
 - Completed/cancelled read-only session.
-- Permission denied actions hidden or disabled.
 - Offline with pending local changes.
 - Sync failed with recoverable actions.
 
@@ -53,3 +64,5 @@ Help the organizer identify the active session and access high-level session act
 - Connection and sync status are visible without blocking session operation.
 - Completing or cancelling a session requires confirmation.
 - Completed and cancelled sessions do not show live operation actions.
+- No Share session button in MVP v1.
+- No role or permission-level badge in MVP v1.

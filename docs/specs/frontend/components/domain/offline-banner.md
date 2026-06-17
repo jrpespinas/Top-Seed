@@ -28,8 +28,8 @@ Shows page-level connection and sync guidance when the organizer is offline, syn
 - `failedCount`: number of failed actions.
 - `lastSyncedAt`: optional timestamp.
 - `onRetry`: retry failed sync actions.
-- `onReview`: open sync review/details.
-- `onExportBackup`: optional backup export action.
+- `onReview`: open `SyncReviewPanel`.
+- `onExportBackup`: future hook only; hide in MVP. See `sync-review-panel.md`.
 
 ## States
 
@@ -68,4 +68,4 @@ Shows page-level connection and sync guidance when the organizer is offline, syn
 
 - Blocking the dashboard while offline.
 - Showing scary error copy for normal disconnection.
-- Hiding backup/export path when sync repeatedly fails.
+- Promising export backup in MVP when no format or control exists.

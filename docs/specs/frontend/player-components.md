@@ -115,16 +115,17 @@ Purpose:
 
 Supported sorts:
 
-- Rating.
-- Wins.
-- Matches played.
-- Win rate.
-- Attendance.
+- Rating, wins, losses, draws, games played, win rate, attendance.
+
+Scopes:
+
+- Club (`/leaderboards/current`) and session (`/sessions/:id/leaderboard`).
 
 Rules:
 
+- Display **W-L-D** on every row; align with `match-results-and-ratings.md`.
 - Label ratings as internal club ratings, not official Elo.
-- Respect hidden or guest player visibility settings.
+- Respect hidden or guest player visibility settings when player-facing views ship.
 
 ### PlayerProfileSummary
 

@@ -4,13 +4,14 @@
 
 Displays one player in queue, payment, check-in, roster, or assignment contexts with key operational metadata.
 
-In pegboard-inspired areas, this component may behave like a player token: something the organizer can move from available pool, to next queue, to court slots, and back to waiting/resting.
+In pegboard-inspired areas, this component may behave like a player token: something the organizer can move from the available pool to next queue lanes, to court slots, and back to `waiting` after a match. `resting` is an explicit organizer action only.
 
 ## Source Specs
 
 - `docs/specs/frontend/design-system.md`
 - `docs/specs/frontend/frontend-technical-standards.md`
 - `docs/specs/backend/domain-model.md`
+- `docs/specs/backend/state-transitions.md`
 
 ## When To Use
 
@@ -27,8 +28,9 @@ In pegboard-inspired areas, this component may behave like a player token: somet
 - `player`: display name, optional contact, optional profile id.
 - `checkIn`: queue status, session rating, wait time, matches played.
 - `payment`: payment status and amount summary.
-- `actions`: context-specific row actions.
+- `actions`: context-specific row actions. On management lists, prefer `onOpenPlayerDetails` over inline field editors.
 - `assignmentState`: optional `available`, `queued`, `onCourt`, `resting`, or `done`.
+- `queuedMatchIds`: optional list when the same player appears in multiple Next-lane staged matches.
 - `dragHandleProps`: optional desktop drag/drop affordance metadata.
 - `isSelected`: optional.
 
@@ -42,7 +44,7 @@ In pegboard-inspired areas, this component may behave like a player token: somet
 
 ## States
 
-- Default, selected, draggable, queued, on court, recently played, unpaid warning, removed/done muted, loading action, pending sync, and error.
+- Default, selected, draggable, queued, on court, recently played, unpaid warning, **skipped from suggestions**, removed/done muted, loading action, pending sync, and error.
 
 ## Accessibility
 
@@ -61,7 +63,10 @@ In pegboard-inspired areas, this component may behave like a player token: somet
 
 - Use compact labels such as `12 min`, `3 games`, `Rating 3.4`.
 - Do not expose organizer notes in player-facing rows.
-- Token actions should use movement language: `Add to next match`, `Move to court`, `Send to resting`.
+- Do not render inline `FormField` editors for profile fields (`gender`, club rating, notes) on list rows — use `PlayerDetailDrawer`.
+- Session skill rating may display as read-only text on the row; edit in drawer.
+- Token actions should use movement language: `Add to next match`, `Move to court`, `Send to resting`, `Back to waiting`.
+- A player token may appear on multiple Next-lane cards when staged for future matchups.
 
 ## Testing Expectations
 

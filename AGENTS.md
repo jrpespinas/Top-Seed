@@ -12,9 +12,16 @@ Read these files before making feature or architecture decisions:
 
 - `docs/specs/README.md`
 - `docs/specs/architecture.md`
+- `docs/specs/mvp-access.md`
+- `docs/specs/backend/backend-architecture.md`
+- `docs/specs/backend/sync-actions.md`
+- `docs/specs/backend/sync-payload-reference.md`
+- `docs/specs/backend/api-contracts.md`
 - `docs/specs/backend/domain-model.md`
+- `docs/specs/backend/state-transitions.md`
 - `docs/specs/backend/api-spec.md`
 - `docs/specs/backend/queueing-and-ratings.md`
+- `docs/specs/backend/match-results-and-ratings.md`
 - `docs/specs/backend/payments.md`
 - `docs/specs/frontend/component-architecture.md`
 - `docs/specs/frontend/organizer-components.md`
@@ -24,6 +31,8 @@ Read these files before making feature or architecture decisions:
 - `docs/specs/frontend/frontend-technical-standards.md`
 - `docs/specs/frontend/components/`
 - `docs/specs/frontend/features/`
+- `docs/specs/frontend/features/organizer/player-detail-drawer.md`
+- `docs/specs/frontend/features/organizer/sync-review-panel.md`
 - `docs/specs/frontend/pages/`
 
 If implementation needs conflict with these specs, update the relevant spec in the same change and explain why.
@@ -31,12 +40,20 @@ If implementation needs conflict with these specs, update the relevant spec in t
 ## Engineering Standards
 
 - Prefer boring, explicit code over clever abstractions.
-- Keep domain language consistent: `organization`, `session`, `court`, `player`, `check-in`, `match`, `team`, `payment`, `rating`.
+- Use the backend Clean Architecture modular monolith from `docs/specs/backend/backend-architecture.md`: domain rules stay framework-free, controllers stay thin, and sync replay shares application use cases with direct API mutations.
+- Use `docs/specs/backend/sync-actions.md` as the source of truth for offline sync action names, semantics, idempotency, ordering, and per-action results.
+- Use `docs/specs/backend/sync-payload-reference.md` for golden JSON payload examples and shared input shapes (`SyncParticipantInput`, `MatchResultInput`).
+- Use `docs/specs/backend/api-contracts.md` for `/api/v1` versioning, response envelopes, cursor pagination, DTO shape, dashboard snapshot, and API security baseline.
+- Keep domain language consistent: `organization`, `session`, `court`, `queue lane`, `queued match`, `player`, `check-in`, `match`, `team`, `payment`, `rating`.
 - Design for badminton doubles first. Singles and other racket sports can be added later behind explicit product decisions.
 - Keep queueing logic deterministic and explainable to organizers.
-- Preserve organizer override paths. Suggestions should assist the queue master, not remove control.
+- Use `docs/specs/backend/match-results-and-ratings.md` for winner, draw, unscored, cancelled, correction, rating mode, and leaderboard behavior.
+- Use `docs/specs/backend/state-transitions.md` for player, queued match, court match, court, and session state transitions during live session operation.
+- Use `docs/specs/mvp-access.md` for MVP v1 no-login access rules and session-mode read-only behavior.
+- Use `docs/specs/frontend/organizer-components.md` for canonical dashboard component names, composition tree, and deprecated aliases.
+- Preserve organizer override paths. Suggestions should assist the queue master, not remove control. Default assignment stages in Next lanes; direct court assignment is a labeled override per `docs/specs/backend/queueing-and-ratings.md`.
 - Treat payments as manual tracking in MVP. Do not add payment gateway concepts unless requested.
-- Optimize the main organizer dashboard for tablet width first, then mobile.
+- Optimize the live organizer dashboard for phone, tablet, and desktop per `docs/specs/frontend/design-system.md`.
 - Do not require constant connectivity for live session operations. Use local-first state and sync recovery for MVP workflows.
 - Add tests around queueing, ratings, permissions, and payment state transitions when code is implemented.
 

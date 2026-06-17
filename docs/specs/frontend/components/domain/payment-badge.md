@@ -30,7 +30,7 @@ Shows a player's session-level payment status without turning the interface into
 
 ## States
 
-- Default, interactive focus, warning for unpaid/partial, and neutral for paid/waived.
+- Default, interactive focus, warning for unpaid/partial, neutral for paid/waived/refunded.
 
 ## Accessibility
 
@@ -44,7 +44,7 @@ Shows a player's session-level payment status without turning the interface into
 
 ## Content Rules
 
-- Use `Mark paid`, not `Charge`.
+- Use `Mark paid`, `Mark refunded`, and `Reset to unpaid` — not `Charge` or `Process refund`.
 - Use `Payment tracked manually`, not `Payment processed`.
 
 ## Testing Expectations

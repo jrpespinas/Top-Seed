@@ -2,7 +2,9 @@
 
 ## User Job
 
-Support match operation from assignment through score or winner recording.
+Support match operation from assignment through explicit start, score or winner recording, and completion.
+
+State transition rules: `docs/specs/backend/state-transitions.md`.
 
 ## Data Required
 
@@ -11,6 +13,7 @@ Support match operation from assignment through score or winner recording.
 - Team participants.
 - Match status.
 - Existing score or result.
+- Session `ratingMode`.
 - Rating impact if available after completion.
 - Match sync status for local assignment, start, result, completion, or cancellation.
 
@@ -28,18 +31,25 @@ Support match operation from assignment through score or winner recording.
 - `onStartMatch`
 - `onRecordScore`
 - `onMarkWinner`
+- `onMarkDraw`
+- `onMarkUnscored`
 - `onCompleteMatch`
 - `onCancelMatch`
 
-## Permissions
+## Session Mode
 
-- Match operations require organizer permission.
+MVP v1 has no login or role checks. See `docs/specs/mvp-access.md`.
+
+- Match operations are available in live sessions.
+- Hide match actions when the session is `completed` or `cancelled`.
 
 ## States
 
-- Assigned.
-- In progress.
+- Assigned: roster on court; primary action is `Start match`.
+- In progress: play has started; primary action is finish or record result.
 - Recording result.
+- Recording draw.
+- Recording unscored completion.
 - Completing.
 - Cancel confirmation.
 - Completed read-only.
@@ -55,7 +65,12 @@ Support match operation from assignment through score or winner recording.
 
 ## Acceptance Criteria
 
+- Assigned matches require an explicit `Start match` action before completion.
 - Cancelled matches do not update ratings.
-- Completed scored matches can show rating impact.
+- Completed win/loss matches can show rating impact when the session is rated.
+- Draws are recorded as draws, not wins for both sides.
+- Rated draws can show small expectation-based rating impact.
+- Unscored completions count as played but do not show rating impact.
+- Casual sessions explain that results update stats/history but not ratings.
 - Score entry preserves data on validation error.
 - Start, score, complete, and cancel actions update local state immediately and sync later.

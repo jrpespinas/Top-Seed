@@ -29,26 +29,32 @@ Out of scope:
 
 Use a local-first responsive web architecture with a browser local store, sync outbox, backend API, relational database, and simple connectivity recovery path.
 
+The backend should be a Clean Architecture inspired modular monolith for MVP v1: one deployable application with explicit domain, application use case, interface, and infrastructure boundaries. See `docs/specs/backend/backend-architecture.md` for implementation rules.
+
 ```mermaid
 flowchart TD
     OrganizerWeb[Organizer Web] --> LocalStore[Browser Local Store]
     LocalStore --> Outbox[Sync Outbox]
     Outbox --> Api[Backend API]
-    Api --> Outbox
-    Api --> Domain[Domain Services]
-    Domain --> QueueService[Queue Service]
-    Domain --> RatingService[Rating Service]
-    Domain --> PaymentService[Payment Service]
-    Domain --> Database[(PostgreSQL)]
+    Api --> UseCases[Application Use Cases]
+    Api --> SyncProcessor[Sync Action Processor]
+    SyncProcessor --> UseCases
+    UseCases --> Domain[Domain Layer]
+    Domain --> QueueService[Queue Policy]
+    Domain --> RatingService[Rating Policy]
+    Domain --> PaymentService[Payment Rules]
+    Domain --> SessionRules[Session Invariants]
+    UseCases --> Database[(PostgreSQL)]
 ```
 
 ## Application Areas
 
 - Organizer app: session setup, live dashboard, court board, queue, payments, match results, player management.
 - Organizer reporting: leaderboard and match history.
-- Local-first runtime: browser local store, pending action outbox, connection/sync status, and exportable backup.
-- Backend API: organizations/workspace, sessions, check-ins, courts, matches, payments, queue suggestions, ratings, leaderboard.
-- Domain services: queue generation, rating updates, payment state transitions, session consistency checks, and sync validation.
+- Local-first runtime: browser local store, pending action outbox, connection/sync status, and future exportable backup (export deferred in MVP v1).
+- Backend API: organizations/workspace, sessions, check-ins, courts, queue lanes, queued matches, matches, payments, queue suggestions, ratings, leaderboard.
+- Backend application use cases: organizer workflows and sync-replayable mutations such as check-in, queue lane changes, match assignment, payment updates, and result recording.
+- Backend domain rules: queue generation, rating updates, payment state transitions, session consistency checks, and sync validation.
 
 ## Core Domain Flow
 
@@ -63,17 +69,21 @@ flowchart TD
     AssignCourt --> MatchInProgress[Match In Progress]
     MatchInProgress --> RecordResult[Record Result]
     RecordResult --> UpdatePaymentAndRating[Update Rating And History]
-    UpdatePaymentAndRating --> ReturnToQueue[Return Players To Queue]
-    ReturnToQueue --> QueueDashboard
+    UpdatePaymentAndRating --> ReturnToWaiting[Return Players To Waiting]
+    ReturnToWaiting --> QueueDashboard
 ```
 
 ## Data Consistency Rules
 
+Player, queued match, court match, court, and session state transitions are defined in `docs/specs/backend/state-transitions.md`.
+
 - A player can have only one active `checkIn` per active `session`.
 - A court can have at most one active match.
 - A checked-in player can be in only one of these live states: `waiting`, `assigned`, `playing`, `resting`, `done`, or `removed`.
+- A player may be staged in multiple queued matches across lanes, but cannot be on two active court matches in the same session.
 - A match result should update match history and rating history atomically.
 - Payment status belongs to a session-level check-in, not the global player profile.
+- Direct API mutations and offline sync replay should call the same backend application use cases.
 
 ## Offline And Sync Strategy
 
@@ -84,7 +94,9 @@ Required offline-capable operations:
 - View the active session dashboard.
 - Add and edit players.
 - Check players in and update queue status.
-- Add, pause, reopen, and mark courts unavailable.
+- Add, delete, pause, reopen, and mark courts unavailable.
+- Add, rename, reorder, and delete queue lanes.
+- Create, edit, remove, and promote queued matches.
 - Assign courts and manage active matches.
 - Generate match suggestions from cached local session state.
 - Start and finish matches.
@@ -114,7 +126,7 @@ MVP limitations:
 - Best for one organizer device per live session.
 - Cross-device sync and concurrent organizers are not required.
 - Cloud backup only happens after connectivity returns.
-- Clearing browser data can remove unsynced local changes unless the organizer exports a backup.
+- Clearing browser data can remove unsynced local changes unless a future backup export has been saved (export not in MVP v1).
 - The app should warn before destructive browser-storage actions when possible.
 
 ## Realtime Strategy
@@ -133,7 +145,7 @@ The organizer dashboard should refresh these data sets together:
 
 MVP v1 has no login component. Treat the app as a single organizer-operated workspace. The organizer manually manages players, sessions, courts, payments, match results, leaderboard, and match history.
 
-Implementation may still keep internal fields that can later connect to authenticated users, but v1 screens should not require sign-in, player accounts, or guest access links.
+Implementation may still keep internal fields that can later connect to authenticated users, but v1 screens should not require sign-in, player accounts, or guest access links. MVP access rules: `docs/specs/mvp-access.md`.
 
 ## Future Direction
 
