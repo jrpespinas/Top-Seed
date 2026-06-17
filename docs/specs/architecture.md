@@ -27,9 +27,9 @@ Out of scope:
 
 ## Recommended Application Shape
 
-Use a local-first responsive web architecture with a browser local store, sync outbox, backend API, relational database, and simple connectivity recovery path.
+Use a local-first responsive web architecture with a browser local store, sync outbox, **TypeScript monorepo** (`apps/web` + `apps/api`), PostgreSQL, and simple connectivity recovery path.
 
-The backend should be a Clean Architecture inspired modular monolith for MVP v1: one deployable application with explicit domain, application use case, interface, and infrastructure boundaries. See `docs/specs/backend/backend-architecture.md` for implementation rules.
+The backend is a Clean Architecture inspired modular monolith: **Fastify**, **Prisma**, **Node.js** — see `docs/specs/backend/backend-stack.md`. Application structure and sync rules: `docs/specs/backend/backend-architecture.md`.
 
 ```mermaid
 flowchart TD

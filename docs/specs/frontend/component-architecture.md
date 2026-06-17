@@ -79,7 +79,10 @@ Use four component layers:
 - `components`: reusable UI components such as buttons, dialogs, cards, tabs.
 - `lib`: formatting, client utilities, validation helpers, API clients.
 
-Use the frontend stack defined in `docs/specs/frontend/frontend-stack.md`: React, TypeScript, Vite, TanStack Router, TanStack Query, Dexie, Tailwind CSS, Radix UI, optional dnd-kit, Zod, and PWA app-shell support.
+Use the stacks defined in:
+
+- `docs/specs/frontend/frontend-stack.md` — React, TypeScript, Vite, TanStack Router, TanStack Query, Dexie, Tailwind CSS, Radix UI, optional dnd-kit, Zod, PWA
+- `docs/specs/backend/backend-stack.md` — Node, TypeScript, Fastify, Prisma, PostgreSQL, pnpm workspaces
 
 Suggested structure:
 

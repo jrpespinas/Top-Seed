@@ -6,6 +6,8 @@ This spec defines the recommended frontend stack for the organizer-only, offline
 
 The goal is to support a premium sports-club visual feel, a pegboard-inspired live dashboard, and local-first offline operation without drifting into a generic enterprise admin UI.
 
+Monorepo layout and shared packages: `docs/specs/backend/backend-stack.md` (`apps/web`, `apps/api`, `packages/contracts`, `packages/domain`).
+
 ## Chosen Stack
 
 - `React`: component model for the web app.

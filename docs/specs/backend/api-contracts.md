@@ -10,6 +10,7 @@ Use this file with:
 
 - `docs/specs/backend/api-spec.md`
 - `docs/specs/backend/backend-architecture.md`
+- `docs/specs/backend/backend-stack.md`
 - `docs/specs/backend/sync-actions.md`
 - `docs/specs/backend/sync-payload-reference.md`
 - `docs/specs/backend/domain-model.md`

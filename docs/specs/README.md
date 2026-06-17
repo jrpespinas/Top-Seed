@@ -13,6 +13,7 @@ MVP v1 is a no-login, organizer-only badminton web app. The organizer manually m
 
 ## Backend Specs
 
+- `docs/specs/backend/backend-stack.md`: chosen monorepo tooling — Node, TypeScript, Fastify, Prisma, PostgreSQL, pnpm workspaces.
 - `docs/specs/backend/backend-architecture.md`: Clean Architecture modular monolith structure, layering, sync replay, transactions, and testing rules.
 - `docs/specs/backend/sync-actions.md`: canonical offline sync action catalog, semantics, ordering, idempotency, and response rules.
 - `docs/specs/backend/sync-payload-reference.md`: golden JSON payload examples and shared sync input shapes.

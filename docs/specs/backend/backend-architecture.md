@@ -2,9 +2,9 @@
 
 ## Recommendation
 
-Use a Clean Architecture inspired modular monolith for MVP v1.
+Use a **TypeScript** Clean Architecture inspired modular monolith for MVP v1, implemented with **Fastify** (HTTP), **Prisma** (PostgreSQL), and shared **`packages/domain`** + **`packages/contracts`**. Stack details: `docs/specs/backend/backend-stack.md`.
 
-The backend should be one deployable application with strong internal boundaries. Do not split into microservices for MVP. The domain is still changing, and the product needs fast iteration across sessions, courts, queue lanes, queued matches, payments, ratings, history, and offline sync.
+The backend should be one deployable application (`apps/api`) with strong internal boundaries. Do not split into microservices for MVP. The domain is still changing, and the product needs fast iteration across sessions, courts, queue lanes, queued matches, payments, ratings, history, and offline sync.
 
 Clean Architecture is useful here because Top Seed will likely add major future capabilities: organizer login, player accounts, player self-service, online payments, public leaderboards, multi-device sync, and richer auto-queueing. The MVP should stay simple, but not tangled.
 
@@ -112,10 +112,10 @@ The interface layer adapts external inputs to application use cases.
 
 MVP interfaces:
 
-- HTTP controllers or route handlers.
-- Request validation.
-- Response presenters.
-- Sync action deserialization.
+- Fastify route plugins and handlers (`apps/api`).
+- Request validation via Zod (`packages/contracts`).
+- Response presenters mapping to `api-contracts.md` envelopes.
+- Sync action deserialization and `ProcessSyncActions` dispatch.
 
 Rules:
 
@@ -131,28 +131,27 @@ The infrastructure layer implements technical details.
 
 Allowed:
 
-- Database schema and migrations.
-- Repository implementations.
-- ORM or query builder models.
-- Transaction manager.
-- Idempotency store.
+- Prisma schema, migrations, and client (`apps/api` infrastructure).
+- Repository implementations using Prisma.
+- Transaction boundaries via `prisma.$transaction`.
+- Idempotency store for sync action replay.
 - Clock and ID generation adapters.
 - Background job adapters if needed later.
 
 Rules:
 
-- Infrastructure depends inward on application ports and domain types.
-- Domain and application layers must not depend on concrete infrastructure.
+- Infrastructure depends inward on application ports and domain types from `packages/domain`.
+- Domain and application layers must not depend on `@prisma/client` or Fastify types.
 - Database constraints should reinforce domain invariants, not replace application/domain validation.
 
 ## Module Organization
 
 Prefer domain modules with internal layer boundaries.
 
-Suggested structure:
+Suggested structure for `apps/api`:
 
 ```text
-backend/
+apps/api/
   src/
     modules/
       organizations/
@@ -166,10 +165,15 @@ backend/
       sync/
       leaderboards/
     shared/
-      domain/
       application/
       infrastructure/
+        prisma/
       http/
+        plugins/
+        errors.ts
+packages/
+  domain/          # pure rules — imported by api, never imports api
+  contracts/       # Zod DTOs — imported by api and web
 ```
 
 Within a module:
@@ -188,9 +192,9 @@ queue/
     promote-queued-match-to-court.ts
     generate-queue-suggestion.ts
   infrastructure/
-    queue-repository.ts
+    queue-repository.ts      # Prisma implementation
   http/
-    queue-routes.ts
+    queue-routes.ts          # Fastify plugin
 ```
 
 Use file names and class/function names that match product language from `AGENTS.md`.

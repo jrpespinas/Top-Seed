@@ -14,6 +14,7 @@ Read these files before making feature or architecture decisions:
 - `docs/specs/architecture.md`
 - `docs/specs/mvp-access.md`
 - `docs/specs/backend/backend-architecture.md`
+- `docs/specs/backend/backend-stack.md`
 - `docs/specs/backend/sync-actions.md`
 - `docs/specs/backend/sync-payload-reference.md`
 - `docs/specs/backend/api-contracts.md`
@@ -40,7 +41,7 @@ If implementation needs conflict with these specs, update the relevant spec in t
 ## Engineering Standards
 
 - Prefer boring, explicit code over clever abstractions.
-- Use the backend Clean Architecture modular monolith from `docs/specs/backend/backend-architecture.md`: domain rules stay framework-free, controllers stay thin, and sync replay shares application use cases with direct API mutations.
+- Use the backend Clean Architecture modular monolith from `docs/specs/backend/backend-architecture.md` with **Fastify**, **Prisma**, and **PostgreSQL** per `docs/specs/backend/backend-stack.md`: domain rules in `packages/domain` stay framework-free, Fastify routes stay thin, and sync replay shares application use cases with direct API mutations.
 - Use `docs/specs/backend/sync-actions.md` as the source of truth for offline sync action names, semantics, idempotency, ordering, and per-action results.
 - Use `docs/specs/backend/sync-payload-reference.md` for golden JSON payload examples and shared input shapes (`SyncParticipantInput`, `MatchResultInput`).
 - Use `docs/specs/backend/api-contracts.md` for `/api/v1` versioning, response envelopes, cursor pagination, DTO shape, dashboard snapshot, and API security baseline.
