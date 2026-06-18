@@ -2,13 +2,23 @@ import type { SyncAction, SyncActionResult, SyncActionsRequest } from "@top-seed
 import {
   checkInPlayerPayloadSchema,
   completeMatchPayloadSchema,
+  createPlayerProfilePayloadSchema,
   createQueuedMatchPayloadSchema,
   moveQueuedMatchToCourtPayloadSchema,
   startMatchPayloadSchema,
+  updateCheckInPayloadSchema,
+  updateMatchResultPayloadSchema,
+  updatePaymentPayloadSchema,
+  updatePlayerProfilePayloadSchema,
 } from "@top-seed/contracts";
 import { checkInPlayer } from "../check-ins/check-in-player.js";
-import { createQueuedMatch, promoteQueuedMatchToCourt } from "../queue/queued-match.js";
+import { updateCheckIn } from "../check-ins/update-check-in.js";
+import { updateMatchResult } from "../matches/correct-match-result.js";
 import { completeMatch, startMatch } from "../matches/match-lifecycle.js";
+import { updatePayment } from "../payments/update-payment.js";
+import { createPlayerProfile } from "../players/create-player-profile.js";
+import { updatePlayerProfile } from "../players/update-player-profile.js";
+import { createQueuedMatch, promoteQueuedMatchToCourt } from "../queue/queued-match.js";
 import {
   findSyncActionLog,
   recordSyncActionLog,
@@ -18,6 +28,42 @@ import { UseCaseError } from "../../shared/application/errors.js";
 
 async function dispatchAction(action: SyncAction): Promise<SyncActionResult> {
   switch (action.type) {
+    case "CREATE_PLAYER_PROFILE":
+    case "CREATE_PLAYER": {
+      const payload = createPlayerProfilePayloadSchema.parse(action.payload);
+      const { profile } = await createPlayerProfile({
+        id: action.entityId,
+        organizationId: payload.organizationId,
+        displayName: payload.displayName,
+        phone: payload.phone,
+        defaultSkillRating: payload.defaultSkillRating,
+        notes: payload.notes,
+        isActive: payload.isActive,
+      });
+      return {
+        actionId: action.id,
+        status: "applied",
+        entityType: action.entityType,
+        entityId: action.entityId,
+        canonicalEntityId: profile.id,
+        serverUpdatedAt: profile.updatedAt,
+      };
+    }
+    case "UPDATE_PLAYER_PROFILE": {
+      const payload = updatePlayerProfilePayloadSchema.parse(action.payload);
+      const { profile } = await updatePlayerProfile({
+        playerProfileId: action.entityId,
+        payload,
+      });
+      return {
+        actionId: action.id,
+        status: "applied",
+        entityType: action.entityType,
+        entityId: action.entityId,
+        canonicalEntityId: profile.id,
+        serverUpdatedAt: profile.updatedAt,
+      };
+    }
     case "CHECK_IN_PLAYER": {
       const payload = checkInPlayerPayloadSchema.parse(action.payload);
       const { checkIn, serverVersion } = await checkInPlayer({
@@ -39,7 +85,41 @@ async function dispatchAction(action: SyncAction): Promise<SyncActionResult> {
         entityId: action.entityId,
         canonicalEntityId: checkIn.id,
         serverVersion,
-        serverUpdatedAt: new Date().toISOString(),
+        serverUpdatedAt: checkIn.updatedAt,
+      };
+    }
+    case "UPDATE_CHECK_IN": {
+      const payload = updateCheckInPayloadSchema.parse(action.payload);
+      const { checkIn, serverVersion } = await updateCheckIn({
+        checkInId: action.entityId,
+        sessionId: action.sessionId!,
+        payload,
+      });
+      return {
+        actionId: action.id,
+        status: "applied",
+        entityType: action.entityType,
+        entityId: action.entityId,
+        canonicalEntityId: checkIn.id,
+        serverVersion,
+        serverUpdatedAt: checkIn.updatedAt,
+      };
+    }
+    case "UPDATE_PAYMENT": {
+      const payload = updatePaymentPayloadSchema.parse(action.payload);
+      const { checkIn, serverVersion } = await updatePayment({
+        checkInId: action.entityId,
+        sessionId: action.sessionId!,
+        payload,
+      });
+      return {
+        actionId: action.id,
+        status: "applied",
+        entityType: action.entityType,
+        entityId: action.entityId,
+        canonicalEntityId: checkIn.id,
+        serverVersion,
+        serverUpdatedAt: checkIn.updatedAt,
       };
     }
     case "CREATE_QUEUED_MATCH": {
@@ -108,6 +188,24 @@ async function dispatchAction(action: SyncAction): Promise<SyncActionResult> {
     case "COMPLETE_MATCH": {
       const payload = completeMatchPayloadSchema.parse(action.payload);
       const { serverVersion, sideEffects } = await completeMatch({
+        sessionId: action.sessionId!,
+        matchId: action.entityId,
+        result: payload,
+      });
+      return {
+        actionId: action.id,
+        status: "applied",
+        entityType: action.entityType,
+        entityId: action.entityId,
+        canonicalEntityId: action.entityId,
+        serverVersion,
+        serverUpdatedAt: new Date().toISOString(),
+        sideEffects,
+      };
+    }
+    case "UPDATE_MATCH_RESULT": {
+      const payload = updateMatchResultPayloadSchema.parse(action.payload);
+      const { serverVersion, sideEffects } = await updateMatchResult({
         sessionId: action.sessionId!,
         matchId: action.entityId,
         result: payload,

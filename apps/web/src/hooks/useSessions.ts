@@ -23,8 +23,10 @@ export function useSessions(filter: SessionFilter = "all") {
 
   useEffect(() => {
     const sub = liveQuery(async () => {
-      const all = await db.sessions.orderBy("startsAt").reverse().toArray();
-      return all.filter((session) => matchesFilter(session, filter));
+      const all = await db.sessions.toArray();
+      return all
+        .filter((session) => matchesFilter(session, filter))
+        .sort((a, b) => b.startsAt.localeCompare(a.startsAt));
     }).subscribe({
       next: (value) => setSessions(value),
     });

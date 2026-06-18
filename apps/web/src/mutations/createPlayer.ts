@@ -46,7 +46,7 @@ export async function createPlayerLocal(
         await enqueueSyncAction({
           id: options?.syncActionId ?? crypto.randomUUID(),
           organizationId: parsed.organizationId,
-          type: "CREATE_PLAYER",
+          type: "CREATE_PLAYER_PROFILE",
           entityType: "playerProfile",
           entityId: parsed.id,
           sessionId: "",

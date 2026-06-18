@@ -81,4 +81,21 @@ describe("sync-action-labels", () => {
       ).label,
     ).toBe("Record Court 2 result");
   });
+
+  it("labels create player profile with display name", () => {
+    expect(
+      describeSyncAction(
+        {
+          ...paymentAction,
+          id: "a3",
+          type: "CREATE_PLAYER_PROFILE",
+          entityType: "playerProfile",
+          entityId: "player-bogs",
+          sessionId: "",
+          payload: { displayName: "Bogs" },
+        },
+        emptyContext,
+      ).label,
+    ).toBe("Add player Bogs");
+  });
 });

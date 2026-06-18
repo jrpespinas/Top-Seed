@@ -59,6 +59,17 @@ export class TopSeedDatabase extends Dexie {
       matches: "id, sessionId, courtId",
       syncOutbox: "id, sessionId, status, createdAt, blockedByActionId",
     });
+
+    this.version(4).stores({
+      sessions: "id, organizationId, status, startsAt",
+      playerProfiles: "id, organizationId",
+      checkIns: "id, sessionId, playerProfileId, syncStatus",
+      courts: "id, sessionId",
+      queueLanes: "id, sessionId",
+      queuedMatches: "id, sessionId, queueLaneId",
+      matches: "id, sessionId, courtId",
+      syncOutbox: "id, sessionId, status, createdAt, blockedByActionId",
+    });
   }
 }
 

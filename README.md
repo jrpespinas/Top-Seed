@@ -172,7 +172,9 @@ Run `pnpm dev` (not `preview`) to enable these. They do not appear in production
 - **No login in MVP v1** — anyone with the URL can use the organizer UI on that device.
 - **Payments are manual tracking** — “Mark paid” records cash or other off-app payment; there is no card processing.
 
-To reset local data, clear site data for `localhost:5173` in your browser settings.
+To reset local data on this device, open **Sessions** and use **Clear all local data** at the bottom (with confirmation). That wipes IndexedDB only — server rows in PostgreSQL are unchanged.
+
+Alternatively, clear site data for `localhost:5173` (or your preview port) in browser settings.
 
 ---
 
@@ -185,7 +187,9 @@ To reset local data, clear site data for `localhost:5173` in your browser settin
 | Database connection errors | `docker compose up -d`, then `pnpm --filter @top-seed/api db:push` |
 | Port already in use | Stop other apps on 5173 (web) or 3001 (API), or change `API_PORT` in `.env` |
 | Blank page after pull | `pnpm install` then `pnpm --filter @top-seed/contracts build` |
-| Stale or confusing local data | Clear browser storage for localhost, then create a fresh session |
+| Stale or confusing local data | **Sessions** → **Clear all local data** (bottom of page), or clear browser storage for this site |
+| Sync failed: **Player not found** on check-in | Use a current build; ensure API is up → **Review sync issues** → **Retry all failed**. Walk-ins need the server to receive `CREATE_PLAYER_PROFILE` before check-in. |
+| Sync failed: **Session not found** on check-in | Session was not created on the server yet (often when start time is later than check-in timestamps). **Retry all failed** — pending `CREATE_SESSION` / `START_SESSION` rows should sync first. |
 
 ---
 
@@ -220,6 +224,24 @@ packages/
 ```bash
 RUN_DB_TESTS=1 pnpm --filter @top-seed/api test
 ```
+
+### Supported sync replay (API)
+
+The server accepts these `POST /api/v1/sync/actions` types:
+
+| Action | Purpose |
+|--------|---------|
+| `CREATE_PLAYER_PROFILE` (alias `CREATE_PLAYER`) | Walk-in / new player profile |
+| `UPDATE_PLAYER_PROFILE` | Organizer profile edits |
+| `CHECK_IN_PLAYER` | Session check-in |
+| `UPDATE_CHECK_IN` | Queue status, suggestion exclude |
+| `UPDATE_PAYMENT` | Manual payment tracking |
+| `CREATE_QUEUED_MATCH` | Add doubles match to queue |
+| `MOVE_QUEUED_MATCH_TO_COURT` | Assign queued match to court |
+| `START_MATCH` / `COMPLETE_MATCH` | Match lifecycle |
+| `UPDATE_MATCH_RESULT` | Correct completed match result |
+
+Session create/start still use direct REST (`POST /api/v1/sessions`, `POST .../start`). Queue-lane CRUD, `CANCEL_MATCH`, and `COMPLETE_SESSION` sync are not replayed on the server yet.
 
 ---
 

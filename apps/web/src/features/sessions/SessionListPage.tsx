@@ -4,6 +4,8 @@ import { ApiStatusBanner } from "../../components/ApiStatusBanner.js";
 import { OfflineBanner } from "../../components/domain/offline-banner.js";
 import { EmptyState } from "../../components/ui/empty-state.js";
 import { Button } from "../../components/ui/button.js";
+import { ConfirmAction } from "../../components/ui/confirm-action.js";
+import { resetAllLocalData } from "../../lib/reset-local-data.js";
 import { completeSessionLocal } from "../../mutations/completeSession.js";
 import { useSessions, type SessionFilter } from "../../hooks/useSessions.js";
 import { useSyncReviewDrawer } from "../../hooks/useSyncReviewDrawer.js";
@@ -29,6 +31,11 @@ export function SessionListPage() {
     if (sync.connectionStatus === "online") {
       await flushOutbox(sessionId);
     }
+    await sync.refreshCounts();
+  }
+
+  async function handleResetAllLocalData() {
+    await resetAllLocalData();
     await sync.refreshCounts();
   }
 
@@ -111,6 +118,25 @@ export function SessionListPage() {
             </button>
           </p>
         ) : null}
+
+        <section className="rounded-card border border-border bg-surface p-4">
+          <h2 className="text-title font-semibold">Reset local data</h2>
+          <p className="mt-1 text-body text-muted-foreground">
+            Remove every session, player, check-in, queue, match, payment record, and pending sync
+            action from this browser. Server data is not deleted. Use when local state is stuck or
+            you want a clean slate on this device.
+          </p>
+          <div className="mt-3">
+            <ConfirmAction
+              triggerLabel="Clear all local data"
+              title="Clear all local data?"
+              description="This cannot be undone on this device. All sessions and offline work stored in this browser will be permanently removed. Data already synced to the server stays on the server."
+              confirmLabel="Clear everything"
+              variant="danger"
+              onConfirm={handleResetAllLocalData}
+            />
+          </div>
+        </section>
       </section>
       {syncReview.panel}
     </>

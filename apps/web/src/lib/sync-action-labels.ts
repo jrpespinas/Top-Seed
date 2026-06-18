@@ -87,7 +87,13 @@ export function describeSyncAction(
       const name = ctx.playerProfiles.get(action.entityId)?.displayName;
       return { label: name ? `Update ${name}'s profile` : "Update player profile", context: name };
     }
-    case "CREATE_SESSION":
+    case "CREATE_PLAYER_PROFILE":
+    case "CREATE_PLAYER": {
+      const name =
+        String(payload.displayName ?? "") ||
+        ctx.playerProfiles.get(action.entityId)?.displayName;
+      return { label: name ? `Add player ${name}` : "Add player", context: name };
+    }
       return { label: "Create session" };
     case "START_SESSION":
       return { label: "Start session" };

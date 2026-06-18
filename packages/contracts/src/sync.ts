@@ -152,12 +152,18 @@ export const updateCheckInPayloadSchema = z.object({
   paymentNotes: z.string().optional(),
 });
 
-export const createPlayerPayloadSchema = z.object({
+export const createPlayerProfilePayloadSchema = z.object({
   organizationId: z.string(),
   displayName: z.string().min(1),
   defaultSkillRating: z.number().default(3),
   phone: z.string().optional(),
+  gender: z.string().optional(),
+  notes: z.string().optional(),
+  isActive: z.boolean().optional(),
 });
+
+/** @deprecated Prefer createPlayerProfilePayloadSchema */
+export const createPlayerPayloadSchema = createPlayerProfilePayloadSchema;
 
 export type UpdateCheckInPayload = z.infer<typeof updateCheckInPayloadSchema>;
 export type CreateSessionRequest = z.infer<typeof createSessionRequestSchema>;

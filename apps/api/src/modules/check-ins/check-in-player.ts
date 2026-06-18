@@ -82,7 +82,7 @@ export async function checkInPlayer(input: CheckInPlayerInput): Promise<{
     where: { id: input.playerProfileId },
   });
   if (!player) {
-    throw new UseCaseError("VALIDATION_ERROR", "Player not found.");
+    throw new UseCaseError("PLAYER_NOT_FOUND", "Player not found.");
   }
 
   const due = input.paymentAmountDue ?? session.feeAmount;

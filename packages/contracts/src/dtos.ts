@@ -105,3 +105,17 @@ export type CheckInDto = z.infer<typeof checkInDtoSchema>;
 export type LeaderboardEntryDto = z.infer<typeof leaderboardEntryDtoSchema>;
 export type PaymentSummaryDto = z.infer<typeof paymentSummaryDtoSchema>;
 export type HealthData = z.infer<typeof healthDataSchema>;
+
+export const playerProfileDtoSchema = z.object({
+  id: z.string(),
+  organizationId: z.string(),
+  displayName: z.string(),
+  phone: z.string().optional(),
+  defaultSkillRating: z.number(),
+  notes: z.string().optional(),
+  isActive: z.boolean(),
+  createdAt: z.string().datetime(),
+  updatedAt: z.string().datetime(),
+});
+
+export type PlayerProfileDto = z.infer<typeof playerProfileDtoSchema>;
