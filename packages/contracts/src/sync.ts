@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { isoDateTimeSchema } from "./envelopes.js";
+import { paymentStatusSchema } from "./dtos.js";
 
 export const syncParticipantInputSchema = z.object({
   playerProfileId: z.string(),
@@ -160,3 +161,28 @@ export const createPlayerPayloadSchema = z.object({
 
 export type UpdateCheckInPayload = z.infer<typeof updateCheckInPayloadSchema>;
 export type CreateSessionRequest = z.infer<typeof createSessionRequestSchema>;
+
+export const updatePaymentPayloadSchema = z.object({
+  paymentStatus: paymentStatusSchema,
+  paymentAmountDue: z.number().nonnegative(),
+  paymentAmountPaid: z.number().nonnegative(),
+  paymentMethod: z.string(),
+  paymentNotes: z.string(),
+  updatedAt: isoDateTimeSchema,
+});
+
+export const updateMatchResultPayloadSchema = matchResultInputSchema.extend({
+  correctionNote: z.string().optional(),
+});
+
+export const updatePlayerProfilePayloadSchema = z.object({
+  displayName: z.string().min(1),
+  phone: z.string().optional().nullable(),
+  gender: z.string().optional().nullable(),
+  defaultSkillRating: z.number().min(1).max(5),
+  notes: z.string().optional().nullable(),
+});
+
+export type UpdatePaymentPayload = z.infer<typeof updatePaymentPayloadSchema>;
+export type UpdateMatchResultPayload = z.infer<typeof updateMatchResultPayloadSchema>;
+export type UpdatePlayerProfilePayload = z.infer<typeof updatePlayerProfilePayloadSchema>;

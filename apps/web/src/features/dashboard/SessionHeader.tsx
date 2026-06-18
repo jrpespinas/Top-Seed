@@ -77,6 +77,36 @@ export function SessionHeader({
         lastSyncedAt={lastSyncedAt}
         onRetry={onRetrySync}
       />
+      <nav className="flex flex-wrap gap-2 text-caption">
+        <Link
+          to="/organizer/sessions/$sessionId/players"
+          params={{ sessionId: session.id }}
+          className="rounded-control bg-muted px-3 py-1 hover:bg-primary/10"
+        >
+          Players
+        </Link>
+        <Link
+          to="/organizer/sessions/$sessionId/payments"
+          params={{ sessionId: session.id }}
+          className="rounded-control bg-muted px-3 py-1 hover:bg-primary/10"
+        >
+          Payments
+        </Link>
+        <Link
+          to="/organizer/sessions/$sessionId/history"
+          params={{ sessionId: session.id }}
+          className="rounded-control bg-muted px-3 py-1 hover:bg-primary/10"
+        >
+          History
+        </Link>
+        <Link
+          to="/organizer/leaderboard"
+          search={{ sessionId: session.id }}
+          className="rounded-control bg-muted px-3 py-1 hover:bg-primary/10"
+        >
+          Leaderboard
+        </Link>
+      </nav>
       {isLive ? (
         <div className="flex flex-wrap gap-2">
           <ConfirmAction

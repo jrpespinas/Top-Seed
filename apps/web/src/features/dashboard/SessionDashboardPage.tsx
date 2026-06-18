@@ -10,7 +10,10 @@ import { CourtBoard } from "../courts/CourtBoard.js";
 import { NextQueuePanel } from "../queue/NextQueuePanel.js";
 import { PaymentSummaryPanel } from "./PaymentSummaryPanel.js";
 import { RecentMatchesPanel } from "./RecentMatchesPanel.js";
+import { LeaderboardPreview } from "./LeaderboardPreview.js";
 import { ActiveMatchPanel } from "../matches/ActiveMatchPanel.js";
+import { PlayerDetailDrawer } from "../players/PlayerDetailDrawer.js";
+import { MatchCorrectionDrawer } from "../history/MatchHistoryList.js";
 
 export function SessionDashboardPage() {
   const { sessionId } = useParams({ from: "/organizer/sessions/$sessionId/dashboard" });
@@ -20,6 +23,9 @@ export function SessionDashboardPage() {
   const [queueTab, setQueueTab] = useState("waiting");
   const [selectedLaneId, setSelectedLaneId] = useState<string>("");
   const [activeMatchId, setActiveMatchId] = useState<string | null>(null);
+  const [selectedCheckInId, setSelectedCheckInId] = useState<string | null>(null);
+  const [correctMatchId, setCorrectMatchId] = useState<string | null>(null);
+  const [correctedMatchIds, setCorrectedMatchIds] = useState<Set<string>>(new Set());
 
   const resolvedLaneId = useMemo(() => {
     if (selectedLaneId) {
@@ -67,8 +73,12 @@ export function SessionDashboardPage() {
           suggestionExcludeNote: input.suggestionExcludeNote,
         })
       }
+      onOpenPlayerDetails={setSelectedCheckInId}
     />
   );
+
+  const correctMatch =
+    dashboard.matches.find((match) => match.id === correctMatchId) ?? null;
 
   const courts = (
     <CourtBoard
@@ -96,13 +106,18 @@ export function SessionDashboardPage() {
         summary={dashboard.paymentSummary}
         checkIns={dashboard.checkIns}
         sessionId={sessionId}
+        sessionMode={dashboard.sessionMode}
       />
       <RecentMatchesPanel
         sessionId={sessionId}
         matches={dashboard.recentMatches}
         courts={dashboard.courts}
         checkIns={dashboard.checkIns}
+        sessionMode={dashboard.sessionMode}
+        correctedMatchIds={correctedMatchIds}
+        onCorrectMatch={setCorrectMatchId}
       />
+      <LeaderboardPreview sessionId={sessionId} />
     </div>
   );
 
@@ -168,25 +183,29 @@ export function SessionDashboardPage() {
         onComplete={(result) => dashboard.actions.completeMatch(activeMatch!.id, result)}
         onCancel={() => dashboard.actions.cancelMatch(activeMatch!.id)}
       />
+      <PlayerDetailDrawer
+        sessionId={sessionId}
+        checkInId={selectedCheckInId}
+        isOpen={selectedCheckInId !== null}
+        onOpenChange={(open) => {
+          if (!open) {
+            setSelectedCheckInId(null);
+          }
+        }}
+      />
+      <MatchCorrectionDrawer
+        sessionId={sessionId}
+        match={correctMatch}
+        isOpen={correctMatchId !== null}
+        onOpenChange={(open) => {
+          if (!open) {
+            setCorrectMatchId(null);
+          }
+        }}
+        onCorrected={(matchId) => {
+          setCorrectedMatchIds((current) => new Set([...current, matchId]));
+        }}
+      />
     </div>
   );
-}
-
-function PhaseSevenStub({ title }: { title: string }) {
-  return (
-    <section className="rounded-card border border-border bg-surface p-6">
-      <h1 className="text-heading font-semibold">{title}</h1>
-      <p className="mt-2 text-body text-muted-foreground">Full page arrives in Phase 7.</p>
-    </section>
-  );
-}
-
-export function SessionPaymentsStubPage() {
-  const { sessionId } = useParams({ from: "/organizer/sessions/$sessionId/payments" });
-  return <PhaseSevenStub title={`Payments — ${sessionId}`} />;
-}
-
-export function SessionHistoryStubPage() {
-  const { sessionId } = useParams({ from: "/organizer/sessions/$sessionId/history" });
-  return <PhaseSevenStub title={`Match history — ${sessionId}`} />;
 }

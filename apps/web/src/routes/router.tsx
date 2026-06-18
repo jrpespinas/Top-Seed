@@ -6,16 +6,17 @@ import {
   createRouter,
   redirect,
 } from "@tanstack/react-router";
+import { z } from "zod";
 import { ApiStatusBanner } from "../components/ApiStatusBanner";
 import { LocalSessionDevHarness } from "../components/LocalSessionDevHarness";
 import { ComponentGallery } from "../pages/dev/ComponentGallery";
 import { SessionListPage } from "../features/sessions/SessionListPage";
 import { NewSessionPage } from "../features/sessions/NewSessionPage";
-import {
-  SessionDashboardPage,
-  SessionHistoryStubPage,
-  SessionPaymentsStubPage,
-} from "../features/dashboard/SessionDashboardPage";
+import { SessionDashboardPage } from "../features/dashboard/SessionDashboardPage";
+import { SessionPaymentsPage } from "../features/payments/SessionPaymentsPage";
+import { SessionHistoryPage } from "../features/history/SessionHistoryPage";
+import { LeaderboardPage } from "../features/leaderboard/LeaderboardPage";
+import { SessionPlayersPage } from "../features/players/SessionPlayersPage";
 import { db } from "../db/database";
 
 function RootLayout() {
@@ -27,6 +28,9 @@ function RootLayout() {
           <nav className="flex gap-4 text-sm">
             <Link to="/organizer/sessions" className="hover:text-primary">
               Sessions
+            </Link>
+            <Link to="/organizer/leaderboard" className="hover:text-primary">
+              Leaderboard
             </Link>
             {import.meta.env.DEV ? (
               <Link to="/dev/components" className="hover:text-primary">
@@ -110,13 +114,31 @@ const dashboardRoute = createRoute({
 const paymentsRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/organizer/sessions/$sessionId/payments",
-  component: SessionPaymentsStubPage,
+  validateSearch: z.object({
+    status: z.enum(["all", "unpaid", "partial", "paid", "waived", "refunded"]).optional(),
+  }),
+  component: SessionPaymentsPage,
 });
 
 const historyRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/organizer/sessions/$sessionId/history",
-  component: SessionHistoryStubPage,
+  component: SessionHistoryPage,
+});
+
+const playersRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/organizer/sessions/$sessionId/players",
+  component: SessionPlayersPage,
+});
+
+const leaderboardRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/organizer/leaderboard",
+  validateSearch: z.object({
+    sessionId: z.string().optional(),
+  }),
+  component: LeaderboardPage,
 });
 
 const devHarnessRoute = createRoute({
@@ -138,6 +160,8 @@ const routeTree = rootRoute.addChildren([
   dashboardRoute,
   paymentsRoute,
   historyRoute,
+  playersRoute,
+  leaderboardRoute,
   devHarnessRoute,
   devComponentsRoute,
 ]);
