@@ -100,8 +100,42 @@ export const startMatchPayloadSchema = z.object({
 
 export const completeMatchPayloadSchema = matchResultInputSchema;
 
+export const createSessionPayloadSchema = z.object({
+  name: z.string(),
+  venueName: z.string(),
+  startsAt: isoDateTimeSchema,
+  endsAt: isoDateTimeSchema.optional().nullable(),
+  feeAmount: z.number().nonnegative(),
+  currency: z.string(),
+  queueMode: z.enum(["suggested", "manual"]),
+  ratingMode: z.enum(["casual", "rated"]),
+  requirePaymentBeforePlay: z.boolean().optional(),
+});
+
+export const startSessionPayloadSchema = z.object({
+  startedAt: isoDateTimeSchema.optional(),
+});
+
+export const completeSessionPayloadSchema = z.object({
+  completedAt: isoDateTimeSchema.optional(),
+});
+
+export const createSessionRequestSchema = z.object({
+  id: z.string(),
+  organizationId: z.string(),
+  name: z.string(),
+  venueName: z.string(),
+  startsAt: isoDateTimeSchema,
+  feeAmount: z.number().int().nonnegative(),
+  currency: z.string().optional(),
+  queueMode: z.enum(["suggested", "manual"]).optional(),
+  ratingMode: z.enum(["casual", "rated"]).optional(),
+  courtCount: z.number().int().min(2).max(8).optional(),
+});
+
 export type SyncAction = z.infer<typeof syncActionSchema>;
 export type SyncActionsRequest = z.infer<typeof syncActionsRequestSchema>;
 export type SyncActionResult = z.infer<typeof syncActionResultSchema>;
 export type SyncParticipantInput = z.infer<typeof syncParticipantInputSchema>;
 export type MatchResultInput = z.infer<typeof matchResultInputSchema>;
+export type CreateSessionRequest = z.infer<typeof createSessionRequestSchema>;

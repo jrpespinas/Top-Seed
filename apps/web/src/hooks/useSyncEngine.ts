@@ -28,7 +28,7 @@ export function useSyncEngine(sessionId?: string) {
   }, [sessionId]);
 
   const runSync = useCallback(async () => {
-    if (!sessionId || !getConnectionStatus()) {
+    if (!getConnectionStatus()) {
       return;
     }
     setSyncStatus("syncing");
@@ -43,9 +43,6 @@ export function useSyncEngine(sessionId?: string) {
   }, [sessionId, refreshCounts]);
 
   const retry = useCallback(async () => {
-    if (!sessionId) {
-      return;
-    }
     setSyncStatus("syncing");
     await retryFailedOutbox(sessionId);
     await refreshCounts();
@@ -68,10 +65,10 @@ export function useSyncEngine(sessionId?: string) {
   }, [runSync]);
 
   useEffect(() => {
-    if (connectionStatus === "online" && sessionId) {
+    if (connectionStatus === "online") {
       void runSync();
     }
-  }, [connectionStatus, sessionId, runSync]);
+  }, [connectionStatus, runSync]);
 
   return {
     connectionStatus,

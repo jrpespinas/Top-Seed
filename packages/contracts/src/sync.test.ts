@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 import {
   syncActionsRequestSchema,
   createQueuedMatchPayloadSchema,
+  createSessionPayloadSchema,
+  startSessionPayloadSchema,
   moveQueuedMatchToCourtPayloadSchema,
   completeMatchPayloadSchema,
 } from "@top-seed/contracts";
@@ -42,6 +44,27 @@ describe("sync payload contracts", () => {
       endedAt: "2026-06-09T14:50:00.000Z",
     });
     expect(payload.outcome).toBe("team_one_win");
+  });
+
+  it("parses CREATE_SESSION payload", () => {
+    const payload = createSessionPayloadSchema.parse({
+      name: "Friday Open Play",
+      venueName: "Main Hall",
+      startsAt: "2026-06-09T18:00:00.000Z",
+      feeAmount: 150,
+      currency: "PHP",
+      queueMode: "suggested",
+      ratingMode: "casual",
+      requirePaymentBeforePlay: false,
+    });
+    expect(payload.ratingMode).toBe("casual");
+  });
+
+  it("parses START_SESSION payload", () => {
+    const payload = startSessionPayloadSchema.parse({
+      startedAt: "2026-06-09T18:00:00.000Z",
+    });
+    expect(payload.startedAt).toBeTruthy();
   });
 
   it("parses sync batch request", () => {

@@ -9,6 +9,10 @@ import {
 import { ApiStatusBanner } from "../components/ApiStatusBanner";
 import { LocalSessionDevHarness } from "../components/LocalSessionDevHarness";
 import { ComponentGallery } from "../pages/dev/ComponentGallery";
+import { SessionListPage } from "../features/sessions/SessionListPage";
+import { NewSessionPage } from "../features/sessions/NewSessionPage";
+import { SessionDashboardPlaceholder } from "../features/sessions/SessionDashboardPlaceholder";
+import { db } from "../db/database";
 
 function RootLayout() {
   return (
@@ -35,16 +39,6 @@ function RootLayout() {
   );
 }
 
-function PlaceholderPage({ title, description }: { title: string; description: string }) {
-  return (
-    <section className="rounded-lg border border-border bg-white p-6 shadow-sm">
-      <h1 className="text-2xl font-semibold">{title}</h1>
-      <p className="mt-2 text-muted-foreground">{description}</p>
-      <p className="mt-4 rounded-md bg-muted px-3 py-2 text-sm">Phase 0 scaffold — UI lands in later phases.</p>
-    </section>
-  );
-}
-
 function DevComponentsPage() {
   if (!import.meta.env.DEV) {
     return (
@@ -56,36 +50,19 @@ function DevComponentsPage() {
   return <ComponentGallery />;
 }
 
-function SessionsPage() {
+function DevHarnessPage() {
+  if (!import.meta.env.DEV) {
+    return (
+      <section className="rounded-lg border border-border bg-white p-6 shadow-sm">
+        <h1 className="text-2xl font-semibold">Not found</h1>
+      </section>
+    );
+  }
   return (
     <>
       <ApiStatusBanner />
-      <section className="rounded-lg border border-border bg-white p-6 shadow-sm">
-        <h1 className="text-2xl font-semibold">Sessions</h1>
-        <p className="mt-2 text-muted-foreground">
-          Organizer session list. Create and open live sessions from here.
-        </p>
-        {import.meta.env.DEV ? <LocalSessionDevHarness /> : null}
-      </section>
+      <LocalSessionDevHarness />
     </>
-  );
-}
-
-function NewSessionPage() {
-  return (
-    <PlaceholderPage
-      title="New session"
-      description="Create a new open-play session with venue, fee, and queue settings."
-    />
-  );
-}
-
-function DashboardPage() {
-  return (
-    <PlaceholderPage
-      title="Live dashboard"
-      description="Court board, queue lanes, check-in, and match flow for the active session."
-    />
   );
 }
 
@@ -96,7 +73,14 @@ const rootRoute = createRootRoute({
 const indexRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/",
-  beforeLoad: () => {
+  beforeLoad: async () => {
+    const active = await db.sessions.where("status").equals("active").toArray();
+    if (active.length === 1 && active[0]) {
+      throw redirect({
+        to: "/organizer/sessions/$sessionId/dashboard",
+        params: { sessionId: active[0].id },
+      });
+    }
     throw redirect({ to: "/organizer/sessions" });
   },
 });
@@ -104,7 +88,7 @@ const indexRoute = createRoute({
 const sessionsRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/organizer/sessions",
-  component: SessionsPage,
+  component: SessionListPage,
 });
 
 const newSessionRoute = createRoute({
@@ -116,7 +100,13 @@ const newSessionRoute = createRoute({
 const dashboardRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/organizer/sessions/$sessionId/dashboard",
-  component: DashboardPage,
+  component: SessionDashboardPlaceholder,
+});
+
+const devHarnessRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/organizer/sessions/dev-harness",
+  component: DevHarnessPage,
 });
 
 const devComponentsRoute = createRoute({
@@ -130,8 +120,11 @@ const routeTree = rootRoute.addChildren([
   sessionsRoute,
   newSessionRoute,
   dashboardRoute,
+  devHarnessRoute,
   devComponentsRoute,
 ]);
+
+export { routeTree };
 
 export const router = createRouter({ routeTree });
 
