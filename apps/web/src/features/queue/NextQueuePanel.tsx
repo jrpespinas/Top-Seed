@@ -23,8 +23,8 @@ export function NextQueuePanel({ dashboard, selectedLaneId, onSelectLane }: Next
     : null;
 
   return (
-    <section className="space-y-4 rounded-card border border-border bg-surface p-4">
-      <h2 className="text-title font-semibold">Next queue</h2>
+    <section className="space-y-4 rounded-card border border-border bg-surface p-4 lg:rounded-none lg:border-0 lg:bg-transparent lg:p-0">
+      <h2 className="text-title font-semibold lg:hidden">Next queue</h2>
       <SuggestionStrip
         sessionMode={dashboard.sessionMode}
         queueMode={dashboard.session?.queueMode ?? "suggested"}

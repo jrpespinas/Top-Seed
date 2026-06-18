@@ -5,6 +5,7 @@ import {
   createRoute,
   createRouter,
   redirect,
+  useRouterState,
 } from "@tanstack/react-router";
 import { z } from "zod";
 import { ApiStatusBanner } from "../components/ApiStatusBanner";
@@ -20,10 +21,16 @@ import { SessionPlayersPage } from "../features/players/SessionPlayersPage";
 import { db } from "../db/database";
 
 function RootLayout() {
+  const pathname = useRouterState({ select: (state) => state.location.pathname });
+  const isSessionWorkspace = /^\/organizer\/sessions\/[^/]+\/(dashboard|payments|history|players)/.test(
+    pathname,
+  );
+  const shellWidth = isSessionWorkspace ? "max-w-[1400px]" : "max-w-6xl";
+
   return (
     <div className="min-h-screen">
       <header className="border-b border-border bg-white px-4 py-3">
-        <div className="mx-auto flex max-w-6xl items-center justify-between">
+        <div className={`mx-auto flex ${shellWidth} items-center justify-between`}>
           <span className="text-lg font-semibold text-primary">Top Seed</span>
           <nav className="flex gap-4 text-sm">
             <Link to="/organizer/sessions" className="hover:text-primary">
@@ -40,7 +47,7 @@ function RootLayout() {
           </nav>
         </div>
       </header>
-      <main className="mx-auto max-w-6xl p-4">
+      <main className={`mx-auto ${shellWidth} p-4`}>
         <Outlet />
       </main>
     </div>

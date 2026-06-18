@@ -12,6 +12,8 @@ Read first:
 MVP organizer queue and detail behavior is specified in:
 
 - `docs/specs/frontend/organizer-components.md` — **canonical component registry** (names, aliases, composition tree)
+- `docs/specs/frontend/features/organizer/live-dashboard-layout.md` — **desktop pegboard layout**, zones, empty states, validation checklist
+- `docs/specs/frontend/features/organizer/attention-rail.md` — exception strip (sync, unpaid)
 - `docs/specs/frontend/features/organizer/next-queue-panel.md`
 - `docs/specs/frontend/features/organizer/queue-lane-management.md`
 - `docs/specs/frontend/features/organizer/player-pool.md`

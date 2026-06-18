@@ -73,6 +73,71 @@ describe.skipIf(!hasDatabase)("walk-in golden chain", () => {
     );
   });
 
+  it("applies duplicate CHECK_IN_PLAYER with a new action id when check-in already exists", async () => {
+    await resetDatabase();
+    const { sessionId } = await seedBaseFixtures();
+    const app = await buildApp();
+
+    const checkInAction = {
+      id: "sync-checkin-bogs",
+      type: "CHECK_IN_PLAYER",
+      entityType: "checkIn",
+      entityId: "ci-bogs",
+      sessionId,
+      createdAt: "2026-06-09T18:01:00.000Z",
+      payload: {
+        sessionId,
+        playerProfileId: "player-bogs",
+        arrivalOrder: 5,
+        checkedInAt: "2026-06-09T18:01:00.000Z",
+        sessionSkillRating: 3,
+        paymentAmountDue: 250,
+      },
+    };
+
+    await app.inject({
+      method: "POST",
+      url: "/api/v1/sync/actions",
+      payload: {
+        organizationId: ORG_ID,
+        deviceId: DEVICE_ID,
+        actions: [
+          {
+            id: "sync-create-bogs",
+            type: "CREATE_PLAYER_PROFILE",
+            entityType: "playerProfile",
+            entityId: "player-bogs",
+            createdAt: "2026-06-09T18:00:00.000Z",
+            payload: {
+              organizationId: ORG_ID,
+              displayName: "Bogs",
+              defaultSkillRating: 3,
+            },
+          },
+          checkInAction,
+        ],
+      },
+    });
+
+    const retry = await app.inject({
+      method: "POST",
+      url: "/api/v1/sync/actions",
+      payload: {
+        organizationId: ORG_ID,
+        deviceId: "device-bootstrap-retry",
+        actions: [
+          {
+            ...checkInAction,
+            id: "bootstrap-checkin-bogs",
+          },
+        ],
+      },
+    });
+    expect(retry.statusCode).toBe(200);
+    const retryBody = JSON.parse(retry.body);
+    expect(retryBody.results[0]?.status).toBe("applied");
+  });
+
   it("accepts legacy CREATE_PLAYER alias", async () => {
     await resetDatabase();
     await seedBaseFixtures();
@@ -238,5 +303,291 @@ describe.skipIf(!hasDatabase)("phase 7 sync actions", () => {
     const profile = await prisma.playerProfile.findUnique({ where: { id: "player-ana" } });
     expect(profile?.displayName).toBe("Ana Updated");
     expect(profile?.defaultSkillRating).toBe(4);
+  });
+
+  it("replays CREATE_QUEUE_LANE for organizer-added lanes", async () => {
+    await resetDatabase();
+    const { sessionId } = await seedBaseFixtures();
+    const app = await buildApp();
+
+    const response = await app.inject({
+      method: "POST",
+      url: "/api/v1/sync/actions",
+      payload: {
+        organizationId: ORG_ID,
+        deviceId: DEVICE_ID,
+        actions: [
+          {
+            id: "sync-create-lane-2",
+            type: "CREATE_QUEUE_LANE",
+            entityType: "queueLane",
+            entityId: "lane-queue-2",
+            sessionId,
+            createdAt: "2026-06-09T18:05:00.000Z",
+            payload: {
+              sessionId,
+              name: "Priority",
+              sortOrder: 1,
+            },
+          },
+        ],
+      },
+    });
+
+    expect(response.statusCode).toBe(200);
+    const body = JSON.parse(response.body);
+    expect(body.results[0]?.status).toBe("applied");
+
+    const lane = await prisma.queueLane.findUnique({ where: { id: "lane-queue-2" } });
+    expect(lane?.name).toBe("Priority");
+    expect(lane?.sortOrder).toBe(1);
+  });
+
+  it("replays REMOVE_QUEUED_MATCH and releases players to waiting", async () => {
+    await resetDatabase();
+    const { sessionId, laneId } = await seedBaseFixtures();
+    const app = await buildApp();
+
+    await app.inject({
+      method: "POST",
+      url: "/api/v1/sync/actions",
+      payload: {
+        organizationId: ORG_ID,
+        deviceId: DEVICE_ID,
+        actions: [
+          {
+            id: "sync-create-qm",
+            type: "CREATE_QUEUED_MATCH",
+            entityType: "queuedMatch",
+            entityId: "qm-1",
+            sessionId,
+            createdAt: "2026-06-09T18:10:00.000Z",
+            payload: {
+              sessionId,
+              queueLaneId: laneId,
+              sortOrder: 0,
+              status: "draft",
+              createdFrom: "manual",
+              participants: [
+                {
+                  playerProfileId: "player-ana",
+                  checkInId: "ci-ana",
+                  team: "team_one",
+                  slotOrder: 1,
+                },
+              ],
+            },
+          },
+        ],
+      },
+    });
+
+    const removeResponse = await app.inject({
+      method: "POST",
+      url: "/api/v1/sync/actions",
+      payload: {
+        organizationId: ORG_ID,
+        deviceId: DEVICE_ID,
+        actions: [
+          {
+            id: "sync-remove-qm",
+            type: "REMOVE_QUEUED_MATCH",
+            entityType: "queuedMatch",
+            entityId: "qm-1",
+            sessionId,
+            createdAt: "2026-06-09T18:11:00.000Z",
+            payload: {},
+          },
+        ],
+      },
+    });
+
+    expect(removeResponse.statusCode).toBe(200);
+    const body = JSON.parse(removeResponse.body);
+    expect(body.results[0]?.status).toBe("applied");
+
+    const queuedMatch = await prisma.queuedMatch.findUnique({ where: { id: "qm-1" } });
+    expect(queuedMatch?.status).toBe("removed");
+
+    const checkIn = await prisma.checkIn.findUnique({ where: { id: "ci-ana" } });
+    expect(checkIn?.queueStatus).toBe("waiting");
+  });
+
+  it("replays CREATE_COURT and DELETE_COURT", async () => {
+    await resetDatabase();
+    const { sessionId } = await seedBaseFixtures();
+    const app = await buildApp();
+
+    const createResponse = await app.inject({
+      method: "POST",
+      url: "/api/v1/sync/actions",
+      payload: {
+        organizationId: ORG_ID,
+        deviceId: DEVICE_ID,
+        actions: [
+          {
+            id: "sync-create-court-4",
+            type: "CREATE_COURT",
+            entityType: "court",
+            entityId: "court-4",
+            sessionId,
+            createdAt: "2026-06-09T18:12:00.000Z",
+            payload: {
+              sessionId,
+              name: "Court 4",
+              sortOrder: 3,
+              status: "open",
+            },
+          },
+        ],
+      },
+    });
+    expect(createResponse.statusCode).toBe(200);
+    expect(JSON.parse(createResponse.body).results[0]?.status).toBe("applied");
+
+    const deleteResponse = await app.inject({
+      method: "POST",
+      url: "/api/v1/sync/actions",
+      payload: {
+        organizationId: ORG_ID,
+        deviceId: DEVICE_ID,
+        actions: [
+          {
+            id: "sync-delete-court-4",
+            type: "DELETE_COURT",
+            entityType: "court",
+            entityId: "court-4",
+            sessionId,
+            createdAt: "2026-06-09T18:13:00.000Z",
+            payload: {},
+          },
+        ],
+      },
+    });
+    expect(deleteResponse.statusCode).toBe(200);
+    expect(JSON.parse(deleteResponse.body).results[0]?.status).toBe("applied");
+
+    const court = await prisma.court.findUnique({ where: { id: "court-4" } });
+    expect(court).toBeNull();
+  });
+
+  it("fails DELETE_COURT with a clear error when the court has match history", async () => {
+    await resetDatabase();
+    const { sessionId } = await seedBaseFixtures();
+    await prisma.court.create({
+      data: { id: "court-2", sessionId, name: "Court 2", sortOrder: 1 },
+    });
+    await prisma.match.create({
+      data: {
+        id: "match-on-court-1",
+        sessionId,
+        courtId: "court-1",
+        status: "completed",
+        outcome: "team_one_win",
+        winningTeam: "team_one",
+      },
+    });
+    const app = await buildApp();
+
+    const deleteResponse = await app.inject({
+      method: "POST",
+      url: "/api/v1/sync/actions",
+      payload: {
+        organizationId: ORG_ID,
+        deviceId: DEVICE_ID,
+        actions: [
+          {
+            id: "sync-delete-court-with-history",
+            type: "DELETE_COURT",
+            entityType: "court",
+            entityId: "court-1",
+            sessionId,
+            createdAt: "2026-06-09T18:13:00.000Z",
+            payload: {},
+          },
+        ],
+      },
+    });
+
+    expect(deleteResponse.statusCode).toBe(200);
+    const body = JSON.parse(deleteResponse.body);
+    expect(body.results[0]?.status).toBe("failed");
+    expect(body.results[0]?.message).toMatch(/match history/i);
+
+    const court = await prisma.court.findUnique({ where: { id: "court-1" } });
+    expect(court).not.toBeNull();
+  });
+
+  it("replays UPDATE_COURT by creating the court when it is missing on the server", async () => {
+    await resetDatabase();
+    const { sessionId } = await seedBaseFixtures();
+    const app = await buildApp();
+
+    const response = await app.inject({
+      method: "POST",
+      url: "/api/v1/sync/actions",
+      payload: {
+        organizationId: ORG_ID,
+        deviceId: DEVICE_ID,
+        actions: [
+          {
+            id: "sync-update-missing-court",
+            type: "UPDATE_COURT",
+            entityType: "court",
+            entityId: "court-2",
+            sessionId,
+            createdAt: "2026-06-09T18:14:00.000Z",
+            payload: {
+              name: "Court 2",
+              sortOrder: 1,
+              status: "open",
+            },
+          },
+        ],
+      },
+    });
+
+    expect(response.statusCode).toBe(200);
+    const body = JSON.parse(response.body);
+    expect(body.results[0]?.status).toBe("applied");
+
+    const court = await prisma.court.findUnique({ where: { id: "court-2" } });
+    expect(court?.name).toBe("Court 2");
+    expect(court?.sortOrder).toBe(1);
+  });
+
+  it("replays UPDATE_COURT with only a name by upserting the missing court", async () => {
+    await resetDatabase();
+    const { sessionId } = await seedBaseFixtures();
+    const app = await buildApp();
+
+    const response = await app.inject({
+      method: "POST",
+      url: "/api/v1/sync/actions",
+      payload: {
+        organizationId: ORG_ID,
+        deviceId: DEVICE_ID,
+        actions: [
+          {
+            id: "sync-update-missing-court-name-only",
+            type: "UPDATE_COURT",
+            entityType: "court",
+            entityId: "court-2",
+            sessionId,
+            createdAt: "2026-06-09T18:15:00.000Z",
+            payload: {
+              name: "Court 2",
+            },
+          },
+        ],
+      },
+    });
+
+    expect(response.statusCode).toBe(200);
+    const body = JSON.parse(response.body);
+    expect(body.results[0]?.status).toBe("applied");
+
+    const court = await prisma.court.findUnique({ where: { id: "court-2" } });
+    expect(court?.name).toBe("Court 2");
   });
 });

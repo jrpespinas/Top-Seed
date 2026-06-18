@@ -5,6 +5,9 @@ import { useSessionDashboard } from "../../hooks/useSessionDashboard.js";
 import { useSyncReviewDrawer } from "../../hooks/useSyncReviewDrawer.js";
 import { SessionHeader } from "./SessionHeader.js";
 import { SessionStatusBar } from "./SessionStatusBar.js";
+import { AttentionRail } from "./AttentionRail.js";
+import { PegboardLayout } from "./PegboardLayout.js";
+import { SupportingStrip } from "./SupportingStrip.js";
 import { PlayerPool } from "./PlayerPool.js";
 import { CourtBoard } from "../courts/CourtBoard.js";
 import { NextQueuePanel } from "../queue/NextQueuePanel.js";
@@ -89,6 +92,22 @@ export function SessionDashboardPage() {
       sessionMode={dashboard.sessionMode}
       onStartMatch={dashboard.actions.startMatch}
       onOpenMatch={setActiveMatchId}
+      onAddCourt={() => void dashboard.actions.addCourt()}
+      onDeleteCourt={(courtId) => void dashboard.actions.deleteCourt(courtId)}
+    />
+  );
+
+  const courtsPegboard = (
+    <CourtBoard
+      courts={dashboard.courts}
+      matches={dashboard.matches}
+      checkIns={dashboard.checkIns}
+      sessionMode={dashboard.sessionMode}
+      layout="pegboard"
+      onStartMatch={dashboard.actions.startMatch}
+      onOpenMatch={setActiveMatchId}
+      onAddCourt={() => void dashboard.actions.addCourt()}
+      onDeleteCourt={(courtId) => void dashboard.actions.deleteCourt(courtId)}
     />
   );
 
@@ -102,6 +121,15 @@ export function SessionDashboardPage() {
 
   const more = (
     <div className="space-y-4">
+      <SessionStatusBar
+        session={dashboard.session}
+        metrics={dashboard.metrics}
+        onFilterWaiting={() => {
+          setQueueTab("waiting");
+          setMobileTab("available");
+        }}
+        onFilterUnpaid={() => setMobileTab("more")}
+      />
       <PaymentSummaryPanel
         session={dashboard.session}
         summary={dashboard.paymentSummary}
@@ -128,37 +156,50 @@ export function SessionDashboardPage() {
         session={dashboard.session}
         courtCount={dashboard.courts.length}
         sessionMode={dashboard.sessionMode}
-        connectionStatus={sync.connectionStatus}
         syncStatus={sync.syncStatus}
         pendingCount={sync.pendingCount}
-        failedCount={sync.failedCount}
         blockedCount={sync.blockedCount}
         lastSyncedAt={sync.lastSyncedAt}
-        onCompleteSession={dashboard.actions.completeSession}
-        onRetrySync={() => void sync.retry()}
-        onReviewSyncIssues={syncReview.openReview}
       />
 
-      <SessionStatusBar
-        session={dashboard.session}
-        metrics={dashboard.metrics}
-        onFilterWaiting={() => {
-          setQueueTab("waiting");
-          setMobileTab("available");
-        }}
-        onFilterUnpaid={() => setMobileTab("more")}
-      />
+      <div className="hidden lg:block">
+        <AttentionRail
+          sessionId={sessionId}
+          unpaidCount={dashboard.metrics.unpaid}
+          connectionStatus={sync.connectionStatus}
+          syncStatus={sync.syncStatus}
+          pendingCount={sync.pendingCount}
+          failedCount={sync.failedCount}
+          blockedCount={sync.blockedCount}
+          lastSyncedAt={sync.lastSyncedAt}
+          onRetrySync={() => void sync.retry()}
+          onReviewSyncIssues={syncReview.openReview}
+        />
+      </div>
 
-      <div className="hidden gap-4 lg:grid lg:grid-cols-[minmax(240px,1fr)_minmax(320px,1.4fr)_minmax(260px,1fr)]">
-        <div>{pool}</div>
-        <div>{courts}</div>
-        <div>{nextQueue}</div>
+      <div className="hidden lg:block">
+        <PegboardLayout available={pool} next={nextQueue} now={courtsPegboard} />
+      </div>
+
+      <div className="hidden lg:block">
+        <SupportingStrip
+          session={dashboard.session}
+          collected={dashboard.metrics.collected}
+          expectedTotal={dashboard.paymentSummary?.expectedTotal ?? 0}
+          recentMatches={dashboard.recentMatches}
+          checkIns={dashboard.checkIns}
+          courts={dashboard.courts}
+          sessionId={sessionId}
+          sessionMode={dashboard.sessionMode}
+          checkedInCount={dashboard.metrics.checkedIn}
+          onCompleteSession={dashboard.actions.completeSession}
+        />
       </div>
 
       <div className="hidden gap-4 md:grid md:grid-cols-2 lg:hidden">
-        <div>{courts}</div>
+        <div>{pool}</div>
         <div>{nextQueue}</div>
-        <div className="md:col-span-2">{pool}</div>
+        <div className="md:col-span-2">{courts}</div>
       </div>
 
       <div className="lg:hidden">
@@ -172,10 +213,6 @@ export function SessionDashboardPage() {
           ]}
           defaultValue={mobileTab}
         />
-      </div>
-
-      <div className="hidden gap-4 lg:grid lg:grid-cols-2">
-        {more}
       </div>
 
       <ActiveMatchPanel

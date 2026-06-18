@@ -10,6 +10,22 @@ import type { OutboxAction } from "../db/types.js";
 
 const apiBaseUrl = import.meta.env.VITE_API_URL ?? "";
 
+async function parseJsonResponse(response: Response): Promise<unknown> {
+  const text = await response.text();
+  if (!text.trim()) {
+    throw new Error(
+      response.ok
+        ? "API returned an empty response. Is the server running?"
+        : `API request failed (${response.status}) with an empty response. Is the server running?`,
+    );
+  }
+  try {
+    return JSON.parse(text);
+  } catch {
+    throw new Error(`API returned invalid JSON (status ${response.status}).`);
+  }
+}
+
 export async function postSyncActions(
   request: SyncActionsRequest,
 ): Promise<SyncActionsResponse> {
@@ -20,7 +36,7 @@ export async function postSyncActions(
     body: JSON.stringify(body),
   });
 
-  const json: unknown = await response.json();
+  const json: unknown = await parseJsonResponse(response);
   if (!response.ok) {
     throw new Error(
       typeof json === "object" && json !== null && "error" in json

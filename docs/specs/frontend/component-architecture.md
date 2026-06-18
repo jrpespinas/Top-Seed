@@ -30,24 +30,31 @@ Secondary emphasis:
 
 ## Dashboard Composition Model
 
-The organizer dashboard should be court-first and pegboard-inspired.
+The organizer dashboard should be court-first and pegboard-inspired. **Canonical desktop layout:** `docs/specs/frontend/features/organizer/live-dashboard-layout.md`.
 
-Desktop composition:
+Desktop composition (≥1280px):
 
-- Left: `PlayerPool`, combining quick check-in, search, waiting/resting players, and payment badges.
-- Center: `CourtBoard`, showing courts as spatial containers with Team A / Team B slots.
-- Right: `NextQueuePanel`, showing one or more queue lanes, multiple lined-up matches, and accept/manual assignment actions.
-- Bottom/supporting area: recent matches, payment exceptions, and leaderboard shortcut.
+- **Session chrome:** `SessionHeader` (compact; see `session-header.md`).
+- **Attention rail (conditional):** `AttentionRail` — unpaid, sync failure, offline only (`attention-rail.md`). Do **not** render a six-tile `SessionStatusBar` on desktop.
+- **Pegboard (`PegboardLayout`):** three columns without page scroll for core ops (~70vh min):
+  - Left (~22%): `PlayerPool` — compact check-in + waiting list.
+  - Center (~48%): `CourtBoard` — horizontal court strip for 3 courts; largest zone typography.
+  - Right (~30%): `NextQueuePanel` — suggestions, lanes, send to court.
+- **Supporting strip:** `SupportingStrip` — one muted row (collected total, last match teaser, links). Hidden until first check-in. **Not** full-width `PaymentSummaryPanel` / `RecentMatchesPanel` / `LeaderboardPreview` cards.
+
+**Deprecated desktop pattern:** pegboard grid followed by a separate `lg:grid-cols-2` block for payments, history, and leaderboard. That layout buries courts and reads as a generic admin dashboard.
 
 Tablet composition:
 
 - Keep `CourtBoard` and `NextQueuePanel` visible together.
 - Place `PlayerPool` below or beside them depending on available width.
-- Keep recent matches and payment exceptions secondary.
+- Use `AttentionRail` or compact chips — not the full metric strip.
+- Do not copy the deprecated full-width secondary card stack.
 
 Mobile composition:
 
 - Use bottom tabs on phone when possible: **Now** (default) | **Next** | **Available** | **More**.
+- `SessionStatusBar` remains acceptable on the **More** tab.
 - Fallback single-column stack: sync → courts → next queue → check-in → player pool → payments → recent matches.
 - Do not require drag-and-drop on mobile; provide assign, swap, and move buttons.
 

@@ -80,6 +80,26 @@ export const checkInPlayerPayloadSchema = z.object({
   paymentNotes: z.string().optional(),
 });
 
+export const createQueueLanePayloadSchema = z.object({
+  sessionId: z.string(),
+  name: z.string().min(1),
+  sortOrder: z.number().int().nonnegative(),
+});
+
+export const updateQueueLanePayloadSchema = z.object({
+  name: z.string().min(1).optional(),
+  sortOrder: z.number().int().nonnegative().optional(),
+  status: z.string().optional(),
+});
+
+export const deleteQueueLanePayloadSchema = z.object({
+  deleteQueuedMatches: z.boolean().optional(),
+});
+
+export const reorderQueueLanesPayloadSchema = z.object({
+  orderedLaneIds: z.array(z.string()).min(1),
+});
+
 export const createQueuedMatchPayloadSchema = z.object({
   sessionId: z.string(),
   queueLaneId: z.string(),
@@ -93,6 +113,27 @@ export const moveQueuedMatchToCourtPayloadSchema = z.object({
   courtId: z.string(),
   matchId: z.string(),
   assignedAt: isoDateTimeSchema,
+});
+
+export const removeQueuedMatchPayloadSchema = z.object({});
+
+export const createCourtPayloadSchema = z.object({
+  sessionId: z.string(),
+  name: z.string().min(1),
+  sortOrder: z.number().int().nonnegative(),
+  status: z.enum(["open", "occupied", "paused", "unavailable"]).optional(),
+});
+
+export const deleteCourtPayloadSchema = z.object({
+  name: z.string().optional(),
+  sortOrder: z.number().int().nonnegative().optional(),
+  status: z.enum(["open", "occupied", "paused", "unavailable"]).optional(),
+});
+
+export const updateCourtPayloadSchema = z.object({
+  name: z.string().min(1).optional(),
+  sortOrder: z.number().int().nonnegative().optional(),
+  status: z.enum(["open", "occupied", "paused", "unavailable"]).optional(),
 });
 
 export const startMatchPayloadSchema = z.object({

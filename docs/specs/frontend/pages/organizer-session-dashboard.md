@@ -35,18 +35,21 @@ The dashboard should behave like a digital pegboard: available players move into
 
 ## Component Composition
 
-- `SessionHeader`
-- `SessionStatusBar`
-- `PlayerPool`: composes `PlayerCheckInPanel` and `QueuePanel`. See `features/organizer/player-pool.md`.
-- `CourtBoard`
-- `NextQueuePanel`: composes `QueueLaneManagement`. See `features/organizer/next-queue-panel.md`.
+**Layout shell:** `docs/specs/frontend/features/organizer/live-dashboard-layout.md`
+
+- `SessionHeader` — compact session chrome
+- `AttentionRail` — conditional exceptions (desktop); replaces `SessionStatusBar` on desktop
+- `PegboardLayout` — three-zone grid
+  - `PlayerPool`: composes `PlayerCheckInPanel` and `QueuePanel`. See `features/organizer/player-pool.md`.
+  - `CourtBoard`
+  - `NextQueuePanel`: composes `QueueLaneManagement`. See `features/organizer/next-queue-panel.md`.
+- `SupportingStrip` — collected total, recent teaser, links (not full payment/history/leaderboard cards)
 - `ActiveMatchPanel`
-- `PaymentSummaryPanel`
-- `RecentMatchesPanel`
-- `OfflineBanner`
-- `SyncStatusBadge`
+- `SyncStatusBadge` (in header when synced; no duplicate banner)
 - `PlayerDetailDrawer` (overlay)
 - `SyncReviewPanel` (overlay)
+
+**Desktop — not top-level on dashboard:** `SessionStatusBar`, full `PaymentSummaryPanel`, full `RecentMatchesPanel`, `LeaderboardPreview`, always-visible `OfflineBanner`. Those live on dedicated routes or inside `SupportingStrip` / `AttentionRail`.
 
 ## Page States
 
@@ -85,22 +88,26 @@ The dashboard should behave like a digital pegboard: available players move into
 
 ## Responsive Layout
 
-Desktop:
+See `features/organizer/live-dashboard-layout.md` for wireframes, empty states, and validation checklist.
 
-- Left column: `PlayerPool`, including search/add player, waiting/resting filters, ratings, wait time, and payment badges.
-- Center column: `CourtBoard`, the largest area, showing all courts as spatial containers with Team A / Team B slots.
-- Right column: `NextQueuePanel`, showing one or more queue lanes, multiple lined-up matches, accept suggestion, manual override, and move-to-court actions.
-- Bottom/supporting row: recent matches, payment exceptions, and session leaderboard preview (top 5 by wins, W-L-D) with link to `/organizer/leaderboard?sessionId=:sessionId`.
+Desktop (≥1280px):
+
+- Session chrome + conditional `AttentionRail` + pegboard (~70vh min, no scroll for core ops).
+- Left: `PlayerPool` (compact check-in + waiting list).
+- Center: `CourtBoard` — **horizontal strip for 3 courts** (not 2×2 with orphan slot).
+- Right: `NextQueuePanel`.
+- `SupportingStrip` below pegboard (hidden until first check-in) — not full-width payment/history/leaderboard cards.
 
 Tablet:
 
 - Keep `CourtBoard` and `NextQueuePanel` visible together.
 - Place `PlayerPool` below or beside them depending on width.
-- Keep payments and recent matches below the core pegboard.
+- Do not use the deprecated full-width secondary card stack.
 
 Mobile:
 
 - Co-primary organizer device. Prefer bottom tabs: **Now** (default) | **Next** | **Available** | **More** per `docs/specs/frontend/design-system.md`.
+- `SessionStatusBar` acceptable on **More** tab.
 - Fallback stack: sync → courts → next queue → check-in → player pool → payments → recent matches.
 - Do not require drag-and-drop; provide buttons for assign, swap, move to court, and remove.
 

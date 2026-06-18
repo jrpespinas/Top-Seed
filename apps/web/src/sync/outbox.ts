@@ -46,8 +46,18 @@ function actionFlushPriority(action: OutboxAction): number {
     case "UPDATE_CHECK_IN":
     case "UPDATE_PAYMENT":
       return 4;
-    default:
+    case "CREATE_COURT":
+    case "CREATE_QUEUE_LANE":
       return 5;
+    case "UPDATE_COURT":
+    case "UPDATE_QUEUE_LANE":
+    case "REORDER_QUEUE_LANES":
+      return 6;
+    case "DELETE_COURT":
+    case "DELETE_QUEUE_LANE":
+      return 7;
+    default:
+      return 8;
   }
 }
 

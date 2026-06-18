@@ -6,6 +6,7 @@ import { createSessionLocal } from "../mutations/createSession.js";
 import { listPendingForFlush } from "./outbox.js";
 import { flushOutbox } from "./syncEngine.js";
 import * as connection from "./connection.js";
+import * as sessionApi from "../lib/session-api.js";
 
 const SESSION = {
   id: "session-1",
@@ -84,6 +85,8 @@ describe("flushOutbox walk-in ordering", () => {
     await clearDatabase();
     await db.sessions.put(SESSION);
     vi.restoreAllMocks();
+    vi.spyOn(sessionApi, "ensureSessionOnServer").mockResolvedValue();
+    vi.spyOn(sessionApi, "sessionExistsOnServer").mockResolvedValue(true);
   });
 
   it("posts profile create before check-in to sync API", async () => {
@@ -91,19 +94,20 @@ describe("flushOutbox walk-in ordering", () => {
 
     const fetchMock = vi.fn().mockResolvedValue({
       ok: true,
-      json: async () => ({
-        organizationId: "org-default",
-        deviceId: "device-1",
-        processedAt: "2026-06-09T10:01:00.000Z",
-        results: [
-          {
-            actionId: "sync-profile",
-            status: "applied",
-            entityType: "playerProfile",
-            entityId: "player-bogs",
-          },
-        ],
-      }),
+      text: async () =>
+        JSON.stringify({
+          organizationId: "org-default",
+          deviceId: "device-1",
+          processedAt: "2026-06-09T10:01:00.000Z",
+          results: [
+            {
+              actionId: "sync-profile",
+              status: "applied",
+              entityType: "playerProfile",
+              entityId: "player-bogs",
+            },
+          ],
+        }),
     });
     vi.stubGlobal("fetch", fetchMock);
 
@@ -124,36 +128,38 @@ describe("flushOutbox walk-in ordering", () => {
 
     fetchMock.mockResolvedValueOnce({
       ok: true,
-      json: async () => ({
-        organizationId: "org-default",
-        deviceId: "device-1",
-        processedAt: "2026-06-09T10:01:00.000Z",
-        results: [
-          {
-            actionId: "sync-profile",
-            status: "applied",
-            entityType: "playerProfile",
-            entityId: "player-bogs",
-          },
-        ],
-      }),
+      text: async () =>
+        JSON.stringify({
+          organizationId: "org-default",
+          deviceId: "device-1",
+          processedAt: "2026-06-09T10:01:00.000Z",
+          results: [
+            {
+              actionId: "sync-profile",
+              status: "applied",
+              entityType: "playerProfile",
+              entityId: "player-bogs",
+            },
+          ],
+        }),
     });
     fetchMock.mockResolvedValueOnce({
       ok: true,
-      json: async () => ({
-        organizationId: "org-default",
-        deviceId: "device-1",
-        processedAt: "2026-06-09T10:02:00.000Z",
-        results: [
-          {
-            actionId: "sync-checkin",
-            status: "applied",
-            entityType: "checkIn",
-            entityId: "check-in-bogs",
-            serverUpdatedAt: "2026-06-09T10:02:00.000Z",
-          },
-        ],
-      }),
+      text: async () =>
+        JSON.stringify({
+          organizationId: "org-default",
+          deviceId: "device-1",
+          processedAt: "2026-06-09T10:02:00.000Z",
+          results: [
+            {
+              actionId: "sync-checkin",
+              status: "applied",
+              entityType: "checkIn",
+              entityId: "check-in-bogs",
+              serverUpdatedAt: "2026-06-09T10:02:00.000Z",
+            },
+          ],
+        }),
     });
 
     const result = await flushOutbox(SESSION.id);

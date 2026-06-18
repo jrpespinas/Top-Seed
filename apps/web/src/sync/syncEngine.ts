@@ -1,6 +1,8 @@
 import { db } from "../db/database.js";
-import type { LocalCheckIn, OutboxAction } from "../db/types.js";
+import { normalizeSessionCourtsIfNeeded } from "../mutations/courts.js";
+import type { LocalCheckIn, LocalCourt, OutboxAction } from "../db/types.js";
 import {
+  listBlockedOutboxActions,
   listFailedOutboxActions,
   listPendingOutboxActions,
   markOutboxApplied,
@@ -13,6 +15,7 @@ import {
 import { outboxToSyncRequest, postSyncActions } from "./syncClient.js";
 import { getConnectionStatus } from "./connection.js";
 import { isSessionSyncAction, syncSessionActionViaRest } from "./sessionActionSync.js";
+import { ensureSessionOnServer } from "../lib/session-api.js";
 import { DEFAULT_ORG_ID, getDeviceId } from "../lib/device.js";
 
 async function markEntitySyncFailed(action: OutboxAction, message: string): Promise<void> {
@@ -67,7 +70,127 @@ export async function markDependentsBlocked(failedAction: OutboxAction): Promise
   }
 }
 
+async function restoreCourtAfterFailedDelete(action: OutboxAction): Promise<void> {
+  if (action.type !== "DELETE_COURT" || !action.sessionId) {
+    return;
+  }
+
+  const payload = action.payload as {
+    name?: string;
+    sortOrder?: number;
+    status?: LocalCourt["status"];
+  };
+  if (!payload.name || payload.sortOrder === undefined) {
+    return;
+  }
+
+  const existing = await db.courts.get(action.entityId);
+  if (existing) {
+    return;
+  }
+
+  await db.courts.put({
+    id: action.entityId,
+    sessionId: action.sessionId,
+    name: payload.name,
+    sortOrder: payload.sortOrder,
+    status: payload.status ?? "open",
+  });
+  await normalizeSessionCourtsIfNeeded(action.sessionId);
+}
+
+function isBootstrapRecoverableError(message: string): boolean {
+  const lower = message.toLowerCase();
+  return (
+    lower.includes("session not found") ||
+    lower.includes("court not found") ||
+    lower.includes("queue lane not found") ||
+    lower.includes("check-in not found") ||
+    lower.includes("player not found")
+  );
+}
+
+function isIdempotentCheckInError(message: string): boolean {
+  return message.toLowerCase().includes("player is already checked in");
+}
+
+async function prepareActionForSync(action: OutboxAction): Promise<OutboxAction | "skip"> {
+  if (!action.sessionId) {
+    return action;
+  }
+
+  if (action.type === "UPDATE_COURT") {
+    const court = await db.courts.get(action.entityId);
+    if (!court || court.sessionId !== action.sessionId) {
+      return "skip";
+    }
+    const payload = action.payload as {
+      name?: string;
+      sortOrder?: number;
+      status?: LocalCourt["status"];
+    };
+    return {
+      ...action,
+      payload: {
+        name: payload.name ?? court.name,
+        sortOrder: payload.sortOrder ?? court.sortOrder,
+        status: payload.status ?? court.status,
+      },
+    };
+  }
+
+  if (action.type === "UPDATE_QUEUE_LANE") {
+    const lane = await db.queueLanes.get(action.entityId);
+    if (!lane || lane.sessionId !== action.sessionId || lane.status === "deleted") {
+      return "skip";
+    }
+    const payload = action.payload as {
+      name?: string;
+      sortOrder?: number;
+      status?: string;
+    };
+    return {
+      ...action,
+      payload: {
+        name: payload.name ?? lane.name,
+        sortOrder: payload.sortOrder ?? lane.sortOrder,
+        status: payload.status ?? lane.status,
+      },
+    };
+  }
+
+  if (action.type === "DELETE_COURT") {
+    const court = await db.courts.get(action.entityId);
+    if (!court) {
+      return "skip";
+    }
+  }
+
+  if (action.type === "DELETE_QUEUE_LANE") {
+    const lane = await db.queueLanes.get(action.entityId);
+    if (!lane || lane.status === "deleted") {
+      return "skip";
+    }
+  }
+
+  return action;
+}
+
+async function ensureSessionForAction(action: OutboxAction): Promise<void> {
+  if (!action.sessionId || isSessionSyncAction(action.type)) {
+    return;
+  }
+  try {
+    await ensureSessionOnServer(action.sessionId);
+  } catch {
+    // Continue — payload repair and server upsert may still succeed.
+  }
+}
+
 async function markActionFailed(action: OutboxAction, message: string): Promise<void> {
+  if (action.type === "DELETE_COURT") {
+    await restoreCourtAfterFailedDelete(action);
+  }
   await markOutboxFailed(action.id, message);
   await markEntitySyncFailed(action, message);
   await markDependentsBlocked(action);
@@ -85,6 +208,14 @@ export async function flushOutbox(sessionId?: string): Promise<{
   let failed = 0;
   let pending = await listPendingOutboxActions(sessionId);
 
+  if (sessionId) {
+    try {
+      await ensureSessionOnServer(sessionId);
+    } catch {
+      // Flush may still succeed; individual actions retry bootstrap on session-not-found.
+    }
+  }
+
   while (pending.length > 0) {
     const action = pending[0];
     if (!action) {
@@ -100,7 +231,17 @@ export async function flushOutbox(sessionId?: string): Promise<{
         await markEntitySynced(action);
         flushed += 1;
       } else {
-        const batch = [action];
+        await ensureSessionForAction(action);
+
+        const prepared = await prepareActionForSync(action);
+        if (prepared === "skip") {
+          await markOutboxApplied(action.id);
+          flushed += 1;
+          pending = await listPendingOutboxActions(sessionId);
+          continue;
+        }
+
+        const batch = [prepared];
         const response = await postSyncActions(
           outboxToSyncRequest(DEFAULT_ORG_ID, getDeviceId(), batch),
         );
@@ -113,7 +254,32 @@ export async function flushOutbox(sessionId?: string): Promise<{
           await markEntitySynced(action, result.serverUpdatedAt);
           flushed += 1;
         } else if (result.status === "failed") {
-          await markActionFailed(action, result.message ?? result.errorCode ?? "Sync failed");
+          const message = result.message ?? result.errorCode ?? "Sync failed";
+          if (action.type === "CHECK_IN_PLAYER" && isIdempotentCheckInError(message)) {
+            await markOutboxApplied(action.id);
+            await markEntitySynced(action);
+            flushed += 1;
+            pending = await listPendingOutboxActions(sessionId);
+            continue;
+          }
+          if (action.sessionId && isBootstrapRecoverableError(message)) {
+            await ensureSessionOnServer(action.sessionId);
+            const retryResponse = await postSyncActions(
+              outboxToSyncRequest(DEFAULT_ORG_ID, getDeviceId(), batch),
+            );
+            const retryResult = retryResponse.results[0];
+            if (
+              retryResult &&
+              (retryResult.status === "applied" || retryResult.status === "already_applied")
+            ) {
+              await markOutboxApplied(action.id);
+              await markEntitySynced(action, retryResult.serverUpdatedAt);
+              flushed += 1;
+              pending = await listPendingOutboxActions(sessionId);
+              continue;
+            }
+          }
+          await markActionFailed(action, message);
           failed += 1;
           break;
         } else if (result.status === "blocked") {
@@ -140,6 +306,9 @@ export async function retryOutboxAction(actionId: string): Promise<void> {
   if (!action || action.status !== "failed") {
     return;
   }
+  if (action.sessionId) {
+    await ensureSessionOnServer(action.sessionId);
+  }
   await resetFailedToPending(actionId);
   await unblockDependentsOf(actionId);
   if (action.entityType === "checkIn") {
@@ -152,8 +321,13 @@ export async function retryOutboxAction(actionId: string): Promise<void> {
 }
 
 export async function retryFailedOutbox(sessionId?: string): Promise<void> {
+  if (sessionId) {
+    await ensureSessionOnServer(sessionId);
+  }
+
   const failed = await listFailedOutboxActions(sessionId);
-  for (const action of failed) {
+  const blocked = await listBlockedOutboxActions(sessionId);
+  for (const action of [...failed, ...blocked]) {
     await resetFailedToPending(action.id);
     await unblockDependentsOf(action.id);
     if (action.entityType === "checkIn") {

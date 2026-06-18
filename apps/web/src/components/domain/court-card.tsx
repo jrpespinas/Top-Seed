@@ -34,7 +34,7 @@ export interface CourtCardProps {
 
 function SlotCell({ player, emptyLabel }: { player: CourtSlotPlayer | null; emptyLabel: string }) {
   return (
-    <div className="rounded-control border border-dashed border-border bg-muted/30 px-2 py-2 text-caption">
+    <div className="rounded-control border border-border bg-muted/50 px-2 py-2 text-caption">
       {player ? (
         <span className="font-medium text-foreground">{player.displayName}</span>
       ) : (
@@ -79,7 +79,7 @@ export function CourtCard({
                 <SlotCell
                   key={`a-${index}`}
                   player={player}
-                  emptyLabel={`Team A player ${index + 1} empty`}
+                  emptyLabel={uiStatus === "open" ? "Assign from Next" : `Team A player ${index + 1} empty`}
                 />
               ))}
             </div>
@@ -91,7 +91,7 @@ export function CourtCard({
                 <SlotCell
                   key={`b-${index}`}
                   player={player}
-                  emptyLabel={`Team B player ${index + 1} empty`}
+                  emptyLabel={uiStatus === "open" ? "Assign from Next" : `Team B player ${index + 1} empty`}
                 />
               ))}
             </div>

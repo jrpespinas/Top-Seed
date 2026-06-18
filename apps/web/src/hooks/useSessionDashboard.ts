@@ -30,6 +30,7 @@ import {
   deleteQueueLaneLocal,
   renameQueueLaneLocal,
 } from "../mutations/queueLanes.js";
+import { createCourtLocal, deleteCourtLocal, normalizeSessionCourtsIfNeeded } from "../mutations/courts.js";
 import { cancelMatchLocal, completeMatchLocal, startMatchLocal } from "../mutations/matches.js";
 import { completeSessionLocal } from "../mutations/completeSession.js";
 import {
@@ -92,6 +93,17 @@ export function useSessionDashboard(sessionId: string) {
   const data = useLiveDashboardData(sessionId);
   const sessionMode = getSessionMode(data.session?.status ?? "active");
   const isLive = sessionMode === "live";
+
+  useEffect(() => {
+    if (!data.session || data.courts.length === 0) {
+      return;
+    }
+    void normalizeSessionCourtsIfNeeded(sessionId).then(() => afterMutation(sessionId));
+  }, [
+    sessionId,
+    data.session?.id,
+    data.courts.map((court) => `${court.id}:${court.name}:${court.sortOrder}`).join("|"),
+  ]);
 
   const snapshot = useMemo(() => {
     if (!data.session) {
@@ -293,6 +305,17 @@ export function useSessionDashboard(sessionId: string) {
     },
     deleteQueueLane: async (laneId: string) => {
       await deleteQueueLaneLocal({ sessionId, laneId });
+      await afterMutation(sessionId);
+    },
+    addCourt: async () => {
+      await createCourtLocal({
+        id: crypto.randomUUID(),
+        sessionId,
+      });
+      await afterMutation(sessionId);
+    },
+    deleteCourt: async (courtId: string) => {
+      await deleteCourtLocal({ sessionId, courtId });
       await afterMutation(sessionId);
     },
   };

@@ -34,20 +34,21 @@ describe("syncClient", () => {
       "fetch",
       vi.fn().mockResolvedValue({
         ok: true,
-        json: async () => ({
-          organizationId: "org-default",
-          deviceId: "device-1",
-          processedAt: "2026-06-09T10:01:00.000Z",
-          results: [
-            {
-              actionId: "action-1",
-              status: "applied",
-              entityType: "checkIn",
-              entityId: "check-in-1",
-              serverUpdatedAt: "2026-06-09T10:01:00.000Z",
-            },
-          ],
-        }),
+        text: async () =>
+          JSON.stringify({
+            organizationId: "org-default",
+            deviceId: "device-1",
+            processedAt: "2026-06-09T10:01:00.000Z",
+            results: [
+              {
+                actionId: "action-1",
+                status: "applied",
+                entityType: "checkIn",
+                entityId: "check-in-1",
+                serverUpdatedAt: "2026-06-09T10:01:00.000Z",
+              },
+            ],
+          }),
       }),
     );
 
@@ -76,9 +77,7 @@ describe("syncClient", () => {
       vi.fn().mockResolvedValue({
         ok: false,
         status: 400,
-        json: async () => ({
-          error: { message: "Invalid sync batch" },
-        }),
+        text: async () => JSON.stringify({ error: { message: "Invalid sync batch" } }),
       }),
     );
 
@@ -99,5 +98,34 @@ describe("syncClient", () => {
         ],
       }),
     ).rejects.toThrow("Invalid sync batch");
+  });
+
+  it("throws a clear error when API returns an empty body", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: false,
+        status: 502,
+        text: async () => "",
+      }),
+    );
+
+    await expect(
+      postSyncActions({
+        organizationId: "org-default",
+        deviceId: "device-1",
+        actions: [
+          {
+            id: "action-1",
+            type: "CHECK_IN_PLAYER",
+            entityType: "checkIn",
+            entityId: "check-in-1",
+            sessionId: "session-1",
+            payload: {},
+            createdAt: "2026-06-09T10:00:00.000Z",
+          },
+        ],
+      }),
+    ).rejects.toThrow("Is the server running?");
   });
 });

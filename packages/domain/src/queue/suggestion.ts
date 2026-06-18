@@ -350,6 +350,31 @@ export function buildSuggestion(snapshot: SessionSnapshot): MatchSuggestion | nu
 }
 
 export function explainSuggestion(suggestion: MatchSuggestion): string {
-  const ids = suggestion.players.map((p) => p.playerProfileId).join(", ");
-  return `Suggested match for ${ids} (score ${suggestion.score.total.toFixed(2)})`;
+  const reasons: string[] = [];
+
+  if (suggestion.score.waitPriority > 0) {
+    reasons.push("players who have waited longest");
+  }
+  if (suggestion.score.teamBalance > 0) {
+    reasons.push("closely balanced teams");
+  }
+  if (suggestion.score.arrivalFairness > 0 && reasons.length < 2) {
+    reasons.push("fair arrival order");
+  }
+  if (suggestion.score.repeatPenalty < 0) {
+    reasons.push("fewer repeat partners");
+  }
+  if (suggestion.score.restPenalty < 0) {
+    reasons.push("recent rest considered");
+  }
+
+  if (reasons.length === 0) {
+    return "Best available doubles match from the waiting pool.";
+  }
+
+  if (reasons.length === 1) {
+    return `Suggested because of ${reasons[0]}.`;
+  }
+
+  return `Suggested because of ${reasons[0]} and ${reasons[1]}.`;
 }

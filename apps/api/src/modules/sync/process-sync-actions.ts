@@ -3,13 +3,21 @@ import {
   checkInPlayerPayloadSchema,
   completeMatchPayloadSchema,
   createPlayerProfilePayloadSchema,
+  createCourtPayloadSchema,
+  createQueueLanePayloadSchema,
   createQueuedMatchPayloadSchema,
+  deleteQueueLanePayloadSchema,
+  deleteCourtPayloadSchema,
+  updateCourtPayloadSchema,
   moveQueuedMatchToCourtPayloadSchema,
+  reorderQueueLanesPayloadSchema,
+  removeQueuedMatchPayloadSchema,
   startMatchPayloadSchema,
   updateCheckInPayloadSchema,
   updateMatchResultPayloadSchema,
   updatePaymentPayloadSchema,
   updatePlayerProfilePayloadSchema,
+  updateQueueLanePayloadSchema,
 } from "@top-seed/contracts";
 import { checkInPlayer } from "../check-ins/check-in-player.js";
 import { updateCheckIn } from "../check-ins/update-check-in.js";
@@ -18,7 +26,14 @@ import { completeMatch, startMatch } from "../matches/match-lifecycle.js";
 import { updatePayment } from "../payments/update-payment.js";
 import { createPlayerProfile } from "../players/create-player-profile.js";
 import { updatePlayerProfile } from "../players/update-player-profile.js";
-import { createQueuedMatch, promoteQueuedMatchToCourt } from "../queue/queued-match.js";
+import { createCourt, deleteCourt, updateCourt } from "../courts/court.js";
+import { createQueuedMatch, promoteQueuedMatchToCourt, removeQueuedMatch } from "../queue/queued-match.js";
+import {
+  createQueueLane,
+  deleteQueueLane,
+  reorderQueueLanes,
+  updateQueueLane,
+} from "../queue/queue-lane.js";
 import {
   findSyncActionLog,
   recordSyncActionLog,
@@ -122,6 +137,130 @@ async function dispatchAction(action: SyncAction): Promise<SyncActionResult> {
         serverUpdatedAt: checkIn.updatedAt,
       };
     }
+    case "CREATE_COURT": {
+      const payload = createCourtPayloadSchema.parse(action.payload);
+      const { court, serverVersion, serverUpdatedAt } = await createCourt({
+        id: action.entityId,
+        sessionId: payload.sessionId,
+        name: payload.name,
+        sortOrder: payload.sortOrder,
+        status: payload.status,
+      });
+      return {
+        actionId: action.id,
+        status: "applied",
+        entityType: action.entityType,
+        entityId: action.entityId,
+        canonicalEntityId: court.id,
+        serverVersion,
+        serverUpdatedAt,
+      };
+    }
+    case "DELETE_COURT": {
+      deleteCourtPayloadSchema.parse(action.payload);
+      const { serverVersion, serverUpdatedAt } = await deleteCourt({
+        courtId: action.entityId,
+        sessionId: action.sessionId!,
+      });
+      return {
+        actionId: action.id,
+        status: "applied",
+        entityType: action.entityType,
+        entityId: action.entityId,
+        canonicalEntityId: action.entityId,
+        serverVersion,
+        serverUpdatedAt,
+      };
+    }
+    case "UPDATE_COURT": {
+      const payload = updateCourtPayloadSchema.parse(action.payload);
+      const { court, serverVersion, serverUpdatedAt } = await updateCourt({
+        courtId: action.entityId,
+        sessionId: action.sessionId!,
+        name: payload.name,
+        sortOrder: payload.sortOrder,
+        status: payload.status,
+      });
+      return {
+        actionId: action.id,
+        status: "applied",
+        entityType: action.entityType,
+        entityId: action.entityId,
+        canonicalEntityId: court.id,
+        serverVersion,
+        serverUpdatedAt,
+      };
+    }
+    case "CREATE_QUEUE_LANE": {
+      const payload = createQueueLanePayloadSchema.parse(action.payload);
+      const { lane, serverVersion, serverUpdatedAt } = await createQueueLane({
+        id: action.entityId,
+        sessionId: payload.sessionId,
+        name: payload.name,
+        sortOrder: payload.sortOrder,
+      });
+      return {
+        actionId: action.id,
+        status: "applied",
+        entityType: action.entityType,
+        entityId: action.entityId,
+        canonicalEntityId: lane.id,
+        serverVersion,
+        serverUpdatedAt,
+      };
+    }
+    case "UPDATE_QUEUE_LANE": {
+      const payload = updateQueueLanePayloadSchema.parse(action.payload);
+      const { lane, serverVersion, serverUpdatedAt } = await updateQueueLane({
+        laneId: action.entityId,
+        sessionId: action.sessionId!,
+        name: payload.name,
+        sortOrder: payload.sortOrder,
+        status: payload.status,
+      });
+      return {
+        actionId: action.id,
+        status: "applied",
+        entityType: action.entityType,
+        entityId: action.entityId,
+        canonicalEntityId: lane.id,
+        serverVersion,
+        serverUpdatedAt,
+      };
+    }
+    case "DELETE_QUEUE_LANE": {
+      const payload = deleteQueueLanePayloadSchema.parse(action.payload);
+      const result = await deleteQueueLane({
+        laneId: action.entityId,
+        sessionId: action.sessionId!,
+        deleteQueuedMatches: payload.deleteQueuedMatches,
+      });
+      return {
+        actionId: action.id,
+        status: "applied",
+        entityType: action.entityType,
+        entityId: action.entityId,
+        canonicalEntityId: result.lane?.id ?? action.entityId,
+        serverVersion: result.serverVersion,
+        serverUpdatedAt: result.serverUpdatedAt,
+      };
+    }
+    case "REORDER_QUEUE_LANES": {
+      const payload = reorderQueueLanesPayloadSchema.parse(action.payload);
+      const { serverVersion, serverUpdatedAt } = await reorderQueueLanes({
+        sessionId: action.sessionId!,
+        orderedLaneIds: payload.orderedLaneIds,
+      });
+      return {
+        actionId: action.id,
+        status: "applied",
+        entityType: action.entityType,
+        entityId: action.entityId,
+        canonicalEntityId: action.entityId,
+        serverVersion,
+        serverUpdatedAt,
+      };
+    }
     case "CREATE_QUEUED_MATCH": {
       const payload = createQueuedMatchPayloadSchema.parse(action.payload);
       const { serverVersion } = await createQueuedMatch({
@@ -140,6 +279,22 @@ async function dispatchAction(action: SyncAction): Promise<SyncActionResult> {
         canonicalEntityId: action.entityId,
         serverVersion,
         serverUpdatedAt: new Date().toISOString(),
+      };
+    }
+    case "REMOVE_QUEUED_MATCH": {
+      removeQueuedMatchPayloadSchema.parse(action.payload);
+      const { serverVersion, serverUpdatedAt } = await removeQueuedMatch({
+        queuedMatchId: action.entityId,
+        sessionId: action.sessionId!,
+      });
+      return {
+        actionId: action.id,
+        status: "applied",
+        entityType: action.entityType,
+        entityId: action.entityId,
+        canonicalEntityId: action.entityId,
+        serverVersion,
+        serverUpdatedAt,
       };
     }
     case "MOVE_QUEUED_MATCH_TO_COURT": {

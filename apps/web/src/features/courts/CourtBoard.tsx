@@ -1,16 +1,23 @@
 import { CourtCard, type CourtUiStatus } from "../../components/domain/court-card.js";
+import { Button } from "../../components/ui/button.js";
+import { ConfirmAction } from "../../components/ui/confirm-action.js";
 import { EmptyState } from "../../components/ui/empty-state.js";
 import { displayNameForCheckIn } from "../../lib/dashboard-helpers.js";
 import type { LocalCheckIn, LocalCourt, LocalMatch } from "../../db/types.js";
 import type { SessionMode } from "../../components/domain/types.js";
+
+const MAX_COURTS = 8;
 
 export interface CourtBoardProps {
   courts: LocalCourt[];
   matches: LocalMatch[];
   checkIns: LocalCheckIn[];
   sessionMode: SessionMode;
+  layout?: "default" | "pegboard";
   onStartMatch: (matchId: string) => void;
   onOpenMatch: (matchId: string) => void;
+  onAddCourt?: () => void;
+  onDeleteCourt?: (courtId: string) => void;
 }
 
 export function CourtBoard({
@@ -18,18 +25,59 @@ export function CourtBoard({
   matches,
   checkIns,
   sessionMode,
+  layout = "default",
   onStartMatch,
   onOpenMatch,
+  onAddCourt,
+  onDeleteCourt,
 }: CourtBoardProps) {
-  if (courts.length === 0) {
-    return <EmptyState title="No courts" description="Courts are created with the session." />;
+  const isLive = sessionMode === "live";
+  const activeCourts = courts.filter((court) => court.status !== "deleted");
+
+  if (activeCourts.length === 0) {
+    return (
+      <section className="space-y-4">
+        <EmptyState
+          title="No courts yet"
+          description="Add a court to start assigning matches."
+        />
+        {isLive && onAddCourt ? (
+          <Button variant="secondary" onClick={onAddCourt}>
+            Add court
+          </Button>
+        ) : null}
+      </section>
+    );
   }
 
   return (
     <section className="space-y-4">
-      <h2 className="text-title font-semibold">Courts</h2>
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-2">
-        {courts.map((court) => {
+      <div className="flex flex-wrap items-center justify-between gap-2 lg:hidden">
+        <h2 className="text-title font-semibold">Courts</h2>
+        {isLive && onAddCourt ? (
+          <Button
+            variant="ghost"
+            size="compact"
+            onClick={onAddCourt}
+            disabled={activeCourts.length >= MAX_COURTS}
+          >
+            Add court
+          </Button>
+        ) : null}
+      </div>
+      {isLive && onAddCourt && layout === "pegboard" ? (
+        <Button
+          className="hidden lg:inline-flex"
+          variant="ghost"
+          size="compact"
+          onClick={onAddCourt}
+          disabled={activeCourts.length >= MAX_COURTS}
+        >
+          Add court
+        </Button>
+      ) : null}
+      <div className={courtGridClass(activeCourts.length, layout)}>
+        {activeCourts.map((court) => {
           const match = matches.find(
             (row) =>
               row.courtId === court.id &&
@@ -38,22 +86,60 @@ export function CourtBoard({
           const uiStatus = courtUiStatus(court, match);
           const teamSlots = matchToSlots(match, checkIns);
           const primaryAction = primaryCourtAction(match, sessionMode, onStartMatch, onOpenMatch);
+          const canDelete =
+            isLive &&
+            onDeleteCourt &&
+            activeCourts.length > 1 &&
+            uiStatus === "open" &&
+            !match &&
+            !matches.some((row) => row.courtId === court.id);
 
           return (
-            <CourtCard
-              key={court.id}
-              court={{ id: court.id, name: court.name }}
-              uiStatus={uiStatus}
-              teamSlots={teamSlots}
-              primaryAction={primaryAction}
-              sessionMode={sessionMode}
-              size="large"
-            />
+            <div key={court.id} className="space-y-2">
+              <CourtCard
+                court={{ id: court.id, name: court.name }}
+                uiStatus={uiStatus}
+                teamSlots={teamSlots}
+                primaryAction={primaryAction}
+                sessionMode={sessionMode}
+                size="large"
+              />
+              {canDelete ? (
+                <ConfirmAction
+                  triggerLabel="Delete court"
+                  title={`Delete ${court.name}?`}
+                  description="Only empty courts with no match history can be deleted."
+                  confirmLabel="Delete court"
+                  variant="danger"
+                  onConfirm={() => onDeleteCourt(court.id)}
+                />
+              ) : null}
+            </div>
           );
         })}
       </div>
     </section>
   );
+}
+
+function courtGridClass(courtCount: number, layout: CourtBoardProps["layout"]): string {
+  if (layout === "pegboard") {
+    if (courtCount <= 2) {
+      return "grid gap-4 grid-cols-1";
+    }
+    if (courtCount <= 4) {
+      return "grid gap-4 grid-cols-1 xl:grid-cols-2";
+    }
+    return "grid gap-4 grid-cols-1 xl:grid-cols-2 2xl:grid-cols-3";
+  }
+
+  if (courtCount <= 3) {
+    return "grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3";
+  }
+  if (courtCount === 4) {
+    return "grid gap-4 grid-cols-2";
+  }
+  return "grid gap-4 grid-cols-2 lg:max-h-full lg:grid-cols-3 lg:overflow-x-auto";
 }
 
 function courtUiStatus(court: LocalCourt, match?: LocalMatch): CourtUiStatus {

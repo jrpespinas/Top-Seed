@@ -21,7 +21,10 @@ Use these names in code, specs, and UI copy. **Aliases are deprecated**—do not
 | Canonical | Role | Spec |
 |-----------|------|------|
 | `SessionHeader` | Session identity and session-level actions | `features/organizer/session-header.md` |
-| `SessionStatusBar` | Operating metrics | `features/organizer/session-status-bar.md` |
+| `AttentionRail` | Exception strip (unpaid, sync, offline) on desktop | `features/organizer/attention-rail.md` |
+| `PegboardLayout` | Three-zone dashboard grid shell | `features/organizer/live-dashboard-layout.md` |
+| `SupportingStrip` | Compact secondary row (payments teaser, links) | `features/organizer/live-dashboard-layout.md` |
+| `SessionStatusBar` | Operating metrics (mobile **More** tab; deprecated desktop) | `features/organizer/session-status-bar.md` |
 | `PlayerCheckInPanel` | Check-in and add player (inside `PlayerPool`) | `features/organizer/player-check-in-panel.md` |
 | `QueuePanel` | Waiting/resting/done/removed list (inside `PlayerPool`) | `features/organizer/queue-panel.md` |
 | `QueueLaneManagement` | Lane CRUD and lane column UI (inside `NextQueuePanel`) | `features/organizer/queue-lane-management.md` |
@@ -55,34 +58,35 @@ Removed from MVP v1 (do not implement): `onAutoFillQueue` and aliases `onAutoFil
 ```text
 OrganizerSessionDashboard
 ├── SessionHeader
-├── SessionStatusBar
-├── PlayerPool
-│   ├── PlayerCheckInPanel
-│   └── QueuePanel
-├── CourtBoard
-├── NextQueuePanel
-│   └── QueueLaneManagement
-├── PaymentSummaryPanel
-├── RecentMatchesPanel
+├── AttentionRail (conditional; desktop)
+├── PegboardLayout
+│   ├── PlayerPool
+│   │   ├── PlayerCheckInPanel
+│   │   └── QueuePanel
+│   ├── CourtBoard
+│   └── NextQueuePanel
+│       └── QueueLaneManagement
+├── SupportingStrip (after first check-in; desktop)
+├── SessionStatusBar (mobile More tab only)
 ├── PlayerDetailDrawer (overlay; opened from rows)
-└── SyncReviewPanel (overlay; opened from header/banner)
+└── SyncReviewPanel (overlay; opened from header/rail)
 ```
+
+Full `PaymentSummaryPanel`, `RecentMatchesPanel`, and leaderboard preview are **route-level** on desktop — linked from `SupportingStrip`, not pegboard siblings.
 
 `QueueLaneManagement` is **not** a top-level dashboard sibling. It is composed inside `NextQueuePanel`.
 
 ## Main Dashboard Composition
 
-The live dashboard should be composed from these feature components:
+The live dashboard should be composed per `features/organizer/live-dashboard-layout.md`:
 
 - `SessionHeader`
-- `SessionStatusBar`
-- `PlayerPool` (composes `PlayerCheckInPanel` + `QueuePanel`)
-- `CourtBoard`
-- `NextQueuePanel` (composes `QueueLaneManagement`)
+- `AttentionRail` (desktop exceptions)
+- `PegboardLayout` wrapping `PlayerPool`, `CourtBoard`, `NextQueuePanel`
+- `SupportingStrip`
 - `ActiveMatchPanel`
-- `PaymentSummaryPanel`
-- `RecentMatchesPanel`
-- `LeaderboardView` from organizer navigation or dashboard link.
+- `SessionStatusBar` on mobile **More** tab only
+- `LeaderboardView` via `/organizer/leaderboard` link — not a full dashboard card on desktop
 
 Detailed feature specs live in `docs/specs/frontend/features/organizer/`. Use this file as the overview and the focused feature files as the implementation contracts.
 

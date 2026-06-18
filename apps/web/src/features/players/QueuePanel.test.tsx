@@ -79,4 +79,17 @@ describe("QueuePanel", () => {
     expect(screen.queryByText("Mark resting")).not.toBeInTheDocument();
     expect(screen.getAllByText("Alex").length).toBeGreaterThan(0);
   });
+
+  it("shows guided empty state before any check-ins", () => {
+    render(
+      <QueuePanel
+        session={session}
+        sessionMode="live"
+        activeTab="waiting"
+        checkIns={[]}
+        onUpdateCheckIn={vi.fn()}
+      />,
+    );
+    expect(screen.getByText("Check in your first players")).toBeInTheDocument();
+  });
 });

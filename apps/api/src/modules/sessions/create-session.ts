@@ -1,5 +1,6 @@
 import type { SessionDto } from "@top-seed/contracts";
 import { prisma, bumpSessionVersion } from "../../shared/infrastructure/prisma/client.js";
+import { UseCaseError } from "../../shared/application/errors.js";
 
 export interface CreateSessionInput {
   id: string;
@@ -49,6 +50,11 @@ function toSessionDto(row: {
 }
 
 export async function createSession(input: CreateSessionInput): Promise<SessionDto> {
+  const existing = await prisma.session.findUnique({ where: { id: input.id } });
+  if (existing) {
+    return toSessionDto(existing);
+  }
+
   const courtCount = input.courtCount ?? 2;
   const session = await prisma.$transaction(async (tx) => {
     const created = await tx.session.create({
@@ -93,6 +99,14 @@ export async function createSession(input: CreateSessionInput): Promise<SessionD
 }
 
 export async function startSession(sessionId: string): Promise<SessionDto> {
+  const existing = await prisma.session.findUnique({ where: { id: sessionId } });
+  if (!existing) {
+    throw new UseCaseError("VALIDATION_ERROR", "Session not found.");
+  }
+  if (existing.status === "active" || existing.status === "open") {
+    return toSessionDto(existing);
+  }
+
   const session = await prisma.session.update({
     where: { id: sessionId },
     data: { status: "active" },

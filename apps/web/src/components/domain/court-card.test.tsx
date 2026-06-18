@@ -19,8 +19,7 @@ describe("CourtCard", () => {
       />,
     );
     expect(screen.getByText("Court 1")).toBeInTheDocument();
-    expect(screen.getByText("Team A player 1 empty")).toBeInTheDocument();
-    expect(screen.getByText("Team B player 2 empty")).toBeInTheDocument();
+    expect(screen.getAllByText("Assign from Next").length).toBe(4);
   });
 
   it("shows finish action for in-progress court", () => {

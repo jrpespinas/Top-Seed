@@ -247,7 +247,7 @@ describe("buildSuggestion", () => {
     expect(suggestion).toBeNull();
   });
 
-  it("explainSuggestion returns readable text", () => {
+  it("explainSuggestion returns plain-language text without ids", () => {
     const suggestion: MatchSuggestion = {
       teamOne: { playerProfileIds: ["a", "b"] },
       teamTwo: { playerProfileIds: ["c", "d"] },
@@ -261,6 +261,9 @@ describe("buildSuggestion", () => {
         total: 3,
       },
     };
-    expect(explainSuggestion(suggestion)).toContain("score 3.00");
+    const explanation = explainSuggestion(suggestion);
+    expect(explanation).toContain("Suggested because");
+    expect(explanation).not.toContain("a, b");
+    expect(explanation).not.toMatch(/score \d/);
   });
 });

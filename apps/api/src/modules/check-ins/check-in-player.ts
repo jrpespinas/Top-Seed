@@ -73,8 +73,15 @@ export async function checkInPlayer(input: CheckInPlayerInput): Promise<{
         playerProfileId: input.playerProfileId,
       },
     },
+    include: { playerProfile: true },
   });
   if (existing && existing.queueStatus !== "removed") {
+    if (existing.id === input.id) {
+      return {
+        checkIn: toCheckInDto(existing),
+        serverVersion: session.serverVersion,
+      };
+    }
     throw new UseCaseError("VALIDATION_ERROR", "Player is already checked in.");
   }
 

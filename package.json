@@ -7,11 +7,11 @@
     "node": ">=20"
   },
   "scripts": {
-    "predev": "pnpm --filter @top-seed/contracts build",
+    "predev": "pnpm --filter @top-seed/contracts build && pnpm --filter @top-seed/domain build",
     "dev": "concurrently -n web,api -c cyan,magenta \"pnpm --filter @top-seed/web dev\" \"pnpm --filter @top-seed/api dev\"",
-    "prebuild": "pnpm --filter @top-seed/contracts build",
+    "prebuild": "pnpm --filter @top-seed/contracts build && pnpm --filter @top-seed/domain build",
     "build": "pnpm -r build",
-    "pretest": "pnpm --filter @top-seed/contracts build",
+    "pretest": "pnpm --filter @top-seed/contracts build && pnpm --filter @top-seed/domain build",
     "test": "pnpm -r test",
     "lint": "pnpm -r lint",
     "db:generate": "pnpm --filter @top-seed/api db:generate"

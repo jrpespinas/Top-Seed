@@ -21,4 +21,23 @@ describe("CourtBoard", () => {
     );
     expect(screen.getByText("Court 1")).toBeInTheDocument();
   });
+
+  it("uses a three-column grid for three courts on large screens", () => {
+    const { container } = render(
+      <CourtBoard
+        courts={[
+          { id: "court-1", sessionId: "session-1", name: "Court 1", status: "open", sortOrder: 0 },
+          { id: "court-2", sessionId: "session-1", name: "Court 2", status: "open", sortOrder: 1 },
+          { id: "court-3", sessionId: "session-1", name: "Court 3", status: "open", sortOrder: 2 },
+        ]}
+        matches={[]}
+        checkIns={[]}
+        sessionMode="live"
+        onStartMatch={vi.fn()}
+        onOpenMatch={vi.fn()}
+      />,
+    );
+    const grid = container.querySelector(".lg\\:grid-cols-3");
+    expect(grid).toBeTruthy();
+  });
 });

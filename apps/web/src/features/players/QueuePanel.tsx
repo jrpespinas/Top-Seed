@@ -42,6 +42,7 @@ export function QueuePanel({
       <QueueTab
         status={status}
         checkIns={poolCheckIns.filter((checkIn) => checkIn.queueStatus === status)}
+        totalCheckedIn={checkIns.filter((c) => c.queueStatus !== "removed").length}
         session={session}
         sessionMode={sessionMode}
         onUpdateCheckIn={onUpdateCheckIn}
@@ -51,8 +52,8 @@ export function QueuePanel({
   }));
 
   return (
-    <section className="rounded-card border border-border bg-surface p-4">
-      <h2 className="text-title font-semibold">Available players</h2>
+    <section className="rounded-card border border-border bg-surface p-4 lg:rounded-none lg:border-0 lg:bg-transparent lg:p-0">
+      <h2 className="text-title font-semibold lg:hidden">Available players</h2>
       <div className="mt-3">
         <Tabs items={tabs} defaultValue={activeTab} />
       </div>
@@ -63,6 +64,7 @@ export function QueuePanel({
 function QueueTab({
   status,
   checkIns,
+  totalCheckedIn,
   session,
   sessionMode,
   onUpdateCheckIn,
@@ -70,12 +72,30 @@ function QueueTab({
 }: {
   status: (typeof TAB_STATUSES)[number];
   checkIns: LocalCheckIn[];
+  totalCheckedIn: number;
   session: LocalSession;
   sessionMode: SessionMode;
   onUpdateCheckIn: QueuePanelProps["onUpdateCheckIn"];
   onOpenPlayerDetails?: (checkInId: string) => void;
 }) {
+  if (status === "waiting" && totalCheckedIn === 0) {
+    return (
+      <EmptyState
+        title="Check in your first players"
+        description="Search returning players or add a walk-in to start the queue."
+      />
+    );
+  }
+
   if (checkIns.length === 0) {
+    if (status === "waiting") {
+      return (
+        <EmptyState
+          title="No one waiting"
+          description="Players may be on court, in Next, or marked resting."
+        />
+      );
+    }
     return <EmptyState title={`No ${status} players`} />;
   }
 

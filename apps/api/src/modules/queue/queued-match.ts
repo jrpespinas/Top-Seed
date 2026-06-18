@@ -214,3 +214,74 @@ export async function promoteQueuedMatchToCourt(input: PromoteQueuedMatchInput) 
   const serverVersion = await bumpSessionVersion(input.sessionId);
   return { match: result, serverVersion };
 }
+
+export interface RemoveQueuedMatchInput {
+  queuedMatchId: string;
+  sessionId: string;
+}
+
+export async function removeQueuedMatch(input: RemoveQueuedMatchInput) {
+  const session = await prisma.session.findUnique({ where: { id: input.sessionId } });
+  if (!session) {
+    throw new UseCaseError("VALIDATION_ERROR", "Session not found.");
+  }
+  assertLiveSession(session.status);
+
+  const existing = await prisma.queuedMatch.findFirst({
+    where: { id: input.queuedMatchId, sessionId: input.sessionId },
+    include: { participants: true },
+  });
+
+  if (!existing || existing.status === "removed") {
+    const serverVersion = await bumpSessionVersion(input.sessionId);
+    return { serverVersion, serverUpdatedAt: new Date().toISOString() };
+  }
+
+  if (existing.status === "promoted") {
+    throw new UseCaseError("VALIDATION_ERROR", "Cannot remove a match already sent to court.");
+  }
+
+  await prisma.$transaction(async (tx) => {
+    const activeCourtCheckInIds = new Set<string>();
+    const activeMatches = await tx.match.findMany({
+      where: {
+        sessionId: input.sessionId,
+        status: { in: ["assigned", "in_progress"] },
+      },
+      include: { participants: true },
+    });
+    for (const match of activeMatches) {
+      for (const participant of match.participants) {
+        activeCourtCheckInIds.add(participant.checkInId);
+      }
+    }
+
+    for (const participant of existing.participants) {
+      const stillStaged = await tx.queuedMatch.count({
+        where: {
+          sessionId: input.sessionId,
+          id: { not: input.queuedMatchId },
+          status: { in: ["draft", "ready"] },
+          participants: { some: { checkInId: participant.checkInId } },
+        },
+      });
+      if (stillStaged === 0 && !activeCourtCheckInIds.has(participant.checkInId)) {
+        await tx.checkIn.update({
+          where: { id: participant.checkInId },
+          data: { queueStatus: "waiting" },
+        });
+      }
+    }
+
+    await tx.queuedMatchParticipant.deleteMany({
+      where: { queuedMatchId: input.queuedMatchId },
+    });
+    await tx.queuedMatch.update({
+      where: { id: input.queuedMatchId },
+      data: { status: "removed" },
+    });
+  });
+
+  const serverVersion = await bumpSessionVersion(input.sessionId);
+  return { serverVersion, serverUpdatedAt: new Date().toISOString() };
+}

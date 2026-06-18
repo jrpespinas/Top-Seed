@@ -41,8 +41,8 @@ export function SuggestionStrip({
   if (!suggestion) {
     return (
       <EmptyState
-        title="Need at least 4 waiting players for a suggestion"
-        description="Check in more players or clear skips to get a suggested match."
+        title="Need four waiting players"
+        description="Check in more players or clear skips to get a suggested doubles match."
       />
     );
   }

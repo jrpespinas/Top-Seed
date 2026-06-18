@@ -3,6 +3,7 @@ import { clearDatabase, db } from "../db/database.js";
 import { enqueueSyncAction, listBlockedOutboxActions } from "./outbox.js";
 import { flushOutbox, markDependentsBlocked, retryOutboxAction } from "./syncEngine.js";
 import * as connection from "./connection.js";
+import * as sessionApi from "../lib/session-api.js";
 
 const baseAction = {
   organizationId: "org-default",
@@ -44,16 +45,26 @@ describe("syncEngine blocked actions", () => {
 
   it("retryOutboxAction unblocks dependents and re-queues flush", async () => {
     vi.spyOn(connection, "getConnectionStatus").mockReturnValue(true);
+    vi.spyOn(sessionApi, "ensureSessionOnServer").mockResolvedValue();
+    vi.spyOn(sessionApi, "sessionExistsOnServer").mockResolvedValue(true);
     vi.stubGlobal(
       "fetch",
       vi.fn().mockResolvedValue({
         ok: true,
-        json: async () => ({
-          organizationId: "org-default",
-          deviceId: "device-1",
-          processedAt: "2026-06-09T10:02:00.000Z",
-          results: [{ actionId: "action-failed", status: "applied", entityType: "checkIn", entityId: "check-in-1" }],
-        }),
+        text: async () =>
+          JSON.stringify({
+            organizationId: "org-default",
+            deviceId: "device-1",
+            processedAt: "2026-06-09T10:02:00.000Z",
+            results: [
+              {
+                actionId: "action-failed",
+                status: "applied",
+                entityType: "checkIn",
+                entityId: "check-in-1",
+              },
+            ],
+          }),
       }),
     );
 

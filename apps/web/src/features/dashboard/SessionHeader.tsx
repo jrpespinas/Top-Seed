@@ -1,8 +1,5 @@
 import { Link } from "@tanstack/react-router";
-import { OfflineBanner } from "../../components/domain/offline-banner.js";
 import { SyncStatusBadge } from "../../components/domain/sync-status-badge.js";
-import { Button } from "../../components/ui/button.js";
-import { ConfirmAction } from "../../components/ui/confirm-action.js";
 import { formatDateTime } from "../../lib/format/datetime.js";
 import { formatMoney } from "../../lib/format/money.js";
 import { formatSessionStatus } from "../../lib/session-mode.js";
@@ -13,33 +10,22 @@ export interface SessionHeaderProps {
   session: LocalSession;
   courtCount: number;
   sessionMode: SessionMode;
-  connectionStatus: "online" | "offline";
   syncStatus: "pending" | "syncing" | "synced" | "failed";
   pendingCount: number;
-  failedCount: number;
   blockedCount?: number;
   lastSyncedAt?: string;
-  onCompleteSession: () => Promise<void>;
-  onRetrySync: () => void;
-  onReviewSyncIssues?: () => void;
 }
 
 export function SessionHeader({
   session,
   courtCount,
   sessionMode,
-  connectionStatus,
   syncStatus,
   pendingCount,
-  failedCount,
   blockedCount = 0,
   lastSyncedAt,
-  onCompleteSession,
-  onRetrySync,
-  onReviewSyncIssues,
 }: SessionHeaderProps) {
   const isLive = sessionMode === "live";
-  const showReview = failedCount > 0 || blockedCount > 0;
 
   return (
     <section className="space-y-3">
@@ -72,23 +58,8 @@ export function SessionHeader({
             pendingCount={pendingCount + blockedCount}
             lastSyncedAt={lastSyncedAt}
           />
-          {showReview && onReviewSyncIssues ? (
-            <Button variant="secondary" size="compact" onClick={onReviewSyncIssues}>
-              Review sync issues
-            </Button>
-          ) : null}
         </div>
       </div>
-      <OfflineBanner
-        connectionStatus={connectionStatus}
-        syncStatus={syncStatus}
-        pendingCount={pendingCount}
-        failedCount={failedCount}
-        blockedCount={blockedCount}
-        lastSyncedAt={lastSyncedAt}
-        onRetry={onRetrySync}
-        onReview={onReviewSyncIssues}
-      />
       <nav className="flex flex-wrap gap-2 text-caption">
         <Link
           to="/organizer/sessions/$sessionId/players"
@@ -119,18 +90,6 @@ export function SessionHeader({
           Leaderboard
         </Link>
       </nav>
-      {isLive ? (
-        <div className="flex flex-wrap gap-2">
-          <ConfirmAction
-            triggerLabel="Complete session"
-            title="Complete this session?"
-            description="Players still waiting will be marked done. This session becomes read-only."
-            confirmLabel="Complete session"
-            variant="danger"
-            onConfirm={onCompleteSession}
-          />
-        </div>
-      ) : null}
     </section>
   );
 }
