@@ -8,7 +8,7 @@ describe("TopSeedDatabase", () => {
   });
 
   it("opens the v1 schema", async () => {
-    expect(db.verno).toBe(1);
+    expect(db.verno).toBe(2);
     expect(db.tables.map((table) => table.name).sort()).toEqual(
       [
         "checkIns",

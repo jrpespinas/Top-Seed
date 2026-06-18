@@ -35,6 +35,7 @@ export function mergeCheckIns(
         paymentAmountPaid: server.paymentAmountPaid,
         paymentMethod: server.paymentMethod,
         paymentNotes: server.paymentNotes,
+        matchesPlayedInSession: 0,
         syncStatus: "synced",
         lastSyncedAt: new Date().toISOString(),
       });

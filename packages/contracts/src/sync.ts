@@ -138,4 +138,25 @@ export type SyncActionsRequest = z.infer<typeof syncActionsRequestSchema>;
 export type SyncActionResult = z.infer<typeof syncActionResultSchema>;
 export type SyncParticipantInput = z.infer<typeof syncParticipantInputSchema>;
 export type MatchResultInput = z.infer<typeof matchResultInputSchema>;
+export const updateCheckInPayloadSchema = z.object({
+  queueStatus: z
+    .enum(["waiting", "assigned", "playing", "resting", "done", "removed"])
+    .optional(),
+  sessionSkillRating: z.number().optional(),
+  suggestionExcluded: z.boolean().optional(),
+  suggestionExcludeNote: z.string().optional().nullable(),
+  paymentStatus: z.enum(["unpaid", "partial", "paid", "waived", "refunded"]).optional(),
+  paymentAmountPaid: z.number().nonnegative().optional(),
+  paymentMethod: z.string().optional(),
+  paymentNotes: z.string().optional(),
+});
+
+export const createPlayerPayloadSchema = z.object({
+  organizationId: z.string(),
+  displayName: z.string().min(1),
+  defaultSkillRating: z.number().default(3),
+  phone: z.string().optional(),
+});
+
+export type UpdateCheckInPayload = z.infer<typeof updateCheckInPayloadSchema>;
 export type CreateSessionRequest = z.infer<typeof createSessionRequestSchema>;

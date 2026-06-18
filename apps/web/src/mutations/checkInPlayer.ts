@@ -61,6 +61,9 @@ export async function checkInPlayerLocal(
           paymentAmountPaid: 0,
           paymentMethod: "none",
           paymentNotes: "",
+          matchesPlayedInSession: 0,
+          lastMatchEndedAt: null,
+          suggestionExcluded: false,
           syncStatus: "pending",
         };
 

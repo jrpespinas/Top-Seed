@@ -11,7 +11,11 @@ import { LocalSessionDevHarness } from "../components/LocalSessionDevHarness";
 import { ComponentGallery } from "../pages/dev/ComponentGallery";
 import { SessionListPage } from "../features/sessions/SessionListPage";
 import { NewSessionPage } from "../features/sessions/NewSessionPage";
-import { SessionDashboardPlaceholder } from "../features/sessions/SessionDashboardPlaceholder";
+import {
+  SessionDashboardPage,
+  SessionHistoryStubPage,
+  SessionPaymentsStubPage,
+} from "../features/dashboard/SessionDashboardPage";
 import { db } from "../db/database";
 
 function RootLayout() {
@@ -100,7 +104,19 @@ const newSessionRoute = createRoute({
 const dashboardRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/organizer/sessions/$sessionId/dashboard",
-  component: SessionDashboardPlaceholder,
+  component: SessionDashboardPage,
+});
+
+const paymentsRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/organizer/sessions/$sessionId/payments",
+  component: SessionPaymentsStubPage,
+});
+
+const historyRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/organizer/sessions/$sessionId/history",
+  component: SessionHistoryStubPage,
 });
 
 const devHarnessRoute = createRoute({
@@ -120,6 +136,8 @@ const routeTree = rootRoute.addChildren([
   sessionsRoute,
   newSessionRoute,
   dashboardRoute,
+  paymentsRoute,
+  historyRoute,
   devHarnessRoute,
   devComponentsRoute,
 ]);
