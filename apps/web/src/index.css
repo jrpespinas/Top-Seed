@@ -2,6 +2,10 @@
 @tailwind components;
 @tailwind utilities;
 
+/*
+ * Design tokens — groups: color, space, text, radius, size, surface roles
+ * See docs/specs/frontend/frontend-technical-standards.md
+ */
 :root {
   --color-background: #f8fafc;
   --color-foreground: #0f172a;
@@ -13,10 +17,37 @@
   --color-success: #15803d;
   --color-warning: #b45309;
   --color-danger: #b91c1c;
+  --color-surface: #ffffff;
+  --color-court: #134e4a;
+  --color-court-foreground: #ecfdf5;
+  --color-next: #c2410c;
+  --color-next-foreground: #fff7ed;
+  --color-attention: #b45309;
+  --color-attention-surface: #fffbeb;
+
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-6: 1.5rem;
+  --space-8: 2rem;
+
+  --text-caption: 0.875rem;
+  --text-body: 1rem;
+  --text-label: 0.9375rem;
+  --text-title: 1.125rem;
+  --text-heading: 1.5rem;
+  --text-display: 2rem;
+
+  --radius-control: 0.5rem;
+  --radius-card: 0.875rem;
+
+  --size-touch-min: 2.75rem;
 }
 
 body {
   @apply bg-background text-foreground antialiased;
   margin: 0;
   min-height: 100vh;
+  font-size: var(--text-body);
 }

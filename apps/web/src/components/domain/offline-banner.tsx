@@ -1,4 +1,6 @@
-import { SyncStatusBadge } from "./SyncStatusBadge";
+import { Button } from "../ui/button.js";
+import { SyncStatusBadge } from "./sync-status-badge.js";
+import { formatTime } from "../../lib/format/datetime.js";
 
 export interface OfflineBannerProps {
   connectionStatus: "online" | "offline";
@@ -23,7 +25,7 @@ export function OfflineBanner({
   if (connectionStatus === "offline") {
     message = "Offline. You can keep running this session.";
   } else if (failedCount > 0) {
-    message = `Sync failed for ${failedCount} change(s). Review and retry.`;
+    message = `Sync failed for ${failedCount} change${failedCount === 1 ? "" : "s"}. Review and retry.`;
   } else if (pendingCount > 0) {
     message = `${pendingCount} change${pendingCount === 1 ? "" : "s"} pending sync.`;
   } else if (syncStatus === "syncing") {
@@ -32,44 +34,36 @@ export function OfflineBanner({
 
   const tone =
     connectionStatus === "offline"
-      ? "border-amber-300 bg-amber-50 text-amber-900"
+      ? "border-warning/40 bg-attention-surface text-foreground"
       : failedCount > 0
-        ? "border-red-300 bg-red-50 text-red-900"
+        ? "border-danger/30 bg-red-50 text-danger"
         : pendingCount > 0
-          ? "border-amber-300 bg-amber-50 text-amber-900"
-          : "border-emerald-300 bg-emerald-50 text-emerald-900";
+          ? "border-warning/40 bg-attention-surface text-foreground"
+          : "border-success/30 bg-emerald-50 text-success";
 
   return (
     <div
-      className={`mb-4 flex flex-wrap items-center justify-between gap-3 rounded-md border px-3 py-2 text-sm ${tone}`}
+      className={`mb-4 flex flex-wrap items-center justify-between gap-3 rounded-card border px-3 py-2 text-body ${tone}`}
       role="status"
       aria-live="polite"
     >
       <div>
         <p>{message}</p>
         {lastSyncedAt && connectionStatus === "online" && failedCount === 0 && pendingCount === 0 ? (
-          <p className="mt-1 text-xs opacity-80">Last synced {new Date(lastSyncedAt).toLocaleTimeString()}</p>
+          <p className="mt-1 text-caption opacity-80">Last synced {formatTime(lastSyncedAt)}</p>
         ) : null}
       </div>
       <div className="flex items-center gap-2">
         <SyncStatusBadge status={syncStatus} pendingCount={pendingCount} size="compact" />
         {failedCount > 0 && onRetry ? (
-          <button
-            type="button"
-            onClick={onRetry}
-            className="rounded-md border border-current px-2 py-1 text-xs font-medium"
-          >
+          <Button variant="secondary" size="compact" onClick={onRetry}>
             Retry
-          </button>
+          </Button>
         ) : null}
         {failedCount > 0 && onReview ? (
-          <button
-            type="button"
-            onClick={onReview}
-            className="rounded-md border border-current px-2 py-1 text-xs font-medium"
-          >
+          <Button variant="ghost" size="compact" onClick={onReview}>
             Review
-          </button>
+          </Button>
         ) : null}
       </div>
     </div>

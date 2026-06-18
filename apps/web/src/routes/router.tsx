@@ -8,6 +8,7 @@ import {
 } from "@tanstack/react-router";
 import { ApiStatusBanner } from "../components/ApiStatusBanner";
 import { LocalSessionDevHarness } from "../components/LocalSessionDevHarness";
+import { ComponentGallery } from "../pages/dev/ComponentGallery";
 
 function RootLayout() {
   return (
@@ -19,6 +20,11 @@ function RootLayout() {
             <Link to="/organizer/sessions" className="hover:text-primary">
               Sessions
             </Link>
+            {import.meta.env.DEV ? (
+              <Link to="/dev/components" className="hover:text-primary">
+                Components
+              </Link>
+            ) : null}
           </nav>
         </div>
       </header>
@@ -37,6 +43,17 @@ function PlaceholderPage({ title, description }: { title: string; description: s
       <p className="mt-4 rounded-md bg-muted px-3 py-2 text-sm">Phase 0 scaffold — UI lands in later phases.</p>
     </section>
   );
+}
+
+function DevComponentsPage() {
+  if (!import.meta.env.DEV) {
+    return (
+      <section className="rounded-lg border border-border bg-white p-6 shadow-sm">
+        <h1 className="text-2xl font-semibold">Not found</h1>
+      </section>
+    );
+  }
+  return <ComponentGallery />;
 }
 
 function SessionsPage() {
@@ -102,11 +119,18 @@ const dashboardRoute = createRoute({
   component: DashboardPage,
 });
 
+const devComponentsRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/dev/components",
+  component: DevComponentsPage,
+});
+
 const routeTree = rootRoute.addChildren([
   indexRoute,
   sessionsRoute,
   newSessionRoute,
   dashboardRoute,
+  devComponentsRoute,
 ]);
 
 export const router = createRouter({ routeTree });

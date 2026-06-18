@@ -2,8 +2,9 @@ import { useCallback, useEffect, useState } from "react";
 import { checkInPlayerLocal } from "../mutations/checkInPlayer.js";
 import { useLiveSession } from "../hooks/useLiveSession.js";
 import { useSyncEngine } from "../hooks/useSyncEngine.js";
-import { OfflineBanner } from "./OfflineBanner.js";
-import { SyncStatusBadge } from "./SyncStatusBadge.js";
+import { OfflineBanner } from "./domain/offline-banner.js";
+import { SyncStatusBadge } from "./domain/sync-status-badge.js";
+import { Button } from "./ui/button.js";
 import {
   DEV_SESSION_ID,
   ensureDevSessionSeeded,
@@ -80,21 +81,20 @@ export function LocalSessionDevHarness() {
       </div>
 
       <div className="flex flex-wrap items-center gap-3">
-        <button
-          type="button"
+        <Button
           disabled={busy || players.length === checkIns.length}
           onClick={() => void checkInNext()}
-          className="rounded-md bg-primary px-3 py-2 text-sm font-medium text-white disabled:opacity-50"
         >
           Check in next player
-        </button>
-        <button
-          type="button"
-          onClick={() => void sync.runSync()}
-          className="rounded-md border border-border px-3 py-2 text-sm"
-        >
+        </Button>
+        <Button variant="secondary" onClick={() => void sync.runSync()}>
           Sync now
-        </button>
+        </Button>
+        {import.meta.env.DEV ? (
+          <a href="/dev/components" className="text-caption text-primary hover:underline">
+            Component gallery →
+          </a>
+        ) : null}
       </div>
 
       <ul className="mt-4 divide-y divide-border rounded-md border border-border">
