@@ -29,25 +29,29 @@ function RootLayout() {
 
   return (
     <div className="min-h-screen">
-      <header className="border-b border-border bg-white px-4 py-3">
-        <div className={`mx-auto flex ${shellWidth} items-center justify-between`}>
-          <span className="text-lg font-semibold text-primary">Top Seed</span>
-          <nav className="flex gap-4 text-sm">
-            <Link to="/organizer/sessions" className="hover:text-primary">
-              Sessions
+      {!isSessionWorkspace ? (
+        <header className="border-b border-border bg-white px-4 py-3">
+          <div className={`mx-auto flex ${shellWidth} items-center justify-between`}>
+            <Link to="/organizer/sessions" className="text-lg font-semibold text-primary">
+              Top Seed
             </Link>
-            <Link to="/organizer/leaderboard" className="hover:text-primary">
-              Leaderboard
-            </Link>
-            {import.meta.env.DEV ? (
-              <Link to="/dev/components" className="hover:text-primary">
-                Components
+            <nav className="flex gap-4 text-sm">
+              <Link to="/organizer/sessions" className="hover:text-primary">
+                Sessions
               </Link>
-            ) : null}
-          </nav>
-        </div>
-      </header>
-      <main className={`mx-auto ${shellWidth} p-4`}>
+              <Link to="/organizer/leaderboard" className="hover:text-primary">
+                Leaderboard
+              </Link>
+              {import.meta.env.DEV ? (
+                <Link to="/dev/components" className="hover:text-primary">
+                  Components
+                </Link>
+              ) : null}
+            </nav>
+          </div>
+        </header>
+      ) : null}
+      <main className={`mx-auto ${shellWidth} ${isSessionWorkspace ? "px-3 py-2" : "p-4"}`}>
         <Outlet />
       </main>
     </div>
@@ -136,6 +140,12 @@ const historyRoute = createRoute({
 const playersRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/organizer/sessions/$sessionId/players",
+  beforeLoad: ({ params }) => {
+    throw redirect({
+      to: "/organizer/sessions/$sessionId/dashboard",
+      params: { sessionId: params.sessionId },
+    });
+  },
   component: SessionPlayersPage,
 });
 

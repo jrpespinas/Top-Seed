@@ -56,7 +56,11 @@ Rules:
 - `components/ui` should contain custom styled primitives, not raw imports from a generic kit.
 - Radix should provide behavior; Tailwind tokens should provide look and spacing.
 - shadcn-style components may be used as a starting pattern, but default visuals must be replaced by Top Seed tokens.
-- Domain components such as `CourtCard`, `PlayerRow`, and `MatchCard` should remain custom.
+- Domain components such as `CourtCard`, `PlayerRow`, `PlayerCard`, and `MatchCard` should remain custom.
+
+### shadcn-style primitives to add when missing
+
+Avatar, Badge, ScrollArea, and Separator — copy/adapt from shadcn/ui patterns using project tokens. Do not import default shadcn theme colors wholesale.
 
 ## Styling And Tokens
 

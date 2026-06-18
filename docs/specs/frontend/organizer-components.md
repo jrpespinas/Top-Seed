@@ -12,15 +12,17 @@ Use these names in code, specs, and UI copy. **Aliases are deprecated**—do not
 
 | Canonical | Pegboard | Aliases (deprecated) | Spec |
 |-----------|----------|----------------------|------|
-| `PlayerPool` | Available | — | `features/organizer/player-pool.md` |
-| `NextQueuePanel` | Next | `SuggestedMatchPanel`, `NextQueue` | `features/organizer/next-queue-panel.md` |
-| `CourtBoard` | Now | — | `features/organizer/court-board.md` |
+| `PlayerPool` | Available (display: **Player List**) | — | `features/organizer/player-pool.md` |
+| `NextQueuePanel` | Next (display: **Upcoming Matches**) | `SuggestedMatchPanel`, `NextQueue` | `features/organizer/next-queue-panel.md` |
+| `CourtBoard` | Now (display: **Courts**) | — | `features/organizer/court-board.md` |
 
 ### Feature components
 
 | Canonical | Role | Spec |
 |-----------|------|------|
-| `SessionHeader` | Session identity and session-level actions | `features/organizer/session-header.md` |
+| `SessionWorkspaceBar` | Immersive sticky session chrome | `features/organizer/session-header.md` |
+| `SessionWorkspaceShell` | Shared chrome wrapper for session sub-routes | `features/organizer/session-workspace-shell.md` |
+| `SessionHeader` | Deprecated alias for `SessionWorkspaceBar` | `features/organizer/session-header.md` |
 | `AttentionRail` | Exception strip (unpaid, sync, offline) on desktop | `features/organizer/attention-rail.md` |
 | `PegboardLayout` | Three-zone dashboard grid shell | `features/organizer/live-dashboard-layout.md` |
 | `SupportingStrip` | Compact secondary row (payments teaser, links) | `features/organizer/live-dashboard-layout.md` |
@@ -51,25 +53,31 @@ Removed from MVP v1 (do not implement): `onAutoFillQueue` and aliases `onAutoFil
 |-----------|------------|
 | **Add to Next queue** / **Add to [lane name]** | Accept suggestion (when label implies court assign) |
 | **Send to court** | Assign to court (for promote from lane) |
-| — | **Auto-fill**, **Magic Queue** (not in MVP v1) |
+| **Magic Queue** | Accept suggestion into selected lane (pegboard footer) |
 
 ### Dashboard composition tree
 
 ```text
 OrganizerSessionDashboard
-├── SessionHeader
+├── SessionWorkspaceBar
 ├── AttentionRail (conditional; desktop)
 ├── PegboardLayout
-│   ├── PlayerPool
+│   ├── PlayerPool (Player List)
 │   │   ├── PlayerCheckInPanel
-│   │   └── QueuePanel
-│   ├── CourtBoard
-│   └── NextQueuePanel
-│       └── QueueLaneManagement
+│   │   └── QueuePanel (filter chips + PlayerCard)
+│   ├── NextQueuePanel (Upcoming Matches)
+│   │   └── QueueLaneManagement
+│   └── CourtBoard (Courts)
 ├── SupportingStrip (after first check-in; desktop)
 ├── SessionStatusBar (mobile More tab only)
 ├── PlayerDetailDrawer (overlay; opened from rows)
-└── SyncReviewPanel (overlay; opened from header/rail)
+└── SyncReviewPanel (overlay; opened from attention rail or sync review hook)
+
+OrganizerSessionPayments / OrganizerSessionHistory
+├── SessionWorkspaceShell
+│   ├── SessionWorkspaceBar
+│   └── SyncReviewPanel (via useSessionChrome)
+└── Page feature content (payments list, history filters, etc.)
 ```
 
 Full `PaymentSummaryPanel`, `RecentMatchesPanel`, and leaderboard preview are **route-level** on desktop — linked from `SupportingStrip`, not pegboard siblings.
@@ -80,9 +88,9 @@ Full `PaymentSummaryPanel`, `RecentMatchesPanel`, and leaderboard preview are **
 
 The live dashboard should be composed per `features/organizer/live-dashboard-layout.md`:
 
-- `SessionHeader`
+- `SessionWorkspaceBar` (or deprecated `SessionHeader` alias)
 - `AttentionRail` (desktop exceptions)
-- `PegboardLayout` wrapping `PlayerPool`, `CourtBoard`, `NextQueuePanel`
+- `PegboardLayout` wrapping `PlayerPool`, `NextQueuePanel`, `CourtBoard` (left → right)
 - `SupportingStrip`
 - `ActiveMatchPanel`
 - `SessionStatusBar` on mobile **More** tab only
@@ -94,22 +102,48 @@ MVP player operations are organizer-managed. Do not implement player self-servic
 
 ## Components
 
-### SessionHeader
+### SessionWorkspaceBar
 
 Purpose:
 
-- Show session name, venue, date/time, and high-level actions.
+- Immersive sticky session chrome on workspace routes.
+- Branding crumbs, session identity, status chip, sync badge, overflow navigation.
 
 Props:
 
-- `session`
-- `onEditSession`
-- `onCompleteSession`
+- `session`, `courtCount`, `sessionMode`
+- `syncStatus`, `pendingCount`, `blockedCount`, `lastSyncedAt`
+- `activeView`, `sticky`, `className`
 
 Rules:
 
-- Completing a session requires confirmation.
-- Cancelled or completed sessions should become mostly read-only.
+- Global app header is hidden on session workspace routes.
+- Complete / cancel session actions are **not** in the bar (use `SupportingStrip` on dashboard).
+- Secondary routes via overflow menu, not pill row.
+- `SessionHeader` is a deprecated alias — use `SessionWorkspaceBar`.
+
+Spec: `features/organizer/session-header.md`.
+
+### SessionWorkspaceShell
+
+Purpose:
+
+- Share `SessionWorkspaceBar` + `useSessionChrome` + sync review overlay across payments and history pages.
+
+Props:
+
+- `sessionId`, `activeView`, `children`, `sticky`
+
+Rules:
+
+- Do not use on the live dashboard (dashboard composes bar + pegboard directly).
+- Do not duplicate `SessionSyncBar` or page-specific headers inside children.
+
+Spec: `features/organizer/session-workspace-shell.md`.
+
+### SessionHeader (deprecated)
+
+Alias for `SessionWorkspaceBar`. Do not reference in new work.
 
 ### SessionStatusBar
 
@@ -367,4 +401,5 @@ Mobile:
 
 Desktop:
 
-- Allow wider dashboard with payments and recent matches visible simultaneously.
+- Immersive session workspace on live routes; payments/history use `SessionWorkspaceShell`.
+- Pegboard is the hero on dashboard; link to full payments/history from `SupportingStrip` or overflow menu.

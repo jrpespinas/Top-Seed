@@ -40,6 +40,9 @@ Payment changes must work offline: save locally first, update totals immediately
 
 ## Component Composition
 
+Wrapped in `SessionWorkspaceShell` with `activeView="payments"`. Spec: `features/organizer/session-workspace-shell.md`.
+
+- `SessionWorkspaceBar` (via shell) — session chrome and overflow navigation
 - `PaymentSummaryPanel` (full totals on this page)
 - Filter bar (`Tabs` or `Select` by status)
 - Payment list: `PlayerRow` + `PaymentBadge` per check-in
@@ -47,8 +50,9 @@ Payment changes must work offline: save locally first, update totals immediately
 - `MetricCard` for summary tiles when layout uses them
 - `PlayerDetailDrawer` (optional overlay for player context)
 - `ConfirmAction` for refund and reset
-- `OfflineBanner`
-- `SyncStatusBadge`
+- `SyncReviewPanel` (via shell — not a duplicate page header)
+
+Do **not** compose a separate `SessionSyncBar`, `OfflineBanner`, or duplicate `SyncStatusBadge` row on this page. Sync state appears in the workspace bar badge; failures use sync review from the shell.
 
 ## Payment Statuses
 
@@ -91,7 +95,7 @@ Use this when you returned their payment outside the app. Collected total will d
 - Filter by status: All, Unpaid, Partial, Paid, Waived, Refunded.
 - Sort by name or status (default: unpaid first).
 - Open `PlayerDetailDrawer` from a row.
-- Return to dashboard.
+- Return to dashboard via workspace bar overflow (**Live dashboard**) or browser back.
 
 ## Session Totals (`PaymentSummaryDto`)
 

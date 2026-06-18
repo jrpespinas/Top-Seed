@@ -1,16 +1,23 @@
+import { useMemo, useState } from "react";
 import { Tabs } from "../../components/ui/tabs.js";
+import { FilterChips } from "../../components/ui/filter-chips.js";
+import { PlayerCard } from "../../components/domain/player-card.js";
 import { PlayerRow } from "../../components/domain/player-row.js";
 import { EmptyState } from "../../components/ui/empty-state.js";
-import type { LocalCheckIn, LocalSession } from "../../db/types.js";
+import type { LocalCheckIn, LocalQueuedMatch, LocalSession } from "../../db/types.js";
 import type { SessionMode } from "../../components/domain/types.js";
 import type { PaymentStatus } from "../../components/domain/payment-badge.js";
 
 const TAB_STATUSES = ["waiting", "resting", "done", "removed"] as const;
+const FILTER_CHIPS = ["all", "available", "queued", "playing"] as const;
+type FilterChip = (typeof FILTER_CHIPS)[number];
 
 export interface QueuePanelProps {
   session: LocalSession;
   checkIns: LocalCheckIn[];
+  queuedMatches?: LocalQueuedMatch[];
   sessionMode: SessionMode;
+  layout?: "default" | "pegboard";
   activeTab?: string;
   onTabChange?: (tab: string) => void;
   onUpdateCheckIn: (input: {
@@ -22,18 +29,88 @@ export interface QueuePanelProps {
   onOpenPlayerDetails?: (checkInId: string) => void;
 }
 
+function filterByChip(checkIns: LocalCheckIn[], chip: FilterChip): LocalCheckIn[] {
+  switch (chip) {
+    case "available":
+      return checkIns.filter((c) => c.queueStatus === "waiting" || c.queueStatus === "resting");
+    case "queued":
+      return checkIns.filter((c) => c.queueStatus === "assigned");
+    case "playing":
+      return checkIns.filter((c) => c.queueStatus === "playing");
+    default:
+      return checkIns.filter((c) => c.queueStatus !== "removed");
+  }
+}
+
+function queuePositionFor(
+  checkInId: string,
+  queuedMatches: LocalQueuedMatch[] | undefined,
+): number | undefined {
+  if (!queuedMatches) {
+    return undefined;
+  }
+  const active = queuedMatches.filter((m) => m.status === "draft" || m.status === "ready");
+  for (let index = 0; index < active.length; index += 1) {
+    const match = active[index];
+    if (match?.participants.some((p) => p.checkInId === checkInId)) {
+      return index + 1;
+    }
+  }
+  return undefined;
+}
+
 export function QueuePanel({
   session,
   checkIns,
+  queuedMatches,
   sessionMode,
+  layout = "default",
   activeTab = "waiting",
   onTabChange,
   onUpdateCheckIn,
   onOpenPlayerDetails,
 }: QueuePanelProps) {
+  const [filterChip, setFilterChip] = useState<FilterChip>("all");
+
   const poolCheckIns = checkIns.filter(
     (checkIn) => checkIn.queueStatus !== "assigned" && checkIn.queueStatus !== "playing",
   );
+
+  const chipCounts = useMemo(() => {
+    const active = checkIns.filter((c) => c.queueStatus !== "removed");
+    return {
+      all: active.length,
+      available: active.filter((c) => c.queueStatus === "waiting" || c.queueStatus === "resting").length,
+      queued: active.filter((c) => c.queueStatus === "assigned").length,
+      playing: active.filter((c) => c.queueStatus === "playing").length,
+    };
+  }, [checkIns]);
+
+  if (layout === "pegboard") {
+    const filtered = filterByChip(checkIns, filterChip);
+    return (
+      <div className="space-y-2">
+        <FilterChips
+          value={filterChip}
+          onChange={(value) => setFilterChip(value as FilterChip)}
+          options={[
+            { value: "all", label: "All", count: chipCounts.all },
+            { value: "available", label: "Available", count: chipCounts.available },
+            { value: "queued", label: "Queued", count: chipCounts.queued },
+            { value: "playing", label: "Playing", count: chipCounts.playing },
+          ]}
+        />
+        <PegboardList
+          checkIns={filtered}
+          session={session}
+          sessionMode={sessionMode}
+          queuedMatches={queuedMatches}
+          onUpdateCheckIn={onUpdateCheckIn}
+          onOpenPlayerDetails={onOpenPlayerDetails}
+        />
+      </div>
+    );
+  }
 
   const tabs = TAB_STATUSES.map((status) => ({
     value: status,
@@ -58,6 +135,74 @@ export function QueuePanel({
         <Tabs items={tabs} defaultValue={activeTab} />
       </div>
     </section>
+  );
+}
+
+function PegboardList({
+  checkIns,
+  session,
+  sessionMode,
+  queuedMatches,
+  onUpdateCheckIn,
+  onOpenPlayerDetails,
+}: {
+  checkIns: LocalCheckIn[];
+  session: LocalSession;
+  sessionMode: SessionMode;
+  queuedMatches?: LocalQueuedMatch[];
+  onUpdateCheckIn: QueuePanelProps["onUpdateCheckIn"];
+  onOpenPlayerDetails?: (checkInId: string) => void;
+}) {
+  if (checkIns.length === 0) {
+    return (
+      <EmptyState
+        title="No players in this filter"
+        description="Try another filter or check in more players."
+      />
+    );
+  }
+
+  return (
+    <ul className="space-y-2">
+      {checkIns.map((checkIn) => {
+        const actions =
+          sessionMode === "live"
+            ? buildActions(checkIn.queueStatus as (typeof TAB_STATUSES)[number] | "assigned" | "playing", checkIn, onUpdateCheckIn)
+            : [];
+        return (
+          <li key={checkIn.id}>
+            <PlayerCard
+              player={{ id: checkIn.playerProfileId, displayName: checkIn.playerDisplayName }}
+              checkIn={{
+                queueStatus: checkIn.queueStatus,
+                sessionSkillRating: checkIn.sessionSkillRating,
+                checkedInAt: checkIn.checkedInAt,
+                matchesPlayed: checkIn.matchesPlayedInSession,
+                suggestionExcluded: checkIn.suggestionExcluded,
+              }}
+              payment={{
+                status: checkIn.paymentStatus as PaymentStatus,
+                amountDue: checkIn.paymentAmountDue,
+                amountPaid: checkIn.paymentAmountPaid,
+                currency: session.currency,
+              }}
+              queuePosition={queuePositionFor(checkIn.id, queuedMatches)}
+              sessionMode={sessionMode}
+              actions={actions}
+              onOpenPlayerDetails={
+                onOpenPlayerDetails ? () => onOpenPlayerDetails(checkIn.id) : undefined
+              }
+              onRemove={
+                sessionMode === "live" &&
+                (checkIn.queueStatus === "waiting" || checkIn.queueStatus === "resting")
+                  ? () => void onUpdateCheckIn({ checkInId: checkIn.id, queueStatus: "removed" })
+                  : undefined
+              }
+            />
+          </li>
+        );
+      })}
+    </ul>
   );
 }
 
@@ -103,9 +248,7 @@ function QueueTab({
     <ul className="divide-y divide-border">
       {checkIns.map((checkIn) => {
         const actions =
-          sessionMode === "live"
-            ? buildActions(status, checkIn, onUpdateCheckIn)
-            : [];
+          sessionMode === "live" ? buildActions(status, checkIn, onUpdateCheckIn) : [];
         return (
           <li key={checkIn.id}>
             <PlayerRow
@@ -137,7 +280,7 @@ function QueueTab({
 }
 
 function buildActions(
-  tabStatus: (typeof TAB_STATUSES)[number],
+  tabStatus: (typeof TAB_STATUSES)[number] | "assigned" | "playing",
   checkIn: LocalCheckIn,
   onUpdateCheckIn: QueuePanelProps["onUpdateCheckIn"],
 ) {

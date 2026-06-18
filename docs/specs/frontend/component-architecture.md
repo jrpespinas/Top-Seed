@@ -34,12 +34,12 @@ The organizer dashboard should be court-first and pegboard-inspired. **Canonical
 
 Desktop composition (≥1280px):
 
-- **Session chrome:** `SessionHeader` (compact; see `session-header.md`).
+- **Session chrome:** `SessionWorkspaceBar` (immersive sticky bar; global app header hidden on session routes — see `session-header.md`).
 - **Attention rail (conditional):** `AttentionRail` — unpaid, sync failure, offline only (`attention-rail.md`). Do **not** render a six-tile `SessionStatusBar` on desktop.
 - **Pegboard (`PegboardLayout`):** three columns without page scroll for core ops (~70vh min):
   - Left (~22%): `PlayerPool` — compact check-in + waiting list.
-  - Center (~48%): `CourtBoard` — horizontal court strip for 3 courts; largest zone typography.
-  - Right (~30%): `NextQueuePanel` — suggestions, lanes, send to court.
+  - Center (~30%): `NextQueuePanel` — suggestions, lanes, send to court.
+  - Right (~48%): `CourtBoard` — vertical court stack; largest zone.
 - **Supporting strip:** `SupportingStrip` — one muted row (collected total, last match teaser, links). Hidden until first check-in. **Not** full-width `PaymentSummaryPanel` / `RecentMatchesPanel` / `LeaderboardPreview` cards.
 
 **Deprecated desktop pattern:** pegboard grid followed by a separate `lg:grid-cols-2` block for payments, history, and leaderboard. That layout buries courts and reads as a generic admin dashboard.
@@ -66,7 +66,7 @@ Organizer routes:
 - `/organizer/sessions`
 - `/organizer/sessions/new`
 - `/organizer/sessions/:sessionId/dashboard`
-- `/organizer/sessions/:sessionId/players`
+- `/organizer/sessions/:sessionId/players` (redirects to dashboard in MVP v1)
 - `/organizer/sessions/:sessionId/payments`
 - `/organizer/sessions/:sessionId/history`
 - `/leaderboard` or `/organizer/leaderboard`
@@ -77,7 +77,20 @@ Future player routes:
 - `/session/:sessionId/status`
 - `/player/me`
 
-## Component Layers
+## App Shell (Root Layout)
+
+The root layout chooses between **global** and **immersive session** chrome:
+
+| Route class | Global header | Main width | Session chrome |
+|-------------|---------------|------------|----------------|
+| Sessions list, new session, leaderboard, dev | Visible (`Top Seed` + nav links) | `max-w-6xl` | — |
+| `/organizer/sessions/:sessionId/{dashboard,payments,history,players}` | **Hidden** | `max-w-[1400px]` | `SessionWorkspaceBar` |
+
+Session sub-pages (payments, history) wrap content in `SessionWorkspaceShell` so chrome and sync review wiring stay DRY. The live dashboard composes `SessionWorkspaceBar` directly with pegboard regions below.
+
+Secondary session navigation uses the workspace bar **overflow menu**, not a global nav Players link or an always-visible pill row.
+
+Specs: `features/organizer/session-header.md`, `features/organizer/session-workspace-shell.md`.
 
 Use four component layers:
 

@@ -32,7 +32,7 @@ Do **not** compose six equal `MetricCard` components in this rail on desktop.
 | Offline with pending local changes | Yes | Offline banner content |
 | Syncing | Optional thin “Syncing…” line | Non-blocking |
 
-When synced and healthy, sync state appears only as **`SyncStatusBadge` in session chrome** — not a second full-width green banner.
+When synced and healthy, sync state appears only as **`SyncStatusBadge` in `SessionWorkspaceBar`** — not a second full-width green banner.
 
 ## Actions Emitted
 

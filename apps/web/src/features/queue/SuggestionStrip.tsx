@@ -16,6 +16,7 @@ export interface SuggestionStripProps {
   selectedLaneName: string;
   openCourtCount: number;
   onAccept: () => void;
+  compact?: boolean;
 }
 
 export function SuggestionStrip({
@@ -25,6 +26,7 @@ export function SuggestionStrip({
   selectedLaneName,
   openCourtCount,
   onAccept,
+  compact = false,
 }: SuggestionStripProps) {
   if (sessionMode === "ended") {
     return null;
@@ -32,7 +34,7 @@ export function SuggestionStrip({
 
   if (queueMode === "manual") {
     return (
-      <p className="rounded-card border border-border bg-muted/40 px-4 py-3 text-body text-muted-foreground">
+      <p className="rounded-card border border-border bg-muted/40 px-3 py-2 text-body text-muted-foreground">
         Manual queue mode — build matches in Next lanes.
       </p>
     );
@@ -50,9 +52,9 @@ export function SuggestionStrip({
   return (
     <section
       aria-label="Suggested next match"
-      className="rounded-card border border-next/30 bg-next/5 p-4"
+      className="rounded-card border border-next/30 bg-next/5 p-3"
     >
-      <h3 className="text-title font-semibold">Suggested next match</h3>
+      <h3 className="text-label font-semibold">Suggested next match</h3>
       <p className="mt-1 text-caption text-muted-foreground">{suggestion.explanation}</p>
       <MatchCard
         variant="queued"
@@ -70,9 +72,11 @@ export function SuggestionStrip({
           All courts busy — you can still add to Next queue.
         </p>
       ) : null}
-      <Button className="mt-3" variant="primary" onClick={onAccept}>
-        Add to {selectedLaneName}
-      </Button>
+      {!compact ? (
+        <Button className="mt-3" variant="primary" onClick={onAccept}>
+          Add to {selectedLaneName}
+        </Button>
+      ) : null}
     </section>
   );
 }

@@ -37,7 +37,7 @@ The dashboard should behave like a digital pegboard: available players move into
 
 **Layout shell:** `docs/specs/frontend/features/organizer/live-dashboard-layout.md`
 
-- `SessionHeader` — compact session chrome
+- `SessionWorkspaceBar` — immersive sticky session chrome (global app header hidden on this route)
 - `AttentionRail` — conditional exceptions (desktop); replaces `SessionStatusBar` on desktop
 - `PegboardLayout` — three-zone grid
   - `PlayerPool`: composes `PlayerCheckInPanel` and `QueuePanel`. See `features/organizer/player-pool.md`.
@@ -113,9 +113,14 @@ Mobile:
 
 ## Navigation
 
-- Payments link goes to `/organizer/sessions/:sessionId/payments`.
-- Player management link goes to `/organizer/sessions/:sessionId/players`.
-- History link goes to `/organizer/sessions/:sessionId/history`.
+Secondary routes are reached from the workspace bar **overflow menu** (`···`), not a pill row:
+
+- Payments → `/organizer/sessions/:sessionId/payments`
+- Match history → `/organizer/sessions/:sessionId/history`
+- Leaderboard (this session) → `/organizer/leaderboard?sessionId=:sessionId`
+- All sessions → `/organizer/sessions`
+
+`/organizer/sessions/:sessionId/players` redirects to the dashboard in MVP v1. Player check-in and queue management live on the dashboard `PlayerPool`.
 
 ## API Endpoints
 

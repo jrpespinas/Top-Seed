@@ -17,10 +17,22 @@ State transition rules: `docs/specs/backend/state-transitions.md`.
 - `suggestionExcluded` and `suggestionExcludeNote` when set.
 - Per-player/check-in sync status for locally pending queue changes.
 
-Players with `assigned` or `playing` status do not appear in Available tabs. They appear on Next-lane cards and court cards.
+Players with `assigned` or `playing` status appear in **Queued** and **Playing** filter chips on desktop. On mobile, `waiting` / `resting` / `done` / `removed` tabs remain.
+
+## Filter Chips (desktop)
+
+| Chip | Queue statuses shown |
+|------|----------------------|
+| All | All except `removed` (default) |
+| Available | `waiting`, `resting` |
+| Queued | `assigned` |
+| Playing | `playing` |
+
+Render as horizontal chip row above the player card list. Use `PlayerCard` for each row on desktop pegboard.
 
 ## Child Components
 
+- `PlayerCard` (desktop list; `PlayerRow` on mobile or compact contexts)
 - `PlayerRow`
 - `Tabs`
 - `SearchInput`

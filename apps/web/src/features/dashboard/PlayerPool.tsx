@@ -2,7 +2,7 @@ import type { PlayerCheckInPanelProps } from "../players/PlayerCheckInPanel.js";
 import type { QueuePanelProps } from "../players/QueuePanel.js";
 import { PlayerCheckInPanel } from "../players/PlayerCheckInPanel.js";
 import { QueuePanel } from "../players/QueuePanel.js";
-import type { LocalCheckIn, LocalPlayerProfile, LocalSession } from "../../db/types.js";
+import type { LocalCheckIn, LocalPlayerProfile, LocalQueuedMatch, LocalSession } from "../../db/types.js";
 import type { SessionMode } from "../../components/domain/types.js";
 
 export interface PlayerPoolProps {
@@ -10,6 +10,8 @@ export interface PlayerPoolProps {
   sessionMode: SessionMode;
   playerProfiles: LocalPlayerProfile[];
   checkIns: LocalCheckIn[];
+  queuedMatches?: LocalQueuedMatch[];
+  layout?: "default" | "pegboard";
   queueTab?: string;
   onCheckIn: PlayerCheckInPanelProps["onCheckIn"];
   onCreateWalkIn: PlayerCheckInPanelProps["onCreateWalkIn"];
@@ -22,6 +24,8 @@ export function PlayerPool({
   sessionMode,
   playerProfiles,
   checkIns,
+  queuedMatches,
+  layout = "default",
   queueTab,
   onCheckIn,
   onCreateWalkIn,
@@ -29,7 +33,7 @@ export function PlayerPool({
   onOpenPlayerDetails,
 }: PlayerPoolProps) {
   return (
-    <div className="space-y-4">
+    <div className="space-y-3">
       <PlayerCheckInPanel
         sessionMode={sessionMode}
         feeAmount={session.feeAmount}
@@ -42,7 +46,9 @@ export function PlayerPool({
       <QueuePanel
         session={session}
         checkIns={checkIns}
+        queuedMatches={queuedMatches}
         sessionMode={sessionMode}
+        layout={layout}
         activeTab={queueTab}
         onUpdateCheckIn={onUpdateCheckIn}
         onOpenPlayerDetails={onOpenPlayerDetails}

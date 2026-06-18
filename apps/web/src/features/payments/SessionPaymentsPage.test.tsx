@@ -45,6 +45,7 @@ describe("SessionPaymentsPage", () => {
     });
 
     renderPage(<SessionPaymentsPage />);
-    expect(await screen.findByText(/Payments · Friday Night/)).toBeInTheDocument();
+    expect(await screen.findByText(/Friday Night/)).toBeInTheDocument();
+    expect(await screen.findByText(/· Payments/)).toBeInTheDocument();
   });
 });

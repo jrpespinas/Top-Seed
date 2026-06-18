@@ -4,7 +4,15 @@
 
 Help the organizer see the `Now` state of the session: all courts, occupied players, open slots, and the next court action.
 
+Desktop display label: **Courts**. Zone header: `Courts · {n} active`.
+
 The board should feel like the court section of a physical pegboard, where each court is a spatial container and players occupy visible Team A / Team B slots.
+
+## Desktop Pegboard Layout
+
+- Courts render in a **vertical stack** inside the right pegboard column.
+- Column scrolls when court count exceeds visible height.
+- Do not use horizontal court strips or orphan grids on desktop pegboard.
 
 ## Data Required
 
@@ -64,7 +72,9 @@ MVP v1 has no login or role checks. See `docs/specs/mvp-access.md`.
 ## Acceptance Criteria
 
 - Every court has exactly one visible status.
-- Court cards show Team A and Team B slots, including empty slots when not full.
+- Court cards show capacity `{filled}/4` in the header.
+- Court cards show Team A and Team B slots with nested player mini-cards or dashed drop zones.
+- Court footer shows match summary and **Start Match** when assigned.
 - Occupied courts show players by team pair, not as a flat list.
 - Paused or unavailable courts are excluded from auto-assignment.
 - Open courts make moving the next queued match onto the court easy.

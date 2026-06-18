@@ -92,4 +92,36 @@ describe("QueuePanel", () => {
     );
     expect(screen.getByText("Check in your first players")).toBeInTheDocument();
   });
+
+  it("renders filter chips and player cards on pegboard layout", () => {
+    render(
+      <QueuePanel
+        session={session}
+        sessionMode="live"
+        layout="pegboard"
+        checkIns={[
+          {
+            id: "check-in-1",
+            sessionId: "session-1",
+            playerProfileId: "player-1",
+            playerDisplayName: "Bogs",
+            arrivalOrder: 0,
+            checkedInAt: "2026-06-09T18:00:00.000Z",
+            queueStatus: "waiting",
+            sessionSkillRating: 3,
+            paymentStatus: "unpaid",
+            paymentAmountDue: 150,
+            paymentAmountPaid: 0,
+            paymentMethod: "none",
+            paymentNotes: "",
+            syncStatus: "pending",
+          },
+        ]}
+        onUpdateCheckIn={vi.fn()}
+      />,
+    );
+    expect(screen.getByRole("tab", { name: "All (1)" })).toBeInTheDocument();
+    expect(screen.getByText("Bogs")).toBeInTheDocument();
+    expect(screen.getByText("Intermediate")).toBeInTheDocument();
+  });
 });

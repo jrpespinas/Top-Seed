@@ -19,7 +19,8 @@ describe("CourtCard", () => {
       />,
     );
     expect(screen.getByText("Court 1")).toBeInTheDocument();
-    expect(screen.getAllByText("Assign from Next").length).toBe(4);
+    expect(screen.getByText("0/4")).toBeInTheDocument();
+    expect(screen.getAllByText("Drop player here").length).toBe(4);
   });
 
   it("shows finish action for in-progress court", () => {

@@ -68,16 +68,16 @@ Example token direction:
   --space-1: 0.25rem;
   --space-2: 0.5rem;
   --space-3: 0.75rem;
-  --space-4: 1rem;
-  --space-6: 1.5rem;
-  --space-8: 2rem;
+  --space-4: 0.875rem;
+  --space-6: 1.25rem;
+  --space-8: 1.75rem;
 
-  --text-body: 1rem;
-  --text-caption: 0.875rem;
-  --text-title: 1.25rem;
+  --text-body: 0.875rem;
+  --text-caption: 0.75rem;
+  --text-title: 1rem;
 
-  --radius-control: 0.5rem;
-  --radius-card: 0.875rem;
+  --radius-control: 0.375rem;
+  --radius-card: 0.75rem;
 }
 ```
 
@@ -113,13 +113,15 @@ Rules:
 Suggested starting scale:
 
 ```text
-caption: 0.875rem / 1.4
-body:    1rem / 1.5
-label:   0.9375rem / 1.3
-title:   1.125rem / 1.35
-heading: 1.5rem / 1.25
-display: 2rem / 1.15
+caption: 0.75rem / 1.4
+body:    0.875rem / 1.5
+label:   0.8125rem / 1.3
+title:   1rem / 1.35
+heading: 1.25rem / 1.25
+display: 1.625rem / 1.15
 ```
+
+Dashboard pegboard surfaces use the same scale; density comes from tighter card padding and zone gaps, not smaller touch targets on primary actions.
 
 ## Spacing Scale
 

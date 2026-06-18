@@ -45,7 +45,7 @@ export function QueueLaneManagement({
   }
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-2">
       <div className="flex flex-wrap gap-2">
         {activeLanes.map((lane) => (
           <Button
@@ -66,7 +66,7 @@ export function QueueLaneManagement({
 
       {activeLanes.map((lane) =>
         lane.id === selectedLaneId ? (
-          <div key={lane.id} className="space-y-3">
+          <div key={lane.id} className="space-y-2">
             {isLive ? (
               <div className="flex flex-wrap gap-2">
                 <Button size="compact" onClick={() => onAddEmptyMatch(lane.id)}>
@@ -138,8 +138,8 @@ function LaneMatches({
   }
 
   return (
-    <ul className="space-y-3">
-      {queuedMatches.map((queuedMatch) => {
+    <ul className="space-y-2">
+      {queuedMatches.map((queuedMatch, index) => {
         const teamOne = queuedMatch.participants.filter((p) => p.team === "team_one");
         const teamTwo = queuedMatch.participants.filter((p) => p.team === "team_two");
         const variant =
@@ -170,8 +170,14 @@ function LaneMatches({
           <li key={queuedMatch.id}>
             <MatchCard
               variant={variant}
+              matchIndex={index + 1}
               queueLaneName={lane.name}
               sessionMode={sessionMode}
+              onRemove={
+                sessionMode === "live"
+                  ? () => onRemoveQueuedMatch(queuedMatch.id)
+                  : undefined
+              }
               match={{
                 id: queuedMatch.id,
                 status: queuedMatch.status,

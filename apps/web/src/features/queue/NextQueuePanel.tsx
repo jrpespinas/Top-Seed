@@ -1,5 +1,7 @@
+import { Sparkles } from "lucide-react";
 import { SuggestionStrip, suggestionDisplay } from "./SuggestionStrip.js";
 import { QueueLaneManagement } from "./QueueLaneManagement.js";
+import { Button } from "../../components/ui/button.js";
 import type { useSessionDashboard } from "../../hooks/useSessionDashboard.js";
 
 type Dashboard = ReturnType<typeof useSessionDashboard>;
@@ -8,9 +10,15 @@ export interface NextQueuePanelProps {
   dashboard: Dashboard;
   selectedLaneId: string;
   onSelectLane: (laneId: string) => void;
+  layout?: "default" | "pegboard";
 }
 
-export function NextQueuePanel({ dashboard, selectedLaneId, onSelectLane }: NextQueuePanelProps) {
+export function NextQueuePanel({
+  dashboard,
+  selectedLaneId,
+  onSelectLane,
+  layout = "default",
+}: NextQueuePanelProps) {
   const selectedLane =
     dashboard.queueLanes.find((lane) => lane.id === selectedLaneId) ??
     dashboard.queueLanes.find((lane) => lane.status !== "deleted");
@@ -22,8 +30,15 @@ export function NextQueuePanel({ dashboard, selectedLaneId, onSelectLane }: Next
       }
     : null;
 
+  const isLive = dashboard.sessionMode === "live";
+  const canAcceptSuggestion =
+    isLive &&
+    dashboard.session?.queueMode === "suggested" &&
+    suggestionView !== null &&
+    selectedLane !== undefined;
+
   return (
-    <section className="space-y-4 rounded-card border border-border bg-surface p-4 lg:rounded-none lg:border-0 lg:bg-transparent lg:p-0">
+    <section className="flex h-full flex-col space-y-3 rounded-card border border-border bg-surface p-3 lg:rounded-none lg:border-0 lg:bg-transparent lg:p-0">
       <h2 className="text-title font-semibold lg:hidden">Next queue</h2>
       <SuggestionStrip
         sessionMode={dashboard.sessionMode}
@@ -36,6 +51,7 @@ export function NextQueuePanel({ dashboard, selectedLaneId, onSelectLane }: Next
             void dashboard.actions.acceptSuggestion(selectedLane.id);
           }
         }}
+        compact={layout === "pegboard"}
       />
       <QueueLaneManagement
         sessionMode={dashboard.sessionMode}
@@ -54,6 +70,22 @@ export function NextQueuePanel({ dashboard, selectedLaneId, onSelectLane }: Next
           void dashboard.actions.sendQueuedMatchToCourt(queuedMatchId, courtId)
         }
       />
+      {layout === "pegboard" && isLive && selectedLane ? (
+        <div className="mt-auto flex flex-col gap-1.5 border-t border-border/60 pt-2 sm:flex-row">
+          <Button
+            className="flex-1"
+            variant="secondary"
+            disabled={!canAcceptSuggestion}
+            onClick={() => void dashboard.actions.acceptSuggestion(selectedLane.id)}
+          >
+            <Sparkles className="mr-2 h-4 w-4" aria-hidden />
+            Magic Queue
+          </Button>
+          <Button className="flex-1" onClick={() => void dashboard.actions.addEmptyQueuedMatch(selectedLane.id)}>
+            Add Match
+          </Button>
+        </div>
+      ) : null}
     </section>
   );
 }

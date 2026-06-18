@@ -136,6 +136,26 @@ Borrow from badminton and club operations without copying literal sports brandin
 
 The app should feel like it belongs in a real community sports hall, not a crypto dashboard, fantasy game, or enterprise BI tool.
 
+## Reference-Inspired Card System
+
+Borrow card chrome from modern queueing dashboards (soft white cards, pill badges, avatar initials) while keeping Top Seed domain language and tokens.
+
+Allowed:
+
+- Avatar initials circles on player tokens.
+- Pill status badges (`Queued #1`, skill level, payment state).
+- Nested mini-cards inside match and court team columns.
+- Zone footers with one primary and one secondary action (`Magic Queue`, `Add Match`, `Start Match`).
+- Lighter borders (`border-border/60`), consistent `shadow-sm`, slightly rounder `--radius-card`.
+
+Still forbidden:
+
+- Vague analytics tiles (`Performance`, `Insights`).
+- Decorative gradients and glassmorphism.
+- Pixel-perfect copy of reference brand colors.
+
+Adapt mood into existing semantic tokens (`surface`, `court`, `next`, `attention`) — do not import a third-party palette wholesale.
+
 ## Aesthetic Direction
 
 The visual feel should borrow from premium sports, wellness, and club interfaces while staying practical for courtside operations.

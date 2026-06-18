@@ -4,6 +4,8 @@
 
 - `/organizer/sessions/:sessionId/players`
 
+**MVP v1:** This route **redirects** to `/organizer/sessions/:sessionId/dashboard`. Player check-in and queue management are organizer workflows on the live dashboard `PlayerPool`, not a separate nav destination.
+
 ## Primary User
 
 - Organizer.
@@ -38,8 +40,8 @@ Top to bottom:
 
 ## Entry Points
 
-- Dashboard player management link.
-- `QueuePanel` on dashboard → same drawer pattern; this page is the dedicated management view.
+- Future dedicated player management entry (post-MVP).
+- `QueuePanel` on dashboard and `PlayerDetailDrawer` cover MVP player operations.
 
 ## Data Dependencies
 

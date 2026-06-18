@@ -49,7 +49,7 @@ export function AttentionRail({
   return (
     <section
       aria-label="Attention"
-      className="space-y-2 rounded-card border border-attention/30 bg-attention-surface px-4 py-3"
+      className="space-y-2 rounded-card border border-attention/30 bg-attention-surface px-3 py-2"
     >
       {unpaidCount > 0 ? (
         <div className="flex flex-wrap items-center justify-between gap-2 text-body">

@@ -36,6 +36,8 @@ MVP v1 is a no-login, organizer-only badminton web app. The organizer manually m
 - `docs/specs/frontend/components/`: reusable primitive and domain component specs.
 - `docs/specs/frontend/features/`: organizer and player feature component specs.
 - `docs/specs/frontend/features/organizer/live-dashboard-layout.md`: desktop-first pegboard layout, zones, empty states, and usability validation checklist.
+- `docs/specs/frontend/features/organizer/session-header.md`: immersive `SessionWorkspaceBar` (sticky session chrome; global header hidden on session routes).
+- `docs/specs/frontend/features/organizer/session-workspace-shell.md`: shared shell for payments and history sub-routes.
 - `docs/specs/frontend/features/organizer/attention-rail.md`: conditional exception strip (unpaid, sync failure, offline).
 - `docs/specs/frontend/features/organizer/next-queue-panel.md`: pegboard Next zone, suggestions, accept-to-lane staging, and queue lanes.
 - `docs/specs/frontend/features/organizer/queue-lane-management.md`: lane CRUD and move-to-court (composed inside `NextQueuePanel`).

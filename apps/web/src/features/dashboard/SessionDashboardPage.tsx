@@ -1,9 +1,10 @@
 import { useMemo, useState } from "react";
+import { Plus } from "lucide-react";
 import { useParams } from "@tanstack/react-router";
 import { Tabs } from "../../components/ui/tabs.js";
 import { useSessionDashboard } from "../../hooks/useSessionDashboard.js";
 import { useSyncReviewDrawer } from "../../hooks/useSyncReviewDrawer.js";
-import { SessionHeader } from "./SessionHeader.js";
+import { SessionWorkspaceBar } from "./SessionWorkspaceBar.js";
 import { SessionStatusBar } from "./SessionStatusBar.js";
 import { AttentionRail } from "./AttentionRail.js";
 import { PegboardLayout } from "./PegboardLayout.js";
@@ -17,6 +18,8 @@ import { LeaderboardPreview } from "./LeaderboardPreview.js";
 import { ActiveMatchPanel } from "../matches/ActiveMatchPanel.js";
 import { PlayerDetailDrawer } from "../players/PlayerDetailDrawer.js";
 import { MatchCorrectionDrawer } from "../history/MatchHistoryList.js";
+import { Button } from "../../components/ui/button.js";
+import { IconButton } from "../../components/ui/icon-button.js";
 
 export function SessionDashboardPage() {
   const { sessionId } = useParams({ from: "/organizer/sessions/$sessionId/dashboard" });
@@ -52,12 +55,44 @@ export function SessionDashboardPage() {
     );
   }
 
-  const pool = (
+  const poolForMobile = (
     <PlayerPool
       session={dashboard.session}
       sessionMode={dashboard.sessionMode}
       playerProfiles={dashboard.playerProfiles}
       checkIns={dashboard.checkIns}
+      queuedMatches={dashboard.queuedMatches}
+      queueTab={queueTab}
+      onCheckIn={dashboard.actions.checkInPlayer}
+      onCreateWalkIn={dashboard.actions.createAndCheckInWalkIn}
+      onUpdateCheckIn={(input) =>
+        dashboard.actions.updateCheckIn({
+          sessionId,
+          checkInId: input.checkInId,
+          queueStatus: input.queueStatus as
+            | "waiting"
+            | "assigned"
+            | "playing"
+            | "resting"
+            | "done"
+            | "removed"
+            | undefined,
+          suggestionExcluded: input.suggestionExcluded,
+          suggestionExcludeNote: input.suggestionExcludeNote,
+        })
+      }
+      onOpenPlayerDetails={setSelectedCheckInId}
+    />
+  );
+
+  const poolForPegboard = (
+    <PlayerPool
+      session={dashboard.session}
+      sessionMode={dashboard.sessionMode}
+      playerProfiles={dashboard.playerProfiles}
+      checkIns={dashboard.checkIns}
+      queuedMatches={dashboard.queuedMatches}
+      layout="pegboard"
       queueTab={queueTab}
       onCheckIn={dashboard.actions.checkInPlayer}
       onCreateWalkIn={dashboard.actions.createAndCheckInWalkIn}
@@ -111,7 +146,7 @@ export function SessionDashboardPage() {
     />
   );
 
-  const nextQueue = (
+  const nextQueueMobile = (
     <NextQueuePanel
       dashboard={dashboard}
       selectedLaneId={resolvedLaneId}
@@ -119,8 +154,27 @@ export function SessionDashboardPage() {
     />
   );
 
+  const nextQueue = (
+    <NextQueuePanel
+      dashboard={dashboard}
+      selectedLaneId={resolvedLaneId}
+      onSelectLane={setSelectedLaneId}
+      layout="pegboard"
+    />
+  );
+
+  const checkedInCount = dashboard.checkIns.filter((c) => c.queueStatus !== "removed").length;
+  const queuedMatchCount = dashboard.queuedMatches.filter(
+    (m) => m.status === "draft" || m.status === "ready",
+  ).length;
+  const activeCourtCount = dashboard.courts.filter((c) => c.status !== "deleted").length;
+
+  const focusPlayerCheckIn = () => {
+    document.getElementById("player-check-in-search")?.focus();
+  };
+
   const more = (
-    <div className="space-y-4">
+    <div className="space-y-3">
       <SessionStatusBar
         session={dashboard.session}
         metrics={dashboard.metrics}
@@ -151,15 +205,17 @@ export function SessionDashboardPage() {
   );
 
   return (
-    <div className="space-y-4 pb-24 lg:pb-4">
-      <SessionHeader
+    <div className="space-y-3 pb-24 lg:pb-4">
+      <SessionWorkspaceBar
         session={dashboard.session}
-        courtCount={dashboard.courts.length}
+        courtCount={activeCourtCount}
         sessionMode={dashboard.sessionMode}
         syncStatus={sync.syncStatus}
         pendingCount={sync.pendingCount}
         blockedCount={sync.blockedCount}
         lastSyncedAt={sync.lastSyncedAt}
+        activeView="dashboard"
+        sticky
       />
 
       <div className="hidden lg:block">
@@ -178,7 +234,39 @@ export function SessionDashboardPage() {
       </div>
 
       <div className="hidden lg:block">
-        <PegboardLayout available={pool} next={nextQueue} now={courtsPegboard} />
+        <PegboardLayout
+          playerList={poolForPegboard}
+          upcomingMatches={nextQueue}
+          courts={courtsPegboard}
+          playerListCount={`${checkedInCount} total`}
+          upcomingCount={`${queuedMatchCount} queued`}
+          courtsCount={`${activeCourtCount} active`}
+          playerListAction={
+            dashboard.sessionMode === "live" ? (
+              <IconButton label="Check in player" size="compact" onClick={focusPlayerCheckIn}>
+                <Plus className="h-4 w-4" />
+              </IconButton>
+            ) : null
+          }
+          upcomingAction={
+            dashboard.sessionMode === "live" && resolvedLaneId ? (
+              <IconButton
+                label="Add match"
+                size="compact"
+                onClick={() => void dashboard.actions.addEmptyQueuedMatch(resolvedLaneId)}
+              >
+                <Plus className="h-4 w-4" />
+              </IconButton>
+            ) : null
+          }
+          courtsAction={
+            dashboard.sessionMode === "live" ? (
+              <Button variant="ghost" size="compact" onClick={() => void dashboard.actions.addCourt()}>
+                Add court
+              </Button>
+            ) : null
+          }
+        />
       </div>
 
       <div className="hidden lg:block">
@@ -197,8 +285,8 @@ export function SessionDashboardPage() {
       </div>
 
       <div className="hidden gap-4 md:grid md:grid-cols-2 lg:hidden">
-        <div>{pool}</div>
-        <div>{nextQueue}</div>
+        <div>{poolForMobile}</div>
+        <div>{nextQueueMobile}</div>
         <div className="md:col-span-2">{courts}</div>
       </div>
 
@@ -207,8 +295,8 @@ export function SessionDashboardPage() {
           key={mobileTab}
           items={[
             { value: "now", label: "Now", content: courts },
-            { value: "next", label: "Next", content: nextQueue },
-            { value: "available", label: "Available", content: pool },
+            { value: "next", label: "Next", content: nextQueueMobile },
+            { value: "available", label: "Available", content: poolForMobile },
             { value: "more", label: "More", content: more },
           ]}
           defaultValue={mobileTab}

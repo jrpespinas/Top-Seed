@@ -1,6 +1,8 @@
 # NextQueuePanel
 
-Canonical feature spec for the pegboard **Next** zone. Do not use `SuggestedMatchPanel` in new code or specs.
+Canonical feature spec for the pegboard **Next** zone. Desktop display label: **Upcoming Matches**.
+
+Do not use `SuggestedMatchPanel` in new code or specs.
 
 Related specs:
 
@@ -107,10 +109,13 @@ Lane and queued-match actions are defined in `queue-lane-management.md`. This pa
 - `onAddEmptyQueuedMatch` — `{ laneId }`; creates empty `draft` match in selected lane.
 - `onDirectAssignToCourt` — override: `CREATE_MATCH`; show skipped-queue messaging. Not on the default suggestion card primary button.
 
+- MVP footer actions on desktop pegboard: **Magic Queue** (accept suggestion into selected lane) and **Add Match** (empty draft in selected lane).
+- `Magic Queue` maps to `onAcceptSuggestion`; label may read `Add to [lane]` when suggestion strip is visible.
+
 Deprecated — not in MVP v1 (do not implement):
 
 - `onAutoFillQueue`, `onAutoFillNextQueue`, `onAutoFillQueueLane`, `onAutoFillLane`
-- UI labels **Auto-fill**, **Magic Queue**
+- UI labels **Auto-fill** (use **Magic Queue** instead on pegboard footer)
 
 Deprecated component names (do not use in new code):
 

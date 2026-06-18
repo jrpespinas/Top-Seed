@@ -32,7 +32,7 @@ Shows one badminton court as a spatial container with Team A and Team B player s
 
 ## Variants And Sizes
 
-- `default`: dashboard card.
+- `default`: dashboard card with capacity `n/4` in header and footer match summary.
 - `large`: active court focus.
 - `compact`: court summaries.
 

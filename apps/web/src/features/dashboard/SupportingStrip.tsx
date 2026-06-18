@@ -59,7 +59,7 @@ export function SupportingStrip({
   return (
     <footer
       aria-label="Session summary"
-      className="flex flex-wrap items-center gap-x-4 gap-y-2 rounded-card border border-border bg-muted/40 px-4 py-3 text-caption text-muted-foreground"
+      className="flex flex-wrap items-center gap-x-3 gap-y-1.5 rounded-card border border-border bg-muted/40 px-3 py-2 text-caption text-muted-foreground"
     >
       <span>
         Collected {formatMoney(collected, session.currency)} of{" "}

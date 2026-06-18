@@ -63,7 +63,8 @@ describe("SessionHistoryPage", () => {
     });
 
     renderPage(<SessionHistoryPage />);
-    expect(await screen.findByText(/Match history · Ended Night/)).toBeInTheDocument();
+    expect(await screen.findByText(/Ended Night/)).toBeInTheDocument();
+    expect(await screen.findByText(/· History/)).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Correct" })).not.toBeInTheDocument();
   });
 });

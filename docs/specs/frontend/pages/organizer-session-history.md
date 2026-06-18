@@ -29,13 +29,16 @@ Match history should show locally completed matches immediately, even before bac
 
 ## Component Composition
 
-- `RecentMatchesPanel`
-- `MatchCard`
-- `Tabs`
-- `Drawer`
-- `ConfirmAction`
-- `OfflineBanner`
-- `SyncStatusBadge`
+Wrapped in `SessionWorkspaceShell` with `activeView="history"`. Spec: `features/organizer/session-workspace-shell.md`.
+
+- `SessionWorkspaceBar` (via shell)
+- Filter buttons (All / Wins-Losses / Draws / Unscored / Cancelled)
+- `MatchHistoryList` with `MatchCard` rows
+- `Drawer` — match detail
+- `MatchCorrectionDrawer`
+- `SyncReviewPanel` (via shell)
+
+Do **not** compose `SessionHistoryHeader`, `SessionSyncBar`, `RecentMatchesPanel`, or standalone `OfflineBanner` on this page.
 
 ## Page States
 
@@ -57,7 +60,7 @@ Match history should show locally completed matches immediately, even before bac
 ## Secondary Actions
 
 - Filter completed, draw, cancelled, or unscored matches.
-- Return to dashboard.
+- Return to dashboard via workspace bar overflow (**Live dashboard**).
 
 ## Responsive Layout
 

@@ -1,8 +1,9 @@
 /**
  * @vitest-environment jsdom
  */
-import { describe, expect, it } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { describe, expect, it, afterEach } from "vitest";
+import { cleanup, render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import {
   RouterProvider,
   createMemoryHistory,
@@ -11,7 +12,7 @@ import {
   createRouter,
 } from "@tanstack/react-router";
 import type { ReactElement } from "react";
-import { SessionHeader } from "./SessionHeader.js";
+import { SessionWorkspaceBar } from "./SessionWorkspaceBar.js";
 
 const session = {
   id: "session-1",
@@ -41,29 +42,56 @@ async function renderWithRouter(element: ReactElement) {
   await router.load();
 }
 
-describe("SessionHeader", () => {
-  it("does not render offline banner when synced", async () => {
-    await renderWithRouter(
-      <SessionHeader
-        session={session}
-        courtCount={3}
-        sessionMode="live"
-        syncStatus="synced"
-        pendingCount={0}
-      />,
-    );
-    expect(screen.queryByText(/All changes synced/i)).not.toBeInTheDocument();
-    expect(await screen.findByText("Tuesday Intense Badminton")).toBeInTheDocument();
+describe("SessionWorkspaceBar", () => {
+  afterEach(() => {
+    cleanup();
   });
 
-  it("does not show complete session in header", async () => {
+  it("renders compact session context without sub-nav pills", async () => {
     await renderWithRouter(
-      <SessionHeader
+      <SessionWorkspaceBar
         session={session}
         courtCount={3}
         sessionMode="live"
         syncStatus="synced"
         pendingCount={0}
+        activeView="dashboard"
+        sticky={false}
+      />,
+    );
+    expect(await screen.findByText("Tuesday Intense Badminton")).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Players" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Payments" })).not.toBeInTheDocument();
+  });
+
+  it("opens overflow menu with payments and history", async () => {
+    const user = userEvent.setup();
+    await renderWithRouter(
+      <SessionWorkspaceBar
+        session={session}
+        courtCount={3}
+        sessionMode="live"
+        syncStatus="synced"
+        pendingCount={0}
+        activeView="dashboard"
+        sticky={false}
+      />,
+    );
+    await user.click(screen.getByRole("button", { name: "Session menu" }));
+    expect(screen.getByText("Payments")).toBeInTheDocument();
+    expect(screen.getByText("Match history")).toBeInTheDocument();
+    expect(screen.getByText("Leaderboard (this session)")).toBeInTheDocument();
+  });
+
+  it("does not show complete session in the bar", async () => {
+    await renderWithRouter(
+      <SessionWorkspaceBar
+        session={session}
+        courtCount={3}
+        sessionMode="live"
+        syncStatus="synced"
+        pendingCount={0}
+        sticky={false}
       />,
     );
     expect(screen.queryByRole("button", { name: "Complete session" })).not.toBeInTheDocument();

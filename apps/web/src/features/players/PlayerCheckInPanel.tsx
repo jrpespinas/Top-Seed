@@ -94,14 +94,15 @@ export function PlayerCheckInPanel({
   }
 
   return (
-    <section className="rounded-card border border-border bg-surface p-4">
-      <h2 className="text-title font-semibold">Check in</h2>
-      <p className="mt-1 text-caption text-muted-foreground">
+    <section className="rounded-card border border-border bg-surface p-3">
+      <h2 className="text-label font-semibold">Check in</h2>
+      <p className="mt-0.5 text-caption text-muted-foreground">
         Session fee {feeAmount} {currency} · defaults to unpaid
       </p>
-      <div className="mt-3 space-y-3">
-        <SearchInput
-          value={query}
+      <div className="mt-2 space-y-2">
+      <SearchInput
+        id="player-check-in-search"
+        value={query}
           onChange={(event) => setQuery(event.target.value)}
           placeholder="Search returning players"
           aria-label="Search players"
@@ -130,7 +131,7 @@ export function PlayerCheckInPanel({
         ) : query ? (
           <EmptyState title="No players found" description="Add a new walk-in below." />
         ) : null}
-        <form onSubmit={(event) => void handleWalkIn(event)} className="space-y-2 border-t border-border pt-3">
+        <form onSubmit={(event) => void handleWalkIn(event)} className="space-y-2 border-t border-border pt-2">
           <FormField label="New walk-in" htmlFor="walk-in-name">
             <input
               id="walk-in-name"

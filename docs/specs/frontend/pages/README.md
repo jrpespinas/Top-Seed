@@ -33,12 +33,14 @@ Pages should not:
 ## MVP Route Defaults
 
 - Root organizer entry: `/organizer/sessions` or the most recent active session.
-- Live operating center: `/organizer/sessions/:sessionId/dashboard`.
-- Organizer-accessible player management: `/organizer/sessions/:sessionId/players`.
-- Organizer-accessible payments: `/organizer/sessions/:sessionId/payments`.
-- Organizer-accessible match history: `/organizer/sessions/:sessionId/history`.
-- Organizer-accessible leaderboard: `/leaderboard` or `/organizer/leaderboard`.
+- Live operating center: `/organizer/sessions/:sessionId/dashboard` (immersive workspace — no global app header).
+- Organizer-accessible payments: `/organizer/sessions/:sessionId/payments` (via `SessionWorkspaceShell`).
+- Organizer-accessible match history: `/organizer/sessions/:sessionId/history` (via `SessionWorkspaceShell`).
+- `/organizer/sessions/:sessionId/players` redirects to dashboard in MVP v1; check-in lives on the dashboard.
+- Organizer-accessible leaderboard: `/leaderboard` or `/organizer/leaderboard` (session scope via `?sessionId=` from workspace overflow).
 - Public marketing homepage: deferred unless explicitly requested.
+
+Session workspace chrome: `features/organizer/session-header.md`, `features/organizer/session-workspace-shell.md`.
 
 ## Future Player Routes
 

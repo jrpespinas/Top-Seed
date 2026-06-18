@@ -11,13 +11,25 @@ MVP v1 is **organizer-only** (no player login, no payment gateway). The app is *
 | Area | What it does |
 |------|----------------|
 | **Sessions** | Create an open-play session, set fee and court count, complete when done |
-| **Live dashboard** | Check in players, manage courts and queue lanes, start matches, record results |
-| **Payments** | Mark paid, partial, waived, refunded; see session totals |
+| **Live dashboard** | Three-column pegboard on desktop: **Player List** · **Upcoming Matches** · **Courts**; check-in, queue, courts, sync recovery |
+| **Payments** | Mark paid, partial, waived, refunded; see session totals (via session **···** menu) |
 | **Match history** | Browse finished matches; correct results on live sessions |
 | **Leaderboard** | Club-wide or per-session stats (wins, losses, draws, win %) |
-| **Players** | Full check-in, queue, and profile editing via the player drawer |
+| **Player profiles** | Edit via player drawer on the dashboard (no separate Players page in nav) |
 
 Specs and product boundaries live in [`docs/specs/`](docs/specs/) and [`AGENTS.md`](AGENTS.md).
+
+### Live dashboard (desktop)
+
+When you open a session on a wide screen (≥1280px), the organizer UI uses a **compact session bar** at the top (session name, venue, fee, sync status, and a **···** menu for Payments, History, and Leaderboard). The global app nav is hidden so more vertical space goes to the pegboard.
+
+The pegboard is three columns, left to right:
+
+1. **Player List** — check-in, filter chips (All / Available / Queued / Playing), player cards  
+2. **Upcoming Matches** — suggestion, queued match cards, Magic Queue / Add Match  
+3. **Courts** — stacked court cards with capacity, team slots, and Start Match  
+
+On phone, use bottom tabs (**Now** · **Next** · **Available** · **More**) instead of the three-column layout.
 
 ---
 

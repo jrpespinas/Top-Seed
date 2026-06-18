@@ -1,12 +1,11 @@
 import { useMemo, useState } from "react";
 import { useParams } from "@tanstack/react-router";
-import { SessionSyncBar } from "../sync/SessionSyncBar.js";
 import { filterHistoryMatches, useSessionHistory } from "../../hooks/useSessionHistory.js";
 import type { HistoryFilter } from "../../hooks/useSessionHistory.js";
+import { SessionWorkspaceShell } from "../dashboard/SessionWorkspaceShell.js";
 import {
   MatchCorrectionDrawer,
   MatchHistoryList,
-  SessionHistoryHeader,
 } from "./MatchHistoryList.js";
 import { displayNameForCheckIn } from "../../lib/dashboard-helpers.js";
 import { Drawer } from "../../components/ui/drawer.js";
@@ -31,42 +30,36 @@ export function SessionHistoryPage() {
   const detailMatch = matches.find((match) => match.id === detailMatchId) ?? null;
   const correctMatch = matches.find((match) => match.id === correctMatchId) ?? null;
 
-  if (!session) {
-    return (
-      <section className="rounded-card border border-border bg-surface p-6">
-        <h1 className="text-heading font-semibold">Session not found</h1>
-      </section>
-    );
-  }
-
   return (
-    <div className="space-y-4">
-      <SessionSyncBar sessionId={sessionId} />
-      <SessionHistoryHeader sessionId={sessionId} sessionName={session.name} />
-      <div className="flex flex-wrap gap-2">
-        {FILTER_OPTIONS.map((option) => (
-          <button
-            key={option.value}
-            type="button"
-            className={`rounded-control px-3 py-2 text-label ${
-              filter === option.value ? "bg-primary text-primary-foreground" : "bg-muted"
-            }`}
-            onClick={() => setFilter(option.value)}
-          >
-            {option.label}
-          </button>
-        ))}
-      </div>
-      <MatchHistoryList
-        sessionId={sessionId}
-        matches={filtered}
-        courts={courts}
-        checkIns={checkIns}
-        sessionMode={sessionMode}
-        correctedMatchIds={correctedIds}
-        onSelectMatch={setDetailMatchId}
-        onCorrectMatch={setCorrectMatchId}
-      />
+    <SessionWorkspaceShell sessionId={sessionId} activeView="history">
+      {session ? (
+        <>
+          <div className="flex flex-wrap gap-2">
+            {FILTER_OPTIONS.map((option) => (
+              <button
+                key={option.value}
+                type="button"
+                className={`rounded-control px-3 py-2 text-label ${
+                  filter === option.value ? "bg-primary text-primary-foreground" : "bg-muted"
+                }`}
+                onClick={() => setFilter(option.value)}
+              >
+                {option.label}
+              </button>
+            ))}
+          </div>
+          <MatchHistoryList
+            sessionId={sessionId}
+            matches={filtered}
+            courts={courts}
+            checkIns={checkIns}
+            sessionMode={sessionMode}
+            correctedMatchIds={correctedIds}
+            onSelectMatch={setDetailMatchId}
+            onCorrectMatch={setCorrectMatchId}
+          />
+        </>
+      ) : null}
       <Drawer
         isOpen={detailMatchId !== null}
         onOpenChange={(open) => {
@@ -108,6 +101,6 @@ export function SessionHistoryPage() {
           setCorrectedIds((current) => new Set([...current, matchId]));
         }}
       />
-    </div>
+    </SessionWorkspaceShell>
   );
 }

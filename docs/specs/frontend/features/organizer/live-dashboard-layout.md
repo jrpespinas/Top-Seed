@@ -35,32 +35,31 @@ Top to bottom on the page:
 
 | Region | Role | Always visible? |
 |--------|------|-----------------|
-| **Session chrome** | Identity, status chips, secondary nav | Yes |
+| **Session chrome** | Identity, sync badge, overflow nav (immersive — no global header) | Yes |
 | **Attention rail** | Exceptions only (unpaid, sync failed, offline) | Conditional |
-| **Pegboard** | Available \| Now \| Next — primary operations | Yes (~70vh min) |
+| **Pegboard** | Player List \| Upcoming Matches \| Courts — primary operations | Yes (~70vh min) |
 | **Supporting strip** | Collected total, recent match teaser, links | After first check-in |
 
 ### Desktop wireframe
 
 ```text
 ┌─────────────────────────────────────────────────────────────────────────────┐
-│ SESSION CHROME (compact)                                                     │
-│ ← Sessions │ {Session name} │ venue · time · fee · courts                   │
-│ [Active] [Synced] │ Players · Payments · History · Leaderboard · ···        │
+│ SESSION WORKSPACE BAR (sticky; global app header hidden on this route)       │
+│ Top Seed / Sessions · {Session name} │ venue · time · fee · courts            │
+│ [Active] [Synced] │ ··· overflow → Payments · History · Leaderboard · …      │
 ├─────────────────────────────────────────────────────────────────────────────┤
 │ ATTENTION RAIL (conditional) — e.g. 3 unpaid · Sync failed — Review          │
 ├─────────────────────────────────────────────────────────────────────────────┤
 │ PEGBOARD                                                                     │
-│ ┌──────────────┬────────────────────────────────────┬──────────────────┐ │
-│ │ AVAILABLE    │ NOW (Courts)                         │ NEXT             │ │
-│ │ ~22% width   │ ~48% width                           │ ~30% width       │ │
-│ │              │                                      │                  │ │
-│ │ Check-in     │ [Court 1] [Court 2] [Court 3]        │ Suggestion       │ │
-│ │ (compact)    │  (horizontal strip for 3 courts)     │ Lane tabs        │ │
-│ │              │                                      │ Queued matches   │ │
-│ │ Waiting list │                                      │ Send to court    │ │
-│ │ (scroll)     │                                      │                  │ │
-│ └──────────────┴────────────────────────────────────┴──────────────────┘ │
+│ ┌──────────────┬──────────────────────────┬──────────────────────────────┐ │
+│ │ PLAYER LIST  │ UPCOMING MATCHES         │ COURTS                       │ │
+│ │ ~22% width   │ ~30% width               │ ~48% width                   │ │
+│ │              │                          │                              │ │
+│ │ Check-in     │ Suggestion + match cards │ [Court 1]                    │ │
+│ │ Filter chips │ Lane tabs                │ [Court 2]  (vertical stack)  │ │
+│ │ Player cards │ Magic Queue · Add Match  │ [Court 3]                    │ │
+│ │ (scroll)     │ (scroll)                 │ (scroll)                     │ │
+│ └──────────────┴──────────────────────────┴──────────────────────────────┘ │
 ├─────────────────────────────────────────────────────────────────────────────┤
 │ SUPPORTING STRIP — Collected ₱X │ Last match │ Leaderboard │ Complete session│
 └─────────────────────────────────────────────────────────────────────────────┘
@@ -68,53 +67,80 @@ Top to bottom on the page:
 
 ### Pegboard column order (desktop)
 
-Left → right: **Available** | **Now** | **Next**
+Left → right: **Player List** (Available) | **Upcoming Matches** (Next) | **Courts** (Now)
 
-Rationale: Spec pegboard flow is Available → Next → Now mentally, but **courts belong in the visual center** as the largest zone (organizer eyes track active courts first on desktop). Next stays on the right as the staging lane (like a physical pegboard’s “next up” column).
+Domain pegboard labels remain Available / Next / Now in code and analytics; **display labels** use Player List, Upcoming Matches, and Courts on desktop.
+
+Rationale: Matches reference-inspired queueing UIs — player pool on the left, staging lane in the center, active courts on the right as the largest zone. Courts stack **vertically** inside the right column (scroll when needed), not as a horizontal strip.
+
+### Zone header pattern (desktop)
+
+Each pegboard column header shows:
+
+- `{Zone title} · {count}` — e.g. `Player List · 4 total`, `Upcoming Matches · 3 queued`, `Courts · 4 active`
+- Optional zone action button (`+`) — add walk-in focus, add match, add court
+
+Headers use soft white/surface styling with subtle border; court zone may use a light court accent on the body cards, not a heavy tinted header bar.
+
+### Player List filter chips
+
+Replace status tabs on **desktop** with horizontal filter chips (mobile may keep tabs):
+
+| Chip | Includes queue statuses |
+|------|-------------------------|
+| **All** | All checked-in players (except `removed` unless viewing removed filter) |
+| **Available** | `waiting`, `resting` |
+| **Queued** | `assigned` |
+| **Playing** | `playing` |
+
+`done` and `removed` remain accessible via overflow or secondary filter on mobile tabs.
 
 ## Zone Definitions
 
-### Available (`PlayerPool`)
+### Player List (`PlayerPool`)
 
 | Attribute | Spec |
 |-----------|------|
 | User question | Who can I pull into the queue? |
-| Visual | Light neutral surface; zone header “Available” |
-| Components | `PlayerCheckInPanel` (compact) + `QueuePanel` |
+| Display label | **Player List** (desktop zone header) |
+| Visual | White card stack; zone header `Player List · {n} total` |
+| Components | `PlayerCheckInPanel` (compact) + `QueuePanel` with `PlayerCard` rows |
 | Primary action | Check in walk-in or returning player |
+| Filters | Chip row: All / Available / Queued / Playing (desktop) |
 | Scroll | Player list scrolls inside zone; check-in stays pinned at top |
 
 See `player-pool.md`, `player-check-in-panel.md`, `queue-panel.md`.
 
-### Now (`CourtBoard`)
+### Courts (`CourtBoard`)
 
 | Attribute | Spec |
 |-----------|------|
 | User question | Who is on court? What is free? |
-| Visual | Court-tinted zone header (`--color-court`); largest player name typography on court cards |
+| Display label | **Courts** (desktop zone header) |
+| Visual | Zone header `Courts · {n} active`; stacked `CourtCard` rows |
 | Components | `CourtCard` per court |
 | Primary action | Start match (assigned) / Finish match (in progress) |
 
-**Court grid rules (desktop):**
+**Court layout rules (desktop):**
 
-| Court count | Layout inside Now zone |
-|-------------|------------------------|
-| 1–3 | Single horizontal row, equal columns |
-| 4 | 2×2 grid |
-| 5–6 | 2 rows or horizontal scroll **within Now zone** — never orphan a single court in a 2-col grid |
+| Court count | Layout inside Courts zone |
+|-------------|---------------------------|
+| 1–6 | **Vertical stack** of court cards; column scrolls when height exceeds pegboard |
 
-Do **not** use a 2-column grid for 3 courts (creates a visual hole).
+Do **not** use a horizontal strip or 2-column grid that orphans a single court on desktop pegboard.
 
 See `court-board.md`.
 
-### Next (`NextQueuePanel`)
+### Upcoming Matches (`NextQueuePanel`)
 
 | Attribute | Spec |
 |-----------|------|
 | User question | What goes to court next? |
-| Visual | Warm accent zone header (`--color-next`) |
+| Display label | **Upcoming Matches** (desktop zone header) |
+| Visual | Zone header `Upcoming Matches · {n} queued`; stacked match cards |
 | Components | Suggestion strip + `QueueLaneManagement` |
-| Primary action | Accept suggestion / Send to court |
+| Primary action | Magic Queue (accept suggestion) / Add Match |
+| Footer | `Magic Queue` + `Add Match` buttons when lane selected |
 
 See `next-queue-panel.md`, `queue-lane-management.md`.
 
@@ -154,12 +180,13 @@ See `next-queue-panel.md`, `queue-lane-management.md`.
 
 | Component | Desktop placement | Notes |
 |-----------|-------------------|-------|
-| `SessionHeader` | Session chrome | Slimmed per `session-header.md` |
+| `SessionWorkspaceBar` | Session chrome | Immersive sticky bar; see `session-header.md` |
+| `SessionWorkspaceShell` | Payments / history pages | Shared chrome + `useSessionChrome`; see `session-workspace-shell.md` |
 | `SessionStatusBar` | **Deprecated on desktop** | Replaced by `AttentionRail` + inline zone context |
 | `SessionStatusBar` | Mobile tab **More** | Keep compact metrics on phone |
-| `PlayerPool` | Pegboard left | Check-in compact |
-| `CourtBoard` | Pegboard center | Horizontal court strip |
-| `NextQueuePanel` | Pegboard right | Unchanged feature logic |
+| `PlayerPool` | Pegboard left (Player List) | Check-in compact; filter chips; `PlayerCard` |
+| `NextQueuePanel` | Pegboard center (Upcoming Matches) | Stacked match cards |
+| `CourtBoard` | Pegboard right (Courts) | Vertical court stack |
 | `PaymentSummaryPanel` | Payments route only on desktop | Teaser in `SupportingStrip` |
 | `RecentMatchesPanel` | History route; 1–2 inline in strip | No full card on dashboard |
 | `LeaderboardPreview` | Removed from dashboard desktop | Link in strip + `/organizer/leaderboard` |
@@ -169,10 +196,11 @@ See `next-queue-panel.md`, `queue-lane-management.md`.
 | `PlayerDetailDrawer` | Overlay | Unchanged |
 | `SyncReviewPanel` | Overlay | Unchanged |
 
-### Page shell width
+### Page shell width and global header
 
-- Session dashboard route may use **wider max-width** than global app shell (`max-w-6xl` → `max-w-7xl` or `max-w-[1400px]`) so pegboard columns breathe on desktop.
-- Global marketing-style header stays; pegboard is the hero surface.
+- Session workspace routes (`dashboard`, `payments`, `history`, `players`) use **wider max-width** (`max-w-[1400px]`) so pegboard columns breathe on desktop.
+- On those routes, the **global app header is hidden**; `SessionWorkspaceBar` provides Top Seed branding and cross-route navigation via overflow.
+- Non-session routes (`/organizer/sessions`, `/organizer/leaderboard`, etc.) keep the standard global header and `max-w-6xl` shell.
 
 ### Deprecated desktop pattern (do not ship)
 
@@ -234,14 +262,14 @@ See § Empty-State Copy below. Rules:
 | `OfflineBanner` always visible | Banner only when offline / failed / pending |
 | `Complete session` prominent red button in header | Text link in `SupportingStrip` or overflow menu |
 | `lg:grid-cols-2` for `more` | `SupportingStrip` |
-| `CourtBoard` `md:grid-cols-2` for 3 courts | Horizontal 3-col strip in Now zone |
+| `CourtBoard` `md:grid-cols-2` for 3 courts | Vertical stack in Courts zone |
 | `max-w-6xl` page constraint | Wider session layout |
 
 ## Acceptance Criteria (Layout)
 
-- On desktop ≥1280px, organizer sees Available, Now, and Next **without scrolling** for a 3-court session with empty queue.
+- On desktop ≥1280px, organizer sees Player List, Upcoming Matches, and Courts **without scrolling** for a 3-court session with empty queue (courts column may scroll when more than ~3 courts).
 - No full-width payment/history/leaderboard cards below pegboard on desktop.
-- Three courts render in **one row** inside Now zone (no orphan court).
+- Three courts render in a **vertical stack** inside Courts zone.
 - When synced and no exceptions, no green “All changes synced” full-width banner — chip only.
 - Complete session requires confirmation; trigger is not the most prominent red control on the page.
 - Mobile tabs unchanged in IA; only visual polish in later passes.
@@ -323,7 +351,8 @@ Target: **5/5 pass** on success signals; qualitative answer favors “running co
 ## Related Specs
 
 - `attention-rail.md` — Attention region detail
-- `session-header.md` — Session chrome (updated)
+- `session-header.md` — `SessionWorkspaceBar` (immersive session chrome)
+- `session-workspace-shell.md` — shared shell for payments / history
 - `session-status-bar.md` — Metrics; desktop deprecation note
 - `organizer-session-dashboard.md` — Page route (updated)
 - `organizer-components.md` — Composition tree (updated)

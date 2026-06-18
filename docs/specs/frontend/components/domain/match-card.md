@@ -29,7 +29,7 @@ Displays queued, assigned, active, completed, or cancelled badminton match detai
 
 ## Variants And Sizes
 
-- `queued`
+- `queued` — stacked match card with Team A/B columns, nested player mini-cards, dashed empty slots, match number header.
 - `queuedIncomplete`
 - `assigned`
 - `active`

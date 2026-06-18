@@ -22,9 +22,10 @@ describe("CourtBoard", () => {
     expect(screen.getByText("Court 1")).toBeInTheDocument();
   });
 
-  it("uses a three-column grid for three courts on large screens", () => {
+  it("uses a vertical stack for pegboard layout", () => {
     const { container } = render(
       <CourtBoard
+        layout="pegboard"
         courts={[
           { id: "court-1", sessionId: "session-1", name: "Court 1", status: "open", sortOrder: 0 },
           { id: "court-2", sessionId: "session-1", name: "Court 2", status: "open", sortOrder: 1 },
@@ -37,7 +38,7 @@ describe("CourtBoard", () => {
         onOpenMatch={vi.fn()}
       />,
     );
-    const grid = container.querySelector(".lg\\:grid-cols-3");
+    const grid = container.querySelector(".grid-cols-1");
     expect(grid).toBeTruthy();
   });
 });

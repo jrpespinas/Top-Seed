@@ -4,7 +4,7 @@
 
 When sync fails or many actions are pending, help the organizer understand what did not reach the server and recover without losing courtside work.
 
-**Efficient MVP pattern:** a drawer/sheet opened from `OfflineBanner` or `SessionHeader`, not a separate route. Keeps the live dashboard in context on phone and tablet.
+**Efficient MVP pattern:** a drawer/sheet opened from `AttentionRail` / `OfflineBanner` or via `useSessionChrome` on session routes — not a separate route. Keeps the live dashboard in context on phone and tablet.
 
 Future: a dedicated sync review page is optional if failure volume justifies it. Do not build a separate route in MVP.
 
@@ -93,8 +93,9 @@ Exclude from MVP UI:
 
 ## Entry Points
 
-- `SessionHeader` → `onReviewSyncIssues`
-- `OfflineBanner` → `onReview`
+- `AttentionRail` → Review sync issues
+- `SessionWorkspaceBar` / `useSessionChrome` on payments and history (sync review panel in shell)
+- `OfflineBanner` → Review
 - `SyncStatusBadge` tap on failed session-level state (optional shortcut)
 
 ## Copy Guidelines
@@ -106,7 +107,7 @@ Exclude from MVP UI:
 
 ## Acceptance Criteria
 
-- Organizer can open sync review from banner or header without route change.
+- Organizer can open sync review from attention rail, offline banner, or session shell without route change.
 - Failed actions appear before pending actions.
 - Blocked actions show which earlier failure blocked them.
 - Retry one and retry all enqueue sync retry using the same outbox records.
