@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import { useParams } from "@tanstack/react-router";
+import { SessionSyncBar } from "../sync/SessionSyncBar.js";
 import { filterHistoryMatches, useSessionHistory } from "../../hooks/useSessionHistory.js";
 import type { HistoryFilter } from "../../hooks/useSessionHistory.js";
 import {
@@ -40,6 +41,7 @@ export function SessionHistoryPage() {
 
   return (
     <div className="space-y-4">
+      <SessionSyncBar sessionId={sessionId} />
       <SessionHistoryHeader sessionId={sessionId} sessionName={session.name} />
       <div className="flex flex-wrap gap-2">
         {FILTER_OPTIONS.map((option) => (

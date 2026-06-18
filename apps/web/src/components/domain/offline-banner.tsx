@@ -7,6 +7,7 @@ export interface OfflineBannerProps {
   syncStatus: "pending" | "syncing" | "synced" | "failed";
   pendingCount: number;
   failedCount: number;
+  blockedCount?: number;
   lastSyncedAt?: string;
   onRetry?: () => void;
   onReview?: () => void;
@@ -17,6 +18,7 @@ export function OfflineBanner({
   syncStatus,
   pendingCount,
   failedCount,
+  blockedCount = 0,
   lastSyncedAt,
   onRetry,
   onReview,
@@ -26,6 +28,8 @@ export function OfflineBanner({
     message = "Offline. You can keep running this session.";
   } else if (failedCount > 0) {
     message = `Sync failed for ${failedCount} change${failedCount === 1 ? "" : "s"}. Review and retry.`;
+  } else if (blockedCount > 0) {
+    message = `${blockedCount} change${blockedCount === 1 ? "" : "s"} blocked by an earlier failure. Review sync issues.`;
   } else if (pendingCount > 0) {
     message = `${pendingCount} change${pendingCount === 1 ? "" : "s"} pending sync.`;
   } else if (syncStatus === "syncing") {
@@ -61,6 +65,11 @@ export function OfflineBanner({
           </Button>
         ) : null}
         {failedCount > 0 && onReview ? (
+          <Button variant="ghost" size="compact" onClick={onReview}>
+            Review
+          </Button>
+        ) : null}
+        {failedCount === 0 && blockedCount > 0 && onReview ? (
           <Button variant="ghost" size="compact" onClick={onReview}>
             Review
           </Button>

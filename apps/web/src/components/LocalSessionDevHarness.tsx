@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { checkInPlayerLocal } from "../mutations/checkInPlayer.js";
 import { useLiveSession } from "../hooks/useLiveSession.js";
-import { useSyncEngine } from "../hooks/useSyncEngine.js";
+import { useSyncReviewDrawer } from "../hooks/useSyncReviewDrawer.js";
 import { OfflineBanner } from "./domain/offline-banner.js";
 import { SyncStatusBadge } from "./domain/sync-status-badge.js";
 import { Button } from "./ui/button.js";
@@ -17,7 +17,8 @@ export function LocalSessionDevHarness() {
   const [players, setPlayers] = useState<LocalPlayerProfile[]>([]);
   const [busy, setBusy] = useState(false);
   const { session, checkIns } = useLiveSession(DEV_SESSION_ID);
-  const sync = useSyncEngine(DEV_SESSION_ID);
+  const syncReview = useSyncReviewDrawer(DEV_SESSION_ID);
+  const sync = syncReview.sync;
 
   useEffect(() => {
     void (async () => {
@@ -74,9 +75,10 @@ export function LocalSessionDevHarness() {
           syncStatus={sync.syncStatus}
           pendingCount={sync.pendingCount}
           failedCount={sync.failedCount}
+          blockedCount={sync.blockedCount}
           lastSyncedAt={sync.lastSyncedAt}
           onRetry={() => void sync.retry()}
-          onReview={() => undefined}
+          onReview={syncReview.openReview}
         />
       </div>
 
@@ -116,6 +118,7 @@ export function LocalSessionDevHarness() {
           ))
         )}
       </ul>
+      {syncReview.panel}
     </section>
   );
 }

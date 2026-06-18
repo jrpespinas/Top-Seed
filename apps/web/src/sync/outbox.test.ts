@@ -7,8 +7,9 @@ import {
   listPendingOutboxActions,
   markOutboxApplied,
   markOutboxFailed,
+  markOutboxBlocked,
   resetFailedToPending,
-} from "../sync/outbox.js";
+} from "./outbox.js";
 
 const baseAction = {
   id: "action-1",
@@ -85,9 +86,19 @@ describe("sync outbox", () => {
     await markOutboxFailed("action-2", "fail");
 
     const sessionOne = await countOutboxByStatus("session-1");
-    expect(sessionOne).toEqual({ pending: 1, failed: 0 });
+    expect(sessionOne).toEqual({ pending: 1, failed: 0, blocked: 0 });
 
     const sessionTwo = await countOutboxByStatus("session-2");
-    expect(sessionTwo).toEqual({ pending: 0, failed: 1 });
+    expect(sessionTwo).toEqual({ pending: 0, failed: 1, blocked: 0 });
+  });
+
+  it("tracks blocked actions separately", async () => {
+    await enqueueSyncAction(baseAction);
+    await markOutboxFailed(baseAction.id, "fail");
+    await enqueueSyncAction({ ...baseAction, id: "action-2", createdAt: "2026-06-09T10:01:00.000Z" });
+    await markOutboxBlocked("action-2", baseAction.id);
+
+    const counts = await countOutboxByStatus("session-1");
+    expect(counts.blocked).toBe(1);
   });
 });

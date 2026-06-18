@@ -17,9 +17,11 @@ export interface SessionHeaderProps {
   syncStatus: "pending" | "syncing" | "synced" | "failed";
   pendingCount: number;
   failedCount: number;
+  blockedCount?: number;
   lastSyncedAt?: string;
   onCompleteSession: () => Promise<void>;
   onRetrySync: () => void;
+  onReviewSyncIssues?: () => void;
 }
 
 export function SessionHeader({
@@ -30,11 +32,14 @@ export function SessionHeader({
   syncStatus,
   pendingCount,
   failedCount,
+  blockedCount = 0,
   lastSyncedAt,
   onCompleteSession,
   onRetrySync,
+  onReviewSyncIssues,
 }: SessionHeaderProps) {
   const isLive = sessionMode === "live";
+  const showReview = failedCount > 0 || blockedCount > 0;
 
   return (
     <section className="space-y-3">
@@ -64,9 +69,14 @@ export function SessionHeader({
                     ? "failed"
                     : "pending"
             }
-            pendingCount={pendingCount}
+            pendingCount={pendingCount + blockedCount}
             lastSyncedAt={lastSyncedAt}
           />
+          {showReview && onReviewSyncIssues ? (
+            <Button variant="secondary" size="compact" onClick={onReviewSyncIssues}>
+              Review sync issues
+            </Button>
+          ) : null}
         </div>
       </div>
       <OfflineBanner
@@ -74,8 +84,10 @@ export function SessionHeader({
         syncStatus={syncStatus}
         pendingCount={pendingCount}
         failedCount={failedCount}
+        blockedCount={blockedCount}
         lastSyncedAt={lastSyncedAt}
         onRetry={onRetrySync}
+        onReview={onReviewSyncIssues}
       />
       <nav className="flex flex-wrap gap-2 text-caption">
         <Link

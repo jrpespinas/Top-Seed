@@ -1,6 +1,6 @@
 export type SyncStatus = "local" | "pending" | "syncing" | "synced" | "failed";
 
-export type OutboxActionStatus = "pending" | "syncing" | "applied" | "failed";
+export type OutboxActionStatus = "pending" | "syncing" | "applied" | "failed" | "blocked";
 
 export interface LocalSession {
   id: string;
@@ -123,4 +123,6 @@ export interface OutboxAction {
   createdAt: string;
   status: OutboxActionStatus;
   errorMessage?: string;
+  blockedByActionId?: string;
+  retryCount?: number;
 }

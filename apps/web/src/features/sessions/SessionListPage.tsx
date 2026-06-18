@@ -6,7 +6,7 @@ import { EmptyState } from "../../components/ui/empty-state.js";
 import { Button } from "../../components/ui/button.js";
 import { completeSessionLocal } from "../../mutations/completeSession.js";
 import { useSessions, type SessionFilter } from "../../hooks/useSessions.js";
-import { useSyncEngine } from "../../hooks/useSyncEngine.js";
+import { useSyncReviewDrawer } from "../../hooks/useSyncReviewDrawer.js";
 import { flushOutbox } from "../../sync/syncEngine.js";
 import { SessionListCard } from "./SessionListCard.js";
 import { cn } from "../../lib/cn.js";
@@ -21,7 +21,8 @@ export function SessionListPage() {
   const navigate = useNavigate();
   const [filter, setFilter] = useState<SessionFilter>("all");
   const { sessions, checkInCounts } = useSessions(filter);
-  const sync = useSyncEngine();
+  const syncReview = useSyncReviewDrawer();
+  const sync = syncReview.sync;
 
   async function handleComplete(sessionId: string) {
     await completeSessionLocal(sessionId);
@@ -39,8 +40,10 @@ export function SessionListPage() {
         syncStatus={sync.syncStatus}
         pendingCount={sync.pendingCount}
         failedCount={sync.failedCount}
+        blockedCount={sync.blockedCount}
         lastSyncedAt={sync.lastSyncedAt}
         onRetry={() => void sync.retry()}
+        onReview={syncReview.openReview}
       />
 
       <section className="space-y-4">
@@ -109,6 +112,7 @@ export function SessionListPage() {
           </p>
         ) : null}
       </section>
+      {syncReview.panel}
     </>
   );
 }

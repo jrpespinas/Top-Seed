@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useParams, useSearch } from "@tanstack/react-router";
 import { useSessionPayments } from "../../hooks/useSessionPayments.js";
 import { PlayerDetailDrawer } from "../players/PlayerDetailDrawer.js";
+import { SessionSyncBar } from "../sync/SessionSyncBar.js";
 import {
   PaymentList,
   PaymentSummaryPanel,
@@ -26,6 +27,7 @@ export function SessionPaymentsPage() {
 
   return (
     <div className="space-y-4">
+      <SessionSyncBar sessionId={sessionId} />
       <SessionPaymentsHeader sessionId={sessionId} sessionName={session.name} />
       {summary ? (
         <PaymentSummaryPanel

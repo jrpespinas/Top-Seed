@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { useParams } from "@tanstack/react-router";
 import { Tabs } from "../../components/ui/tabs.js";
 import { useSessionDashboard } from "../../hooks/useSessionDashboard.js";
-import { useSyncEngine } from "../../hooks/useSyncEngine.js";
+import { useSyncReviewDrawer } from "../../hooks/useSyncReviewDrawer.js";
 import { SessionHeader } from "./SessionHeader.js";
 import { SessionStatusBar } from "./SessionStatusBar.js";
 import { PlayerPool } from "./PlayerPool.js";
@@ -18,7 +18,8 @@ import { MatchCorrectionDrawer } from "../history/MatchHistoryList.js";
 export function SessionDashboardPage() {
   const { sessionId } = useParams({ from: "/organizer/sessions/$sessionId/dashboard" });
   const dashboard = useSessionDashboard(sessionId);
-  const sync = useSyncEngine(sessionId);
+  const syncReview = useSyncReviewDrawer(sessionId);
+  const sync = syncReview.sync;
   const [mobileTab, setMobileTab] = useState("now");
   const [queueTab, setQueueTab] = useState("waiting");
   const [selectedLaneId, setSelectedLaneId] = useState<string>("");
@@ -131,9 +132,11 @@ export function SessionDashboardPage() {
         syncStatus={sync.syncStatus}
         pendingCount={sync.pendingCount}
         failedCount={sync.failedCount}
+        blockedCount={sync.blockedCount}
         lastSyncedAt={sync.lastSyncedAt}
         onCompleteSession={dashboard.actions.completeSession}
         onRetrySync={() => void sync.retry()}
+        onReviewSyncIssues={syncReview.openReview}
       />
 
       <SessionStatusBar
@@ -206,6 +209,7 @@ export function SessionDashboardPage() {
           setCorrectedMatchIds((current) => new Set([...current, matchId]));
         }}
       />
+      {syncReview.panel}
     </div>
   );
 }

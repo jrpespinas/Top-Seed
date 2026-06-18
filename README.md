@@ -49,9 +49,10 @@ git clone <repository-url>
 cd Top-Seed
 pnpm install
 cp .env.example .env
+cp .env.example apps/api/.env
 ```
 
-The `.env` file points the web app at `http://localhost:3001` and the API at a local PostgreSQL database. Defaults work for local development; you usually do not need to edit it.
+The root `.env` feeds the web app (`VITE_API_URL`). **Prisma reads `apps/api/.env`** for `DATABASE_URL` — copy both files so `db:push` and `pnpm dev` work without extra setup.
 
 ### 2. Choose how to run
 
@@ -88,6 +89,53 @@ pnpm --filter @top-seed/web dev
 
 Open [http://localhost:5173](http://localhost:5173). Session data is stored in the browser (IndexedDB). The API warning banner is expected; core session workflows still work offline.
 
+### 3. Production build (local preview)
+
+Use this to run the **optimized production bundle** — the same build you would deploy. Development-only tools (component gallery, dev harness) are **not included** in this mode.
+
+```bash
+# One-time: database (if using the API)
+docker compose up -d
+pnpm --filter @top-seed/api db:push
+pnpm --filter @top-seed/api db:seed
+
+# Build all packages (contracts → domain → api → web)
+pnpm build
+
+# Terminal 1 — API (production Node process)
+pnpm --filter @top-seed/api start
+
+# Terminal 2 — serve the built web app
+pnpm --filter @top-seed/web preview
+```
+
+| Service | URL |
+|---------|-----|
+| **Organizer app (production)** | [http://localhost:4173](http://localhost:4173) |
+| **API** | [http://localhost:3001](http://localhost:3001) |
+
+**API URL at build time:** Vite bakes `VITE_API_URL` into the web bundle when you run `pnpm build`. Set it in `.env` before building (default from `.env.example` is `http://localhost:3001`). If the API will live on another host in deployment, set `VITE_API_URL` to that URL, then rebuild.
+
+**Web-only production preview** (no API):
+
+```bash
+pnpm --filter @top-seed/web build
+pnpm --filter @top-seed/web preview
+```
+
+Organizer routes still work from IndexedDB; sync to the server requires the API running and a matching `VITE_API_URL` at build time.
+
+#### What is hidden in production
+
+These exist only when `pnpm dev` is running (`import.meta.env.DEV`). They are stripped from production builds:
+
+| Dev-only | URL | In production |
+|----------|-----|----------------|
+| **Component gallery** (Phase 4 UI primitives) | `/dev/components` | Nav link removed; direct URL shows **Not found** |
+| **Local-first dev harness** | `/organizer/sessions/dev-harness` | Link on Sessions page removed; direct URL shows **Not found** |
+
+The organizer app itself — sessions, dashboard, payments, history, leaderboard, players — is fully available in production.
+
 ---
 
 ## Run a session (walkthrough)
@@ -106,9 +154,14 @@ Use a tablet-sized browser window if you can — the dashboard is designed for t
 
 **Tip:** If you have exactly one active session, visiting `/` redirects straight to its dashboard.
 
-### Dev shortcut (developers only)
+### Dev shortcuts (development mode only)
 
-In development mode, [http://localhost:5173/organizer/sessions/dev-harness](http://localhost:5173/organizer/sessions/dev-harness) seeds a sample session and players for quick offline testing.
+Run `pnpm dev` (not `preview`) to enable these. They do not appear in production builds — see [What is hidden in production](#what-is-hidden-in-production) above.
+
+| Shortcut | URL |
+|----------|-----|
+| **Component gallery** — buttons, cards, domain components | [http://localhost:5173/dev/components](http://localhost:5173/dev/components) (also linked in the header as **Components**) |
+| **Dev harness** — seeds a sample session for offline check-in testing | [http://localhost:5173/organizer/sessions/dev-harness](http://localhost:5173/organizer/sessions/dev-harness) (link at bottom of Sessions page) |
 
 ---
 
@@ -153,9 +206,11 @@ packages/
 
 | Command | Description |
 |---------|-------------|
-| `pnpm dev` | Web (5173) + API (3001) |
-| `pnpm --filter @top-seed/web dev` | Web app only |
+| `pnpm dev` | Web dev server (5173) + API (3001); enables component gallery and dev harness |
+| `pnpm --filter @top-seed/web dev` | Web dev server only |
 | `pnpm build` | Production build for all packages |
+| `pnpm --filter @top-seed/web preview` | Serve production web build (default port **4173**) |
+| `pnpm --filter @top-seed/api start` | Run API from `apps/api/dist` (after `pnpm build`) |
 | `pnpm test` | Run tests across the monorepo |
 | `pnpm lint` | ESLint |
 | `pnpm db:generate` | Regenerate Prisma client |

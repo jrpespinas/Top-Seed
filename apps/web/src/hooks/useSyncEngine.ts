@@ -9,6 +9,7 @@ export function useSyncEngine(sessionId?: string) {
   );
   const [pendingCount, setPendingCount] = useState(0);
   const [failedCount, setFailedCount] = useState(0);
+  const [blockedCount, setBlockedCount] = useState(0);
   const [syncStatus, setSyncStatus] = useState<"pending" | "syncing" | "synced" | "failed">(
     "synced",
   );
@@ -18,9 +19,10 @@ export function useSyncEngine(sessionId?: string) {
     const counts = await countOutboxByStatus(sessionId);
     setPendingCount(counts.pending);
     setFailedCount(counts.failed);
+    setBlockedCount(counts.blocked);
     if (counts.failed > 0) {
       setSyncStatus("failed");
-    } else if (counts.pending > 0) {
+    } else if (counts.pending > 0 || counts.blocked > 0) {
       setSyncStatus("pending");
     } else {
       setSyncStatus("synced");
@@ -75,6 +77,7 @@ export function useSyncEngine(sessionId?: string) {
     syncStatus,
     pendingCount,
     failedCount,
+    blockedCount,
     lastSyncedAt,
     runSync,
     retry,

@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Link, useParams } from "@tanstack/react-router";
 import { useSessionDashboard } from "../../hooks/useSessionDashboard.js";
+import { SessionSyncBar } from "../sync/SessionSyncBar.js";
 import { PlayerPool } from "../dashboard/PlayerPool.js";
 import { PlayerDetailDrawer } from "./PlayerDetailDrawer.js";
 
@@ -19,6 +20,7 @@ export function SessionPlayersPage() {
 
   return (
     <div className="space-y-4">
+      <SessionSyncBar sessionId={sessionId} />
       <div>
         <Link
           to="/organizer/sessions/$sessionId/dashboard"
