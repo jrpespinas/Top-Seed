@@ -61,10 +61,10 @@ describe("SessionWorkspaceBar", () => {
     );
     expect(await screen.findByText("Tuesday Intense Badminton")).toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "Players" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("link", { name: "Payments" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Admin" })).not.toBeInTheDocument();
   });
 
-  it("opens overflow menu with payments and history", async () => {
+  it("opens overflow menu with admin and history", async () => {
     const user = userEvent.setup();
     await renderWithRouter(
       <SessionWorkspaceBar
@@ -78,9 +78,26 @@ describe("SessionWorkspaceBar", () => {
       />,
     );
     await user.click(screen.getByRole("button", { name: "Session menu" }));
-    expect(screen.getByText("Payments")).toBeInTheDocument();
+    expect(screen.getByText("Admin")).toBeInTheDocument();
     expect(screen.getByText("Match history")).toBeInTheDocument();
     expect(screen.getByText("Leaderboard (this session)")).toBeInTheDocument();
+  });
+
+  it("hides sync badge on dashboard", async () => {
+    await renderWithRouter(
+      <SessionWorkspaceBar
+        session={session}
+        courtCount={3}
+        sessionMode="live"
+        syncStatus="failed"
+        pendingCount={10}
+        activeView="dashboard"
+        showSyncBadge={false}
+        sticky={false}
+      />,
+    );
+    expect(screen.queryByText(/Sync failed/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Pending sync/i)).not.toBeInTheDocument();
   });
 
   it("does not show complete session in the bar", async () => {

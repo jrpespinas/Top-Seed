@@ -313,8 +313,9 @@ Use case: `DeleteCourt`
 
 Rules:
 
-- Only courts without active matches can be deleted.
-- Deleting a court must not delete completed match history.
+- Courts with an **active** match (`assigned` or `in_progress`) cannot be deleted until that match is finished or cancelled.
+- Deleting a court must **not** delete match history. Detach historical matches by setting `match.courtId` to `null`; participants, scores, and outcomes are preserved.
+- At least one court must remain in an active session.
 
 #### `PAUSE_COURT`
 

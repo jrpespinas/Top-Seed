@@ -25,7 +25,7 @@ The board should feel like the court section of a physical pegboard, where each 
 
 ## Child Components
 
-- `CourtCard`
+- `CourtCard` — see `components/domain/court-card.md` (idle open visualization, overflow delete, vs roster).
 - `MatchCard`
 - `EmptyState`
 - `Button`
@@ -72,13 +72,14 @@ MVP v1 has no login or role checks. See `docs/specs/mvp-access.md`.
 ## Acceptance Criteria
 
 - Every court has exactly one visible status.
-- Court cards show capacity `{filled}/4` in the header.
-- Court cards show Team A and Team B slots with nested player mini-cards or dashed drop zones.
-- Court footer shows match summary and **Start Match** when assigned.
-- Occupied courts show players by team pair, not as a flat list.
+- Idle open courts show `0/4` and four visible empty slots (severity of idle capacity is intentional).
+- Court cards show Team A | vs | Team B with flat player tokens or dashed empty slots.
+- Idle open courts show four `Empty` slots and `0/4` only — no instructional line.
+- Footer **Start match** / **Finish match** is full-width primary when assigned or in progress.
+- **Delete court** is in card overflow menu with confirm dialog — not a button under each card.
+- Occupied courts use court green tint; idle open courts stay neutral.
+- Courts remain in session sort order (no pinning actionable courts to top).
 - Paused or unavailable courts are excluded from auto-assignment.
-- Open courts make moving the next queued match onto the court easy.
-- Direct court assignment shows `Assigned directly — skipped Next queue` messaging.
-- Add court, pause/reopen court, and set players actions are visible without leaving the board.
-- Add, pause, reopen, unavailable, assign, start, and finish actions update local state immediately and can sync later.
-- Drag-and-drop may be supported, but button/menu alternatives are required.
+- Add court action lives in the **Courts zone header** on desktop pegboard only — not duplicated inside `CourtBoard`.
+- Add, pause, reopen, assign, start, and finish actions update local state immediately and can sync later.
+- Drag-and-drop may be supported (Phase 11D match → court), but button/menu alternatives are required.

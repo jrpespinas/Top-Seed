@@ -55,7 +55,6 @@ export function SuggestionStrip({
       className="rounded-card border border-next/30 bg-next/5 p-3"
     >
       <h3 className="text-label font-semibold">Suggested next match</h3>
-      <p className="mt-1 text-caption text-muted-foreground">{suggestion.explanation}</p>
       <MatchCard
         variant="queued"
         match={{

@@ -47,7 +47,7 @@ export function displayNameForCheckIn(
 
 export function openCourts(
   courts: { id: string; status: string; currentMatchId?: string | null }[],
-  matches: { courtId: string; status: string }[],
+  matches: { courtId: string | null; status: string }[],
 ): string[] {
   return courts
     .filter((court) => {

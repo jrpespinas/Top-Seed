@@ -15,11 +15,11 @@ import { SessionPaymentsPage } from "./SessionPaymentsPage.js";
 import { clearDatabase } from "../../db/database.js";
 import { createSessionLocal } from "../../mutations/createSession.js";
 
-function renderPage(element: ReactElement, path = "/organizer/sessions/session-1/payments") {
+function renderPage(element: ReactElement, path = "/organizer/sessions/session-1/admin") {
   const rootRoute = createRootRoute();
   const pageRoute = createRoute({
     getParentRoute: () => rootRoute,
-    path: "/organizer/sessions/$sessionId/payments",
+    path: "/organizer/sessions/$sessionId/admin",
     component: () => element,
   });
   const routeTree = rootRoute.addChildren([pageRoute]);
@@ -35,7 +35,7 @@ describe("SessionPaymentsPage", () => {
     await clearDatabase();
   });
 
-  it("renders payments header when session exists", async () => {
+  it("renders admin header when session exists", async () => {
     await createSessionLocal({
       id: "session-1",
       name: "Friday Night",
@@ -46,6 +46,6 @@ describe("SessionPaymentsPage", () => {
 
     renderPage(<SessionPaymentsPage />);
     expect(await screen.findByText(/Friday Night/)).toBeInTheDocument();
-    expect(await screen.findByText(/· Payments/)).toBeInTheDocument();
+    expect(await screen.findByText(/· Admin/)).toBeInTheDocument();
   });
 });

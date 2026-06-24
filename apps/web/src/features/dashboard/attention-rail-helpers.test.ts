@@ -22,7 +22,18 @@ describe("shouldShowAttentionRail", () => {
     expect(shouldShowAttentionRail({ ...healthy, unpaidCount: 2 })).toBe(true);
   });
 
-  it("shows when sync failed", () => {
+  it("ignores sync issues when showSync is false", () => {
+    expect(
+      shouldShowAttentionRail({
+        ...healthy,
+        failedCount: 1,
+        syncStatus: "failed",
+        showSync: false,
+      }),
+    ).toBe(false);
+  });
+
+  it("shows when sync failed and showSync is enabled", () => {
     expect(shouldShowAttentionRail({ ...healthy, failedCount: 1, syncStatus: "failed" })).toBe(
       true,
     );

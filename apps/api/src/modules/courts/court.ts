@@ -155,15 +155,10 @@ export async function deleteCourt(input: DeleteCourtInput) {
     );
   }
 
-  const matchHistoryCount = await prisma.match.count({
+  await prisma.match.updateMany({
     where: { sessionId: input.sessionId, courtId: input.courtId },
+    data: { courtId: null },
   });
-  if (matchHistoryCount > 0) {
-    throw new UseCaseError(
-      "VALIDATION_ERROR",
-      "Cannot delete a court that has match history.",
-    );
-  }
 
   await prisma.court.delete({ where: { id: input.courtId } });
   await renumberSessionCourts(input.sessionId);

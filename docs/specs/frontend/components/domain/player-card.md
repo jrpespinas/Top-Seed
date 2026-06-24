@@ -2,12 +2,13 @@
 
 ## Purpose
 
-Card variant of the player token for the Player List zone. Shows avatar, name, skill, status, session stats, and row actions in a glanceable card layout.
+Card variant of the player token for the Player List zone. Shows name, skill, status, session stats, and row actions in a glanceable card layout. No avatar in MVP — photo support is future work.
 
 ## Source Specs
 
 - `docs/specs/frontend/design-system.md` — Reference-inspired card system
 - `components/domain/player-row.md` — shared data contract and actions
+- `features/organizer/desktop-drag-and-drop.md` — optional drag handle and `player` drag source
 
 ## When To Use
 
@@ -30,8 +31,8 @@ Same as `PlayerRow` plus:
 
 ## Variants
 
-- `default`: full card with avatar, badges, stats footer, overflow menu.
-- `compact`: smaller padding; used inside match team columns.
+- `default`: full card with name + edit pencil, skill/status badges, stats footer (games, wins, elapsed time), drag handle, remove.
+- `compact`: name-only token for drag overlay previews.
 
 ## States
 
@@ -39,8 +40,8 @@ Same as `PlayerRow` plus:
 
 ## Accessibility
 
-- Avatar is decorative; name is the accessible label.
-- Overflow menu exposes all row actions with keyboard access.
+- Avatar is not shown in MVP v1.
+- Name is the accessible label; edit pencil opens player details.
 
 ## Testing Expectations
 

@@ -8,6 +8,7 @@ import type {
   LocalMatch,
   LocalPlayerProfile,
   LocalQueuedMatch,
+  LocalQueuedMatchParticipant,
   LocalQueueLane,
   LocalSession,
 } from "../db/types.js";
@@ -23,7 +24,9 @@ import {
   addEmptyQueuedMatchLocal,
   createQueuedMatchLocal,
   moveQueuedMatchToCourtLocal,
+  moveQueuedMatchToLaneLocal,
   removeQueuedMatchLocal,
+  updateQueuedMatchLocal,
 } from "../mutations/queuedMatches.js";
 import {
   createQueueLaneLocal,
@@ -38,6 +41,13 @@ import {
   nextArrivalOrder,
 } from "../lib/mutation-utils.js";
 import { suggestionToParticipants, openCourts } from "../lib/dashboard-helpers.js";
+import {
+  addPlayerToQueuedParticipants,
+  moveQueuedParticipantToSlot,
+  removePlayerFromQueuedParticipants,
+  type QueuedMatchSlotOrder,
+  type QueuedMatchTeam,
+} from "../lib/queued-match-participants.js";
 import type { MatchResultInput } from "@top-seed/contracts";
 
 export interface DashboardData {
@@ -248,6 +258,107 @@ export function useSessionDashboard(sessionId: string) {
     [sessionId],
   );
 
+  const updateQueuedMatchParticipants = useCallback(
+    async (queuedMatchId: string, participants: LocalQueuedMatchParticipant[]) => {
+      await updateQueuedMatchLocal({ sessionId, queuedMatchId, participants });
+      await afterMutation(sessionId);
+    },
+    [sessionId],
+  );
+
+  const addPlayerToQueuedSlot = useCallback(
+    async (input: {
+      queuedMatchId: string;
+      checkInId: string;
+      team: QueuedMatchTeam;
+      slotOrder: QueuedMatchSlotOrder;
+    }) => {
+      const [queuedMatch, checkIn] = await Promise.all([
+        db.queuedMatches.get(input.queuedMatchId),
+        db.checkIns.get(input.checkInId),
+      ]);
+      if (!queuedMatch || queuedMatch.sessionId !== sessionId) {
+        throw new Error("Queued match not found.");
+      }
+      if (queuedMatch.status !== "draft" && queuedMatch.status !== "ready") {
+        throw new Error("Match cannot be edited.");
+      }
+      if (!checkIn || checkIn.sessionId !== sessionId) {
+        throw new Error("Check-in not found.");
+      }
+      if (checkIn.queueStatus !== "waiting" && checkIn.queueStatus !== "resting") {
+        throw new Error("Player is not available.");
+      }
+      const participants = addPlayerToQueuedParticipants(queuedMatch.participants, {
+        checkInId: input.checkInId,
+        playerProfileId: checkIn.playerProfileId,
+        team: input.team,
+        slotOrder: input.slotOrder,
+      });
+      await updateQueuedMatchLocal({ sessionId, queuedMatchId: input.queuedMatchId, participants });
+      await afterMutation(sessionId);
+    },
+    [sessionId],
+  );
+
+  const removePlayerFromQueuedSlot = useCallback(
+    async (input: { queuedMatchId: string; checkInId: string }) => {
+      const queuedMatch = await db.queuedMatches.get(input.queuedMatchId);
+      if (!queuedMatch || queuedMatch.sessionId !== sessionId) {
+        throw new Error("Queued match not found.");
+      }
+      const participants = removePlayerFromQueuedParticipants(
+        queuedMatch.participants,
+        input.checkInId,
+      );
+      await updateQueuedMatchLocal({ sessionId, queuedMatchId: input.queuedMatchId, participants });
+      await afterMutation(sessionId);
+    },
+    [sessionId],
+  );
+
+  const movePlayerInQueuedSlot = useCallback(
+    async (input: {
+      queuedMatchId: string;
+      checkInId: string;
+      team: QueuedMatchTeam;
+      slotOrder: QueuedMatchSlotOrder;
+    }) => {
+      const queuedMatch = await db.queuedMatches.get(input.queuedMatchId);
+      if (!queuedMatch || queuedMatch.sessionId !== sessionId) {
+        throw new Error("Queued match not found.");
+      }
+      if (queuedMatch.status !== "draft" && queuedMatch.status !== "ready") {
+        throw new Error("Match cannot be edited.");
+      }
+      const participants = moveQueuedParticipantToSlot(queuedMatch.participants, {
+        checkInId: input.checkInId,
+        team: input.team,
+        slotOrder: input.slotOrder,
+      });
+      await updateQueuedMatchLocal({ sessionId, queuedMatchId: input.queuedMatchId, participants });
+      await afterMutation(sessionId);
+    },
+    [sessionId],
+  );
+
+  const moveQueuedMatchToLane = useCallback(
+    async (input: {
+      queuedMatchId: string;
+      targetQueueLaneId: string;
+      sortOrder: number;
+    }) => {
+      await moveQueuedMatchToLaneLocal({
+        sessionId,
+        queuedMatchId: input.queuedMatchId,
+        targetQueueLaneId: input.targetQueueLaneId,
+        sortOrder: input.sortOrder,
+      });
+      await afterMutation(sessionId);
+    },
+    [sessionId],
+  );
+
   const actions = {
     checkInPlayer,
     createAndCheckInWalkIn,
@@ -268,6 +379,11 @@ export function useSessionDashboard(sessionId: string) {
       await removeQueuedMatchLocal({ sessionId, queuedMatchId });
       await afterMutation(sessionId);
     },
+    addPlayerToQueuedSlot,
+    removePlayerFromQueuedSlot,
+    movePlayerInQueuedSlot,
+    updateQueuedMatchParticipants,
+    moveQueuedMatchToLane,
     sendQueuedMatchToCourt,
     startMatch: async (matchId: string) => {
       await startMatchLocal({

@@ -5,11 +5,15 @@ export interface AttentionRailVisibilityInput {
   pendingCount: number;
   failedCount: number;
   blockedCount: number;
+  showSync?: boolean;
 }
 
 export function shouldShowAttentionRail(input: AttentionRailVisibilityInput): boolean {
   if (input.unpaidCount > 0) {
     return true;
+  }
+  if (input.showSync === false) {
+    return false;
   }
   if (input.failedCount > 0 || input.blockedCount > 0) {
     return true;

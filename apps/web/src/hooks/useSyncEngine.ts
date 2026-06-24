@@ -72,6 +72,26 @@ export function useSyncEngine(sessionId?: string) {
     }
   }, [connectionStatus, runSync]);
 
+  const autoSync = useCallback(async () => {
+    if (!getConnectionStatus()) {
+      return;
+    }
+    const counts = await countOutboxByStatus(sessionId);
+    if (counts.failed > 0 || counts.blocked > 0) {
+      await retry();
+    } else if (counts.pending > 0) {
+      await runSync();
+    }
+  }, [sessionId, retry, runSync]);
+
+  useEffect(() => {
+    if (connectionStatus !== "online") {
+      return;
+    }
+    const interval = window.setInterval(() => void autoSync(), 30_000);
+    return () => window.clearInterval(interval);
+  }, [connectionStatus, autoSync]);
+
   return {
     connectionStatus,
     syncStatus,

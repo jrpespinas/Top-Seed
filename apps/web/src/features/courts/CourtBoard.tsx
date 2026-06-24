@@ -1,6 +1,5 @@
 import { CourtCard, type CourtUiStatus } from "../../components/domain/court-card.js";
 import { Button } from "../../components/ui/button.js";
-import { ConfirmAction } from "../../components/ui/confirm-action.js";
 import { EmptyState } from "../../components/ui/empty-state.js";
 import { displayNameForCheckIn } from "../../lib/dashboard-helpers.js";
 import type { LocalCheckIn, LocalCourt, LocalMatch } from "../../db/types.js";
@@ -52,29 +51,20 @@ export function CourtBoard({
 
   return (
     <section className="space-y-3">
-      <div className="flex flex-wrap items-center justify-between gap-2 lg:hidden">
-        <h2 className="text-title font-semibold">Courts</h2>
-        {isLive && onAddCourt ? (
-          <Button
-            variant="ghost"
-            size="compact"
-            onClick={onAddCourt}
-            disabled={activeCourts.length >= MAX_COURTS}
-          >
-            Add court
-          </Button>
-        ) : null}
-      </div>
-      {isLive && onAddCourt && layout === "pegboard" ? (
-        <Button
-          className="hidden lg:inline-flex"
-          variant="ghost"
-          size="compact"
-          onClick={onAddCourt}
-          disabled={activeCourts.length >= MAX_COURTS}
-        >
-          Add court
-        </Button>
+      {layout !== "pegboard" ? (
+        <div className="flex flex-wrap items-center justify-between gap-2 lg:hidden">
+          <h2 className="text-title font-semibold">Courts</h2>
+          {isLive && onAddCourt ? (
+            <Button
+              variant="ghost"
+              size="compact"
+              onClick={onAddCourt}
+              disabled={activeCourts.length >= MAX_COURTS}
+            >
+              Add court
+            </Button>
+          ) : null}
+        </div>
       ) : null}
       <div className={courtGridClass(activeCourts.length, layout)}>
         {activeCourts.map((court) => {
@@ -91,31 +81,19 @@ export function CourtBoard({
             onDeleteCourt &&
             activeCourts.length > 1 &&
             uiStatus === "open" &&
-            !match &&
-            !matches.some((row) => row.courtId === court.id);
+            !match;
 
           return (
-            <div key={court.id} className="space-y-2">
-              <CourtCard
-                court={{ id: court.id, name: court.name }}
-                uiStatus={uiStatus}
-                teamSlots={teamSlots}
-                primaryAction={primaryAction}
-                matchSummary={match ? formatMatchSummary(match, checkIns) : undefined}
-                sessionMode={sessionMode}
-                size="large"
-              />
-              {canDelete ? (
-                <ConfirmAction
-                  triggerLabel="Delete court"
-                  title={`Delete ${court.name}?`}
-                  description="Only empty courts with no match history can be deleted."
-                  confirmLabel="Delete court"
-                  variant="danger"
-                  onConfirm={() => onDeleteCourt(court.id)}
-                />
-              ) : null}
-            </div>
+            <CourtCard
+              key={court.id}
+              court={{ id: court.id, name: court.name }}
+              uiStatus={uiStatus}
+              teamSlots={teamSlots}
+              primaryAction={primaryAction}
+              sessionMode={sessionMode}
+              size="large"
+              onDelete={canDelete ? () => onDeleteCourt(court.id) : undefined}
+            />
           );
         })}
       </div>
@@ -195,16 +173,4 @@ function primaryCourtAction(
     return { label: "Finish match", onClick: () => onOpenMatch(match.id) };
   }
   return undefined;
-}
-
-function formatMatchSummary(match: LocalMatch, checkIns: LocalCheckIn[]): string {
-  const teamOne = match.participants
-    .filter((p) => p.team === "team_one")
-    .map((p) => displayNameForCheckIn(p.checkInId, checkIns));
-  const teamTwo = match.participants
-    .filter((p) => p.team === "team_two")
-    .map((p) => displayNameForCheckIn(p.checkInId, checkIns));
-  const formatTeam = (names: string[]) =>
-    names.length > 0 ? names.join(" & ") : "Open slot";
-  return `${formatTeam(teamOne)} vs ${formatTeam(teamTwo)}`;
 }

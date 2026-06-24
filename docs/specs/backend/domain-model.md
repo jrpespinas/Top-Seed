@@ -322,7 +322,6 @@ Required fields:
 
 - `id`
 - `sessionId`
-- `courtId`
 - `status`
 - `startedAt`
 - `endedAt`
@@ -332,6 +331,10 @@ Required fields:
 - `winningTeam`
 - `createdAt`
 - `updatedAt`
+
+Optional fields:
+
+- `courtId` — required while a match is `assigned` or `in_progress` on a live court. May be `null` after the court is deleted; historical match records keep teams and results without a court reference.
 
 Future fields:
 

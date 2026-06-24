@@ -35,9 +35,11 @@ const COURT_LABELS: Record<CourtUiStatus, string> = {
   unavailable: "Unavailable",
 };
 
-const MATCH_LABELS: Record<MatchStatus | "queued" | "queuedIncomplete", string> = {
+const MATCH_LABELS: Record<MatchStatus | "queued" | "queuedIncomplete" | "ready" | "draft", string> = {
   queued: "Queued",
   queuedIncomplete: "Draft",
+  draft: "Draft",
+  ready: "Ready",
   assigned: "Assigned",
   in_progress: "In progress",
   completed: "Completed",

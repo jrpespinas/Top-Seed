@@ -38,7 +38,7 @@ MVP should start with one default queue lane per session. The default lane can b
 
 ## Child Components
 
-- `MatchCard`
+- `MatchCard` — staged rows follow `components/domain/match-card.md` (header progress, flat slot tokens, footer primary CTA, overflow for destructive actions).
 - `Button`
 - `IconButton`
 - `DropdownMenu` — see `components/primitives/dropdown-menu.md`
@@ -125,7 +125,7 @@ Desktop:
 ## Accessibility
 
 - Lane tabs, column headers, and menus must be keyboard reachable.
-- Drag-and-drop, if implemented, must have button/menu alternatives for moving matches.
+- Drag-and-drop, if implemented, must have button/menu alternatives for moving matches. See `desktop-drag-and-drop.md`.
 - Confirmation dialogs must describe whether queued matches will be deleted.
 - Counts should be text-readable, not color-only.
 

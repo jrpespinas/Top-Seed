@@ -96,7 +96,7 @@ The frontend must support:
 
 ## Drag And Drop
 
-Use `dnd-kit` only as an enhancement.
+Use `dnd-kit` only as an enhancement. Full contract: `docs/specs/frontend/features/organizer/desktop-drag-and-drop.md`.
 
 Allowed:
 

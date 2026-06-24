@@ -26,6 +26,7 @@ Use these names in code, specs, and UI copy. **Aliases are deprecated**—do not
 | `AttentionRail` | Exception strip (unpaid, sync, offline) on desktop | `features/organizer/attention-rail.md` |
 | `PegboardLayout` | Three-zone dashboard grid shell | `features/organizer/live-dashboard-layout.md` |
 | `SupportingStrip` | Compact secondary row (payments teaser, links) | `features/organizer/live-dashboard-layout.md` |
+| `DesktopDndProvider` | Optional desktop pegboard drag-and-drop shell | `features/organizer/desktop-drag-and-drop.md` |
 | `SessionStatusBar` | Operating metrics (mobile **More** tab; deprecated desktop) | `features/organizer/session-status-bar.md` |
 | `PlayerCheckInPanel` | Check-in and add player (inside `PlayerPool`) | `features/organizer/player-check-in-panel.md` |
 | `QueuePanel` | Waiting/resting/done/removed list (inside `PlayerPool`) | `features/organizer/queue-panel.md` |

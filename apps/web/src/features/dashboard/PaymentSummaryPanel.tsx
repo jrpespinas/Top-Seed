@@ -37,7 +37,7 @@ export function PaymentSummaryPanel({
     <section className="rounded-card border border-border bg-surface p-4">
       <div className="flex items-center justify-between gap-2">
         <h2 className="text-title font-semibold">Payments</h2>
-        <Link to="/organizer/sessions/$sessionId/payments" params={{ sessionId }}>
+        <Link to="/organizer/sessions/$sessionId/admin" params={{ sessionId }}>
           <Button variant="ghost" size="compact">
             View all
           </Button>

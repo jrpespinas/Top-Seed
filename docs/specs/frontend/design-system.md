@@ -86,7 +86,7 @@ Rules:
 - On **phone**, the full pegboard cannot fit on one screen. Use **Mobile live dashboard** (below); do not cram three pegboard zones into one unreadable scroll.
 - Court cards must show players by team slot, not as a flat list.
 - Next queue should show multiple lined-up matches and multiple queue lanes when space allows.
-- Drag-and-drop may be supported on desktop; every drag action needs an accessible button/menu alternative on phone and tablet.
+- Drag-and-drop may be supported on desktop; every drag action needs an accessible button/menu alternative on phone and tablet. Spec: `features/organizer/desktop-drag-and-drop.md`.
 - Use court layout, queue movement, and player-token behavior as the badminton context. Avoid decorative shuttle graphics as the main visual identity.
 
 ### Mobile live dashboard (organizer phone)
@@ -143,9 +143,10 @@ Borrow card chrome from modern queueing dashboards (soft white cards, pill badge
 Allowed:
 
 - Avatar initials circles on player tokens.
-- Pill status badges (`Queued #1`, skill level, payment state).
-- Nested mini-cards inside match and court team columns.
+- Pill status badges (`Ready`, `Queued #1`, skill level, payment state).
+- Flat player token rows inside match and court team columns (prefer over nested bordered mini-cards).
 - Zone footers with one primary and one secondary action (`Magic Queue`, `Add Match`, `Start Match`).
+- Staged ready match cards: warm `next` border/accent + full-width **Send to court** primary CTA.
 - Lighter borders (`border-border/60`), consistent `shadow-sm`, slightly rounder `--radius-card`.
 
 Still forbidden:
@@ -406,14 +407,26 @@ Rules:
 
 ### MatchCard
 
-Purpose: show assigned, active, or completed match details.
+Purpose: show assigned, active, completed, or staged match details.
 
 Required content:
 
-- Court.
-- Team one and team two.
-- Match status.
+- Court (when assigned or active).
+- Team one and team two in columns with clear opponent separation (`vs` divider).
+- Match status with human-readable label and semantic tone.
+- Fill progress for staged `draft` matches (`2/4 players` or `Needs 2 players`).
 - Score or result when available.
+
+Staged (`Next` zone) rules:
+
+- **One primary action** per card: **Send to court** when `ready`; use `primary` button variant.
+- **Progressive disclosure** for slot-level **Remove** — overflow or hover/focus, not four always-visible text buttons.
+- **Remove match** and lane moves live in header overflow menu only; do not duplicate in footer.
+- Ready cards use warm `next` accent (border or left bar) so they read as actionable tokens.
+- Player tokens in slots are **flat rows** (avatar + name), not nested bordered mini-cards.
+- Omit per-card lane subtitle when parent lane switcher already shows selected lane.
+
+Full anatomy and interaction contract: `components/domain/match-card.md`.
 
 Rules:
 

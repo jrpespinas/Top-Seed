@@ -471,7 +471,7 @@ describe.skipIf(!hasDatabase)("phase 7 sync actions", () => {
     expect(court).toBeNull();
   });
 
-  it("fails DELETE_COURT with a clear error when the court has match history", async () => {
+  it("replays DELETE_COURT and detaches completed match history", async () => {
     await resetDatabase();
     const { sessionId } = await seedBaseFixtures();
     await prisma.court.create({
@@ -511,11 +511,14 @@ describe.skipIf(!hasDatabase)("phase 7 sync actions", () => {
 
     expect(deleteResponse.statusCode).toBe(200);
     const body = JSON.parse(deleteResponse.body);
-    expect(body.results[0]?.status).toBe("failed");
-    expect(body.results[0]?.message).toMatch(/match history/i);
+    expect(body.results[0]?.status).toBe("applied");
 
     const court = await prisma.court.findUnique({ where: { id: "court-1" } });
-    expect(court).not.toBeNull();
+    expect(court).toBeNull();
+
+    const match = await prisma.match.findUnique({ where: { id: "match-on-court-1" } });
+    expect(match?.courtId).toBeNull();
+    expect(match?.status).toBe("completed");
   });
 
   it("replays UPDATE_COURT by creating the court when it is missing on the server", async () => {

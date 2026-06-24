@@ -98,7 +98,7 @@ export interface LocalMatchParticipant {
 export interface LocalMatch {
   id: string;
   sessionId: string;
-  courtId: string;
+  courtId: string | null;
   queuedMatchId?: string | null;
   status: string;
   outcome?: string | null;

@@ -10,14 +10,14 @@ import {
 } from "./PaymentList.js";
 
 export function SessionPaymentsPage() {
-  const { sessionId } = useParams({ from: "/organizer/sessions/$sessionId/payments" });
-  const search = useSearch({ from: "/organizer/sessions/$sessionId/payments" });
+  const { sessionId } = useParams({ from: "/organizer/sessions/$sessionId/admin" });
+  const search = useSearch({ from: "/organizer/sessions/$sessionId/admin" });
   const { session, checkIns, summary, sessionMode } = useSessionPayments(sessionId);
   const [statusFilter, setStatusFilter] = useState<string>(search.status ?? "all");
   const [selectedCheckInId, setSelectedCheckInId] = useState<string | null>(null);
 
   return (
-    <SessionWorkspaceShell sessionId={sessionId} activeView="payments">
+    <SessionWorkspaceShell sessionId={sessionId} activeView="admin">
       {session && summary ? (
         <PaymentSummaryPanel
           session={session}

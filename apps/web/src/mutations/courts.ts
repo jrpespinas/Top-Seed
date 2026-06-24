@@ -135,13 +135,13 @@ export async function deleteCourtLocal(input: {
           throw new Error("Finish or cancel the match on this court before deleting it.");
         }
 
-        const matchHistoryCount = await db.matches
+        const detachedMatches = await db.matches
           .where("sessionId")
           .equals(input.sessionId)
           .filter((match) => match.courtId === input.courtId)
-          .count();
-        if (matchHistoryCount > 0) {
-          throw new Error("Cannot delete a court that has match history.");
+          .toArray();
+        for (const match of detachedMatches) {
+          await db.matches.update(match.id, { courtId: null });
         }
 
         await db.courts.delete(input.courtId);

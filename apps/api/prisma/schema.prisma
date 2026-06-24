@@ -142,7 +142,7 @@ model QueuedMatchParticipant {
 model Match {
   id           String    @id
   sessionId    String
-  courtId      String
+  courtId      String?
   status       String    @default("assigned")
   startedAt    DateTime?
   endedAt      DateTime?
@@ -155,7 +155,7 @@ model Match {
   updatedAt    DateTime  @updatedAt
 
   session      Session            @relation(fields: [sessionId], references: [id], onDelete: Cascade)
-  court        Court              @relation(fields: [courtId], references: [id])
+  court        Court?             @relation(fields: [courtId], references: [id], onDelete: SetNull)
   participants MatchParticipant[]
 }
 

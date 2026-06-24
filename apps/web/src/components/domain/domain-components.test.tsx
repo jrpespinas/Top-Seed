@@ -9,14 +9,15 @@ import { MetricCard } from "./metric-card.js";
 import { EmptyState } from "../ui/empty-state.js";
 
 describe("MatchCard", () => {
-  it("renders queued match teams", () => {
+  it("renders queued match teams with vs divider", () => {
     render(
       <MatchCard
         variant="queued"
+        showLaneName
         queueLaneName="Lane A"
         match={{
           id: "m1",
-          status: "queued",
+          status: "ready",
           teams: [
             { name: "Team A", players: ["Alex Chen", "Jordan Lee"] },
             { name: "Team B", players: ["Sam Rivera", "Casey Park"] },
@@ -27,6 +28,8 @@ describe("MatchCard", () => {
     );
     expect(screen.getByText("Lane A")).toBeInTheDocument();
     expect(screen.getByText("Alex Chen")).toBeInTheDocument();
+    expect(screen.getByText("vs")).toBeInTheDocument();
+    expect(screen.getByText("Ready")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Send to court" })).toBeInTheDocument();
   });
 });

@@ -1,10 +1,14 @@
-import { Play } from "lucide-react";
+import { useState } from "react";
+import { MoreHorizontal, Play } from "lucide-react";
 import { cn } from "../../lib/cn.js";
 import { formatCourtUiStatus } from "../../lib/format/status-labels.js";
+import { Avatar } from "../ui/avatar.js";
 import { Button } from "../ui/button.js";
 import { Badge } from "../ui/badge.js";
 import { Card, CardBody, CardFooter, CardHeader } from "../ui/card.js";
-import { PlayerCard } from "./player-card.js";
+import { Dialog, DialogContent } from "../ui/dialog.js";
+import { DropdownMenu } from "../ui/dropdown-menu.js";
+import { IconButton } from "../ui/icon-button.js";
 import { StatusBadge } from "./status-badge.js";
 import type { SessionMode } from "./types.js";
 
@@ -31,35 +35,87 @@ export interface CourtCardProps {
   };
   primaryAction?: { label: string; onClick: () => void };
   secondaryActions?: { label: string; onClick: () => void }[];
-  matchSummary?: string;
   sessionMode?: SessionMode;
   size?: "default" | "large" | "compact";
+  onDelete?: () => void;
 }
 
 function countFilledSlots(teamSlots: CourtCardProps["teamSlots"]): number {
   return [...teamSlots.teamA, ...teamSlots.teamB].filter(Boolean).length;
 }
 
-function SlotCell({
-  player,
-  emptyLabel,
+function isActiveCourtStatus(uiStatus: CourtUiStatus): boolean {
+  return uiStatus === "occupied" || uiStatus === "partiallyFilled" || uiStatus === "inProgress";
+}
+
+function emptySlotLabel(): string {
+  return "Empty";
+}
+
+function emptySlotAriaLabel(team: "A" | "B", slotOrder: number): string {
+  return `Team ${team} slot ${slotOrder}, empty`;
+}
+
+function SlotPlayerToken({ displayName }: { displayName: string }) {
+  return (
+    <div className="flex items-center gap-1.5 rounded-control bg-muted/40 px-2 py-1.5">
+      <Avatar name={displayName} size="sm" />
+      <span className="min-w-0 flex-1 truncate text-caption font-medium text-foreground">{displayName}</span>
+    </div>
+  );
+}
+
+function EmptySlotCell({
+  team,
+  slotOrder,
   uiStatus,
 }: {
-  player: CourtSlotPlayer | null;
-  emptyLabel: string;
+  team: "A" | "B";
+  slotOrder: number;
   uiStatus: CourtUiStatus;
 }) {
-  if (player) {
-    return <PlayerCard variant="compact" player={{ id: player.id, displayName: player.displayName }} />;
-  }
   return (
     <div
+      aria-label={emptySlotAriaLabel(team, slotOrder)}
       className={cn(
         "rounded-control border border-dashed border-border/80 bg-muted/30 px-2 py-2 text-center text-caption text-muted-foreground",
-        uiStatus === "open" && "border-court/30",
+        uiStatus === "open" && "border-border/70",
+        isActiveCourtStatus(uiStatus) && "border-court/30",
       )}
     >
-      {emptyLabel}
+      {emptySlotLabel()}
+    </div>
+  );
+}
+
+function TeamColumn({
+  teamLabel,
+  teamKey,
+  slots,
+  uiStatus,
+}: {
+  teamLabel: string;
+  teamKey: "A" | "B";
+  slots: (CourtSlotPlayer | null)[];
+  uiStatus: CourtUiStatus;
+}) {
+  return (
+    <div className="min-w-0 space-y-1.5">
+      <p className="text-caption font-medium text-muted-foreground">{teamLabel}</p>
+      {slots.map((player, index) => {
+        const slotOrder = index + 1;
+        if (player) {
+          return <SlotPlayerToken key={`${teamKey}-${slotOrder}`} displayName={player.displayName} />;
+        }
+        return (
+          <EmptySlotCell
+            key={`${teamKey}-${slotOrder}`}
+            team={teamKey}
+            slotOrder={slotOrder}
+            uiStatus={uiStatus}
+          />
+        );
+      })}
     </div>
   );
 }
@@ -70,95 +126,124 @@ export function CourtCard({
   teamSlots,
   primaryAction,
   secondaryActions = [],
-  matchSummary,
   sessionMode = "live",
   size = "default",
+  onDelete,
 }: CourtCardProps) {
   const isEnded = sessionMode === "ended";
   const filled = countFilledSlots(teamSlots);
+  const isIdleOpen = uiStatus === "open" && filled === 0;
+  const isActive = isActiveCourtStatus(uiStatus);
+  const [deleteOpen, setDeleteOpen] = useState(false);
+
+  const overflowItems = [
+    ...secondaryActions.map((action) => ({
+      label: action.label,
+      onSelect: action.onClick,
+    })),
+    ...(onDelete && !isEnded
+      ? [
+          {
+            label: `Delete ${court.name}`,
+            destructive: true,
+            onSelect: () => setDeleteOpen(true),
+          },
+        ]
+      : []),
+  ];
 
   return (
-    <Card
-      className={cn(
-        size === "large" && "border-court/30",
-        uiStatus === "inProgress" && "ring-2 ring-court/25",
-        uiStatus === "unavailable" && "opacity-60",
-      )}
-    >
-      <CardHeader className="flex flex-row items-center justify-between gap-2">
-        <div>
-          <h3 className="text-label font-semibold">{court.name}</h3>
-          {court.note ? <p className="text-caption text-muted-foreground">{court.note}</p> : null}
-        </div>
-        <div className="flex items-center gap-2">
-          <Badge variant="outline">{filled}/4</Badge>
-          <StatusBadge type="court" status={uiStatus} size="compact" />
-        </div>
-      </CardHeader>
-      <CardBody className="space-y-2">
-        <div className="grid grid-cols-2 gap-2">
-          <div>
-            <p className="mb-1 text-caption font-medium text-muted-foreground">Team A</p>
-            <div className="space-y-1.5">
-              {teamSlots.teamA.map((player, index) => (
-                <SlotCell
-                  key={`a-${index}`}
-                  player={player}
-                  uiStatus={uiStatus}
-                  emptyLabel={uiStatus === "open" ? "Drop player here" : `Team A slot ${index + 1}`}
-                />
-              ))}
+    <>
+      <Card
+        className={cn(
+          isIdleOpen && "border-border/60 bg-surface",
+          isActive && "border-court/40 bg-court/[0.04]",
+          uiStatus === "inProgress" && "ring-2 ring-court/25",
+          uiStatus === "unavailable" && "opacity-60",
+        )}
+      >
+        <CardHeader className="flex flex-row items-start justify-between gap-2">
+          <div className="min-w-0">
+            <h3
+              className={cn(
+                "font-semibold text-foreground",
+                size === "large" ? "text-title" : "text-label",
+              )}
+            >
+              {court.name}
+            </h3>
+            {court.note ? <p className="text-caption text-muted-foreground">{court.note}</p> : null}
+          </div>
+          <div className="flex shrink-0 items-center gap-1.5">
+            {(filled > 0 || isIdleOpen) && (
+              <Badge variant="outline" className="tabular-nums">
+                {filled}/4
+              </Badge>
+            )}
+            <StatusBadge type="court" status={uiStatus} size="compact" />
+            {overflowItems.length > 0 ? (
+              <DropdownMenu
+                align="end"
+                trigger={
+                  <IconButton label={`Actions for ${court.name}`} size="compact">
+                    <MoreHorizontal className="h-4 w-4" />
+                  </IconButton>
+                }
+                items={overflowItems}
+              />
+            ) : null}
+          </div>
+        </CardHeader>
+        <CardBody className="space-y-2">
+          <div className="grid grid-cols-[1fr_auto_1fr] items-start gap-2">
+            <TeamColumn teamLabel="Team A" teamKey="A" slots={teamSlots.teamA} uiStatus={uiStatus} />
+            <div className="flex self-stretch items-center justify-center px-0.5 pt-6" aria-hidden>
+              <span className="text-caption font-semibold uppercase tracking-wide text-muted-foreground/70">
+                vs
+              </span>
             </div>
+            <TeamColumn teamLabel="Team B" teamKey="B" slots={teamSlots.teamB} uiStatus={uiStatus} />
           </div>
-          <div>
-            <p className="mb-1 text-caption font-medium text-muted-foreground">Team B</p>
-            <div className="space-y-1.5">
-              {teamSlots.teamB.map((player, index) => (
-                <SlotCell
-                  key={`b-${index}`}
-                  player={player}
-                  uiStatus={uiStatus}
-                  emptyLabel={uiStatus === "open" ? "Drop player here" : `Team B slot ${index + 1}`}
-                />
-              ))}
-            </div>
-          </div>
-        </div>
-        <p className="sr-only">Court status: {formatCourtUiStatus(uiStatus)}</p>
-        {secondaryActions.length > 0 ? (
-          <div className="flex flex-wrap gap-2">
-            {secondaryActions.map((action) => (
-              <Button
-                key={action.label}
-                variant="ghost"
-                size="compact"
-                disabled={isEnded}
-                onClick={action.onClick}
-              >
-                {action.label}
-              </Button>
-            ))}
-          </div>
+          <p className="sr-only">Court status: {formatCourtUiStatus(uiStatus)}</p>
+        </CardBody>
+        {primaryAction && !isEnded ? (
+          <CardFooter className="border-t border-border/60 pt-2">
+            <Button
+              size={size === "compact" ? "compact" : "default"}
+              variant="primary"
+              onClick={primaryAction.onClick}
+              className="inline-flex w-full items-center justify-center gap-2"
+              aria-label={`${primaryAction.label} on ${court.name}`}
+            >
+              <Play className="h-4 w-4" aria-hidden />
+              {primaryAction.label}
+            </Button>
+          </CardFooter>
         ) : null}
-      </CardBody>
-      {primaryAction && !isEnded ? (
-        <CardFooter className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-          {matchSummary ? (
-            <p className="text-caption text-muted-foreground">{matchSummary}</p>
-          ) : (
-            <span />
-          )}
-          <Button
-            size={size === "compact" ? "compact" : "default"}
-            variant={uiStatus === "open" ? "secondary" : "primary"}
-            onClick={primaryAction.onClick}
-            className="inline-flex items-center gap-2"
+      </Card>
+      {onDelete ? (
+        <Dialog open={deleteOpen} onOpenChange={setDeleteOpen}>
+          <DialogContent
+            title={`Delete ${court.name}?`}
+            description="Finish any active match on this court first. Completed match history is kept without this court."
           >
-            <Play className="h-4 w-4" aria-hidden />
-            {primaryAction.label}
-          </Button>
-        </CardFooter>
+            <div className="flex justify-end gap-2">
+              <Button variant="ghost" onClick={() => setDeleteOpen(false)}>
+                Cancel
+              </Button>
+              <Button
+                variant="danger"
+                onClick={() => {
+                  onDelete();
+                  setDeleteOpen(false);
+                }}
+              >
+                Delete court
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
       ) : null}
-    </Card>
+    </>
   );
 }

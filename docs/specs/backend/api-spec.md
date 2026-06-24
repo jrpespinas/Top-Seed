@@ -176,7 +176,7 @@ Required behavior:
 
 - A court with an active match cannot be paused without cancelling or completing the match.
 - A court with an active match cannot be deleted or marked unavailable without cancelling or completing the match.
-- Deleting a court must not delete assigned, completed, or cancelled match history.
+- Deleting a court detaches match history (`courtId` set to `null`) but preserves participants, scores, and outcomes.
 
 ### Check-Ins
 

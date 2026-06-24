@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { SessionWorkspaceBar, type SessionWorkspaceView } from "./SessionWorkspaceBar.js";
+import { SessionSyncBar } from "../sync/SessionSyncBar.js";
 import { useSessionChrome } from "../../hooks/useSessionChrome.js";
 
 export interface SessionWorkspaceShellProps {
@@ -41,6 +42,18 @@ export function SessionWorkspaceShell({
         activeView={activeView}
         sticky={sticky}
       />
+      {activeView === "admin" ? (
+        <SessionSyncBar
+          connectionStatus={chrome.connectionStatus}
+          syncStatus={chrome.syncStatus}
+          pendingCount={chrome.pendingCount}
+          failedCount={chrome.failedCount}
+          blockedCount={chrome.blockedCount}
+          lastSyncedAt={chrome.lastSyncedAt}
+          onRetry={() => void chrome.retry()}
+          onReview={chrome.openSyncReview}
+        />
+      ) : null}
       {children}
       {chrome.syncReviewPanel}
     </div>

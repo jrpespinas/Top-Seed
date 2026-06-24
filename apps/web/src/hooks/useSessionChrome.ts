@@ -13,6 +13,7 @@ export interface SessionChromeData {
   syncStatus: "pending" | "syncing" | "synced" | "failed";
   pendingCount: number;
   blockedCount: number;
+  failedCount: number;
   lastSyncedAt?: string;
   connectionStatus: "online" | "offline";
   retry: () => Promise<void>;
@@ -53,6 +54,7 @@ export function useSessionChrome(sessionId: string): SessionChromeData {
     pendingCount: sync.pendingCount,
     blockedCount: sync.blockedCount,
     lastSyncedAt: sync.lastSyncedAt,
+    failedCount: sync.failedCount,
     connectionStatus: sync.connectionStatus,
     retry: sync.retry,
     openSyncReview: syncReview.openReview,

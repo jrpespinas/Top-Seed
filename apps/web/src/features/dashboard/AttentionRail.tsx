@@ -10,6 +10,7 @@ export interface AttentionRailProps extends AttentionRailVisibilityInput {
   lastSyncedAt?: string;
   onReviewSyncIssues?: () => void;
   onRetrySync: () => void;
+  showSync?: boolean;
 }
 
 export function AttentionRail({
@@ -23,6 +24,7 @@ export function AttentionRail({
   lastSyncedAt,
   onReviewSyncIssues,
   onRetrySync,
+  showSync = false,
 }: AttentionRailProps) {
   if (
     !shouldShowAttentionRail({
@@ -32,19 +34,21 @@ export function AttentionRail({
       pendingCount,
       failedCount,
       blockedCount,
+      showSync,
     })
   ) {
     return null;
   }
 
   const showSyncBanner =
-    connectionStatus === "offline" ||
-    failedCount > 0 ||
-    blockedCount > 0 ||
-    pendingCount > 0 ||
-    syncStatus === "failed" ||
-    syncStatus === "pending" ||
-    syncStatus === "syncing";
+    showSync &&
+    (connectionStatus === "offline" ||
+      failedCount > 0 ||
+      blockedCount > 0 ||
+      pendingCount > 0 ||
+      syncStatus === "failed" ||
+      syncStatus === "pending" ||
+      syncStatus === "syncing");
 
   return (
     <section
@@ -57,7 +61,7 @@ export function AttentionRail({
             {unpaidCount} unpaid player{unpaidCount === 1 ? "" : "s"}
           </p>
           <Link
-            to="/organizer/sessions/$sessionId/payments"
+            to="/organizer/sessions/$sessionId/admin"
             params={{ sessionId }}
             search={{ status: "unpaid" }}
             className="text-caption font-medium text-primary hover:underline"

@@ -42,7 +42,7 @@ describe("courts mutations", () => {
     expect(outbox.some((row) => row.type === "UPDATE_COURT")).toBe(true);
   });
 
-  it("rejects deleting a court with match history", async () => {
+  it("detaches completed matches and deletes court with history", async () => {
     await db.matches.put({
       id: "match-1",
       sessionId: "session-1",
@@ -54,9 +54,14 @@ describe("courts mutations", () => {
       syncStatus: "synced",
     });
 
-    await expect(
-      deleteCourtLocal({ sessionId: "session-1", courtId: "session-1-court-1" }),
-    ).rejects.toThrow(/match history/i);
+    await deleteCourtLocal({ sessionId: "session-1", courtId: "session-1-court-1" });
+
+    const match = await db.matches.get("match-1");
+    expect(match?.courtId).toBeNull();
+    expect(match?.status).toBe("completed");
+
+    const courts = await db.courts.where("sessionId").equals("session-1").sortBy("sortOrder");
+    expect(courts.map((court) => court.name)).toEqual(["Court 1", "Court 2"]);
   });
 
   it("rejects deleting the last court", async () => {

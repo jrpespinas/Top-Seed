@@ -294,3 +294,4 @@ After Phase 10, natural next increments:
 | **Realtime** | Cross-device dashboard refresh |
 | **Player-facing** | Self check-in, player status routes |
 | **PWA** | Install prompt, offline shell |
+| **Desktop DnD** | Phase 11 — `desktop-drag-and-drop.md`, `prompt_history/phase-11.md` |

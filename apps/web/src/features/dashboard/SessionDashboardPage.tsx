@@ -3,7 +3,7 @@ import { Plus } from "lucide-react";
 import { useParams } from "@tanstack/react-router";
 import { Tabs } from "../../components/ui/tabs.js";
 import { useSessionDashboard } from "../../hooks/useSessionDashboard.js";
-import { useSyncReviewDrawer } from "../../hooks/useSyncReviewDrawer.js";
+import { useSyncEngine } from "../../hooks/useSyncEngine.js";
 import { SessionWorkspaceBar } from "./SessionWorkspaceBar.js";
 import { SessionStatusBar } from "./SessionStatusBar.js";
 import { AttentionRail } from "./AttentionRail.js";
@@ -20,12 +20,32 @@ import { PlayerDetailDrawer } from "../players/PlayerDetailDrawer.js";
 import { MatchCorrectionDrawer } from "../history/MatchHistoryList.js";
 import { Button } from "../../components/ui/button.js";
 import { IconButton } from "../../components/ui/icon-button.js";
+import { DesktopDndProvider } from "./dnd/DesktopDndProvider.js";
+import { useDesktopDragDrop } from "./dnd/useDesktopDragDrop.js";
 
 export function SessionDashboardPage() {
   const { sessionId } = useParams({ from: "/organizer/sessions/$sessionId/dashboard" });
   const dashboard = useSessionDashboard(sessionId);
-  const syncReview = useSyncReviewDrawer(sessionId);
-  const sync = syncReview.sync;
+  useSyncEngine(sessionId);
+  const dragDrop = useDesktopDragDrop(dashboard.sessionMode);
+  const dropContext = useMemo(
+    () => ({
+      sessionId,
+      sessionMode: dashboard.sessionMode,
+      checkIns: dashboard.checkIns,
+      queuedMatches: dashboard.queuedMatches,
+      addPlayerToQueuedSlot: dashboard.actions.addPlayerToQueuedSlot,
+      movePlayerInQueuedSlot: dashboard.actions.movePlayerInQueuedSlot,
+    }),
+    [
+      sessionId,
+      dashboard.sessionMode,
+      dashboard.checkIns,
+      dashboard.queuedMatches,
+      dashboard.actions.addPlayerToQueuedSlot,
+      dashboard.actions.movePlayerInQueuedSlot,
+    ],
+  );
   const [mobileTab, setMobileTab] = useState("now");
   const [queueTab, setQueueTab] = useState("waiting");
   const [selectedLaneId, setSelectedLaneId] = useState<string>("");
@@ -62,6 +82,7 @@ export function SessionDashboardPage() {
       playerProfiles={dashboard.playerProfiles}
       checkIns={dashboard.checkIns}
       queuedMatches={dashboard.queuedMatches}
+      matches={dashboard.matches}
       queueTab={queueTab}
       onCheckIn={dashboard.actions.checkInPlayer}
       onCreateWalkIn={dashboard.actions.createAndCheckInWalkIn}
@@ -92,6 +113,7 @@ export function SessionDashboardPage() {
       playerProfiles={dashboard.playerProfiles}
       checkIns={dashboard.checkIns}
       queuedMatches={dashboard.queuedMatches}
+      matches={dashboard.matches}
       layout="pegboard"
       queueTab={queueTab}
       onCheckIn={dashboard.actions.checkInPlayer}
@@ -113,6 +135,7 @@ export function SessionDashboardPage() {
         })
       }
       onOpenPlayerDetails={setSelectedCheckInId}
+      playerDraggable={dragDrop.enabled}
     />
   );
 
@@ -160,6 +183,7 @@ export function SessionDashboardPage() {
       selectedLaneId={resolvedLaneId}
       onSelectLane={setSelectedLaneId}
       layout="pegboard"
+      dndEnabled={dragDrop.enabled}
     />
   );
 
@@ -210,11 +234,10 @@ export function SessionDashboardPage() {
         session={dashboard.session}
         courtCount={activeCourtCount}
         sessionMode={dashboard.sessionMode}
-        syncStatus={sync.syncStatus}
-        pendingCount={sync.pendingCount}
-        blockedCount={sync.blockedCount}
-        lastSyncedAt={sync.lastSyncedAt}
+        syncStatus="synced"
+        pendingCount={0}
         activeView="dashboard"
+        showSyncBadge={false}
         sticky
       />
 
@@ -222,51 +245,52 @@ export function SessionDashboardPage() {
         <AttentionRail
           sessionId={sessionId}
           unpaidCount={dashboard.metrics.unpaid}
-          connectionStatus={sync.connectionStatus}
-          syncStatus={sync.syncStatus}
-          pendingCount={sync.pendingCount}
-          failedCount={sync.failedCount}
-          blockedCount={sync.blockedCount}
-          lastSyncedAt={sync.lastSyncedAt}
-          onRetrySync={() => void sync.retry()}
-          onReviewSyncIssues={syncReview.openReview}
+          connectionStatus="online"
+          syncStatus="synced"
+          pendingCount={0}
+          failedCount={0}
+          blockedCount={0}
+          onRetrySync={() => {}}
+          showSync={false}
         />
       </div>
 
       <div className="hidden lg:block">
-        <PegboardLayout
-          playerList={poolForPegboard}
-          upcomingMatches={nextQueue}
-          courts={courtsPegboard}
-          playerListCount={`${checkedInCount} total`}
-          upcomingCount={`${queuedMatchCount} queued`}
-          courtsCount={`${activeCourtCount} active`}
-          playerListAction={
-            dashboard.sessionMode === "live" ? (
-              <IconButton label="Check in player" size="compact" onClick={focusPlayerCheckIn}>
-                <Plus className="h-4 w-4" />
-              </IconButton>
-            ) : null
-          }
-          upcomingAction={
-            dashboard.sessionMode === "live" && resolvedLaneId ? (
-              <IconButton
-                label="Add match"
-                size="compact"
-                onClick={() => void dashboard.actions.addEmptyQueuedMatch(resolvedLaneId)}
-              >
-                <Plus className="h-4 w-4" />
-              </IconButton>
-            ) : null
-          }
-          courtsAction={
-            dashboard.sessionMode === "live" ? (
-              <Button variant="ghost" size="compact" onClick={() => void dashboard.actions.addCourt()}>
-                Add court
-              </Button>
-            ) : null
-          }
-        />
+        <DesktopDndProvider enabled={dragDrop.enabled} dropContext={dropContext}>
+          <PegboardLayout
+            playerList={poolForPegboard}
+            upcomingMatches={nextQueue}
+            courts={courtsPegboard}
+            playerListCount={`${checkedInCount} total`}
+            upcomingCount={`${queuedMatchCount} queued`}
+            courtsCount={`${activeCourtCount} active`}
+            playerListAction={
+              dashboard.sessionMode === "live" ? (
+                <IconButton label="Check in player" size="compact" onClick={focusPlayerCheckIn}>
+                  <Plus className="h-4 w-4" />
+                </IconButton>
+              ) : null
+            }
+            upcomingAction={
+              dashboard.sessionMode === "live" && resolvedLaneId ? (
+                <IconButton
+                  label="Add match"
+                  size="compact"
+                  onClick={() => void dashboard.actions.addEmptyQueuedMatch(resolvedLaneId)}
+                >
+                  <Plus className="h-4 w-4" />
+                </IconButton>
+              ) : null
+            }
+            courtsAction={
+              dashboard.sessionMode === "live" ? (
+                <Button variant="ghost" size="compact" onClick={() => void dashboard.actions.addCourt()}>
+                  Add court
+                </Button>
+              ) : null
+            }
+          />
+        </DesktopDndProvider>
       </div>
 
       <div className="hidden lg:block">
@@ -334,7 +358,7 @@ export function SessionDashboardPage() {
           setCorrectedMatchIds((current) => new Set([...current, matchId]));
         }}
       />
-      {syncReview.panel}
+
     </div>
   );
 }

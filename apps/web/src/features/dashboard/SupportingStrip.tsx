@@ -66,7 +66,7 @@ export function SupportingStrip({
         {formatMoney(expectedTotal, session.currency)}
         {" · "}
         <Link
-          to="/organizer/sessions/$sessionId/payments"
+          to="/organizer/sessions/$sessionId/admin"
           params={{ sessionId }}
           className="font-medium text-primary hover:underline"
         >

@@ -30,6 +30,9 @@ export async function startMatchLocal(input: {
         if (!match || match.sessionId !== input.sessionId) {
           throw new Error("Match not found.");
         }
+        if (!match.courtId) {
+          throw new Error("Match is not assigned to a court.");
+        }
 
         const validation = validateStartMatch({
           id: match.id,
@@ -89,6 +92,9 @@ export async function completeMatchLocal(input: {
         const match = await db.matches.get(input.matchId);
         if (!match || match.sessionId !== input.sessionId) {
           throw new Error("Match not found.");
+        }
+        if (!match.courtId) {
+          throw new Error("Match is not assigned to a court.");
         }
 
         const validation = validateCompleteMatch({
@@ -242,10 +248,12 @@ export async function cancelMatchLocal(input: {
             syncStatus: "pending",
           });
         }
-        await db.courts.update(match.courtId, {
-          status: courtStatusAfterMatchEnd(),
-          currentMatchId: null,
-        });
+        if (match.courtId) {
+          await db.courts.update(match.courtId, {
+            status: courtStatusAfterMatchEnd(),
+            currentMatchId: null,
+          });
+        }
         await enqueueSyncAction({
           id: crypto.randomUUID(),
           organizationId: session.organizationId,

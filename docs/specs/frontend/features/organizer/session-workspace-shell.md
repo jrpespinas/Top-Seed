@@ -9,7 +9,7 @@ Give every session sub-route the same immersive chrome, sync wiring, and not-fou
 | Route pattern | Shell |
 |---------------|-------|
 | `/organizer/sessions/:sessionId/dashboard` | Compose `SessionWorkspaceBar` directly (dashboard also renders `AttentionRail`, pegboard, mobile tabs) |
-| `/organizer/sessions/:sessionId/payments` | `SessionWorkspaceShell` with `activeView="payments"` |
+| `/organizer/sessions/:sessionId/admin` | `SessionWorkspaceShell` with `activeView="admin"` (payments + sync) |
 | `/organizer/sessions/:sessionId/history` | `SessionWorkspaceShell` with `activeView="history"` |
 | `/organizer/sessions/:sessionId/players` | Redirect to dashboard in MVP v1 — no dedicated shell |
 
@@ -41,14 +41,14 @@ Provided by `useSessionChrome(sessionId)`:
 
 ```text
 sessionId: string
-activeView: "dashboard" | "payments" | "history" | "players"
+activeView: "dashboard" | "admin" | "history" | "players"
 children: ReactNode
 sticky?: boolean  // default true
 ```
 
 `activeView` drives:
 
-- Suffix on session title (`· Payments`, `· History`, `· Players`).
+- Suffix on session title (`· Admin`, `· History`, `· Players`).
 - Overflow menu filtering (hide the current route’s destination).
 
 ## Child Components
@@ -56,7 +56,7 @@ sticky?: boolean  // default true
 - `SessionWorkspaceBar`
 - `SyncReviewPanel` (via `useSyncReviewDrawer` inside `useSessionChrome`)
 
-Pages compose their own feature content as `children`. Do **not** add page-level `SessionSyncBar`, duplicate `SessionHistoryHeader`, or standalone `OfflineBanner` when the shell is used — sync visibility lives in the bar badge and `AttentionRail` on the dashboard.
+Pages compose their own feature content as `children`. On the **live dashboard**, sync UI is hidden; background sync runs automatically. On the **admin** page, `SessionSyncBar` shows sync status, retry, and review. Do not add duplicate `OfflineBanner` on the dashboard.
 
 ## States
 

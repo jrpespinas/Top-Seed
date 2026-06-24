@@ -1,12 +1,13 @@
 /**
  * @vitest-environment jsdom
  */
+import { describe, expect, it, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import userEvent from "@testing-library/user-event";
 import { CourtCard } from "./court-card.js";
 
 describe("CourtCard", () => {
-  it("renders team slots and court name", () => {
+  it("renders idle open court with empty slots", () => {
     render(
       <CourtCard
         court={{ id: "c1", name: "Court 1" }}
@@ -15,12 +16,13 @@ describe("CourtCard", () => {
           teamA: [null, null],
           teamB: [null, null],
         }}
-        primaryAction={{ label: "Assign players", onClick: () => undefined }}
       />,
     );
     expect(screen.getByText("Court 1")).toBeInTheDocument();
     expect(screen.getByText("0/4")).toBeInTheDocument();
-    expect(screen.getAllByText("Drop player here").length).toBe(4);
+    expect(screen.getAllByText("Empty")).toHaveLength(4);
+    expect(screen.getByText("vs")).toBeInTheDocument();
+    expect(screen.queryByText("Drop player here")).not.toBeInTheDocument();
   });
 
   it("shows finish action for in-progress court", () => {
@@ -41,7 +43,25 @@ describe("CourtCard", () => {
         primaryAction={{ label: "Finish match", onClick: () => undefined }}
       />,
     );
-    expect(screen.getByRole("button", { name: "Finish match" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Finish match on Court 2" })).toBeInTheDocument();
     expect(screen.getByText("Alex")).toBeInTheDocument();
+  });
+
+  it("opens delete confirmation from overflow menu", async () => {
+    const user = userEvent.setup();
+    const onDelete = vi.fn();
+    render(
+      <CourtCard
+        court={{ id: "c3", name: "Court 3" }}
+        uiStatus="open"
+        teamSlots={{ teamA: [null, null], teamB: [null, null] }}
+        onDelete={onDelete}
+      />,
+    );
+    await user.click(screen.getByRole("button", { name: "Actions for Court 3" }));
+    await user.click(screen.getByText("Delete Court 3"));
+    expect(screen.getByText("Delete Court 3?")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Delete court" }));
+    expect(onDelete).toHaveBeenCalledTimes(1);
   });
 });

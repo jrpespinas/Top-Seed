@@ -30,7 +30,6 @@ A single **Suggested next match** card sits **above** all lane columns. It is a 
 Shows:
 
 - Four player slots in Team 1 / Team 2 layout.
-- Plain-language explanation of why this grouping was chosen.
 - Informational warnings (unpaid player, repeat partner, recent rest, duplicate staging elsewhere).
 - When no court is open: still show the suggestion with a warning such as `All courts busy — you can still add to Next queue`.
 - When too few eligible players: empty state such as `Need at least 4 waiting players for a suggestion`.
@@ -128,11 +127,18 @@ The organizer may stage incomplete matches in Next lanes.
 Flow:
 
 1. Tap `Add match` in a lane (or accept a partial manual build).
-2. Empty slots render as `MatchCard` variant `queuedIncomplete` with labels such as `Needs player`.
+2. Empty slots render as `MatchCard` variant `queuedIncomplete` with **Add player** / drop target affordance.
 3. Tap an empty slot → picker of eligible waiting/resting players from local session state.
 4. Each added player sets check-in `queueStatus` to `assigned` per `state-transitions.md`.
 5. When the fourth player is added, upgrade queued match from `draft` to `ready`.
-6. Only `ready` matches may use **Send to court**.
+6. Only `ready` matches may use **Send to court** as the card footer primary CTA.
+
+**MatchCard presentation (see `components/domain/match-card.md`):**
+
+- Header: match index, status badge, fill progress (`2/4` or `Needs N players`) — not lane name when lane switcher is visible.
+- Roster: Team A | vs | Team B; flat player tokens; slot remove via overflow/hover.
+- Footer: full-width primary **Send to court** when `ready`; no duplicate **Remove match** beside it.
+- Below-card `Needs N player(s)` line is deprecated; use header fill progress instead.
 
 Rules:
 
@@ -179,10 +185,11 @@ MVP v1 has no login or role checks. See `docs/specs/mvp-access.md`.
 Default staging language (from `queueing-and-ratings.md`):
 
 - Suggestion accept: `Add to [lane name]` or `Add to Next queue`.
-- Promotion from lane: `Send to court` (not `Assign to court` for staged matches).
+- Promotion from lane: `Send to court` (not `Assign to court` for staged matches). When exactly one court is open, prefer `Send to Court 3` (court name in label).
 - Direct override elsewhere on dashboard: `Assigned directly — skipped Next queue`.
-- Incomplete slot: `Needs 1 player` / `Needs 2 players`.
-- Staged match from suggestion: optional `Suggested` badge on `MatchCard`.
+- Incomplete slot: `Add player` on empty slot; header shows `Needs 2 players` or `2/4 players`.
+- Staged match from suggestion: optional `Suggested` badge on `MatchCard` header.
+- Do not use `Paired 1x` or other algorithm-facing labels on organizer cards.
 
 ## Responsive Composition
 
@@ -190,7 +197,7 @@ Default staging language (from `queueing-and-ratings.md`):
 
 - Show the global suggestion strip at the top of the tab.
 - Lane switcher below suggestion; one lane column visible at a time.
-- Primary actions on staged `ready` matches: **Send to court** first.
+- Primary actions on staged `ready` matches: **Send to court** first — full width, `primary` variant, in card footer per `match-card.md`.
 - Lane CRUD in overflow menu per `queue-lane-management.md`.
 
 ### Tablet
@@ -209,7 +216,7 @@ Default staging language (from `queueing-and-ratings.md`):
 
 - Suggestion strip is a named region: `Suggested next match`.
 - Selected lane is announced when focus moves between lane columns or tabs.
-- Swap, accept, and send-to-court have button/menu alternatives; drag-and-drop is optional.
+- Swap, accept, and send-to-court have button/menu alternatives; drag-and-drop is optional. See `desktop-drag-and-drop.md`.
 - Empty queued slots expose accessible names such as `Team 1 slot 2, empty`.
 
 ## Acceptance Criteria

@@ -19,6 +19,7 @@ export interface PlayerRowCheckIn {
   sessionSkillRating: number;
   checkedInAt: string;
   matchesPlayed?: number;
+  wins?: number;
   suggestionExcluded?: boolean;
 }
 

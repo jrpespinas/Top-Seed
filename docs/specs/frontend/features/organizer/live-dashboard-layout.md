@@ -25,9 +25,9 @@ Organizer question loop (every 30–90 seconds at open play):
 1. **Now** — Which courts are free or finishing?
 2. **Next** — Who plays next?
 3. **Available** — Who is waiting to be staged?
-4. **Attention** — Who has not paid? Is sync stuck?
+4. **Attention** — Who has not paid?
 
-Optimize for **glanceable operational truth** and **one obvious primary action per zone**.
+Optimize for **glanceable operational truth** and **one obvious primary action per zone**. Sync runs in the background on the dashboard; sync status and review live on the **Admin** page.
 
 ## Layout Regions (Desktop ≥1280px)
 
@@ -35,8 +35,8 @@ Top to bottom on the page:
 
 | Region | Role | Always visible? |
 |--------|------|-----------------|
-| **Session chrome** | Identity, sync badge, overflow nav (immersive — no global header) | Yes |
-| **Attention rail** | Exceptions only (unpaid, sync failed, offline) | Conditional |
+| **Session chrome** | Identity, overflow nav (immersive — no global header; no sync badge on dashboard) | Yes |
+| **Attention rail** | Unpaid players only on dashboard | Conditional |
 | **Pegboard** | Player List \| Upcoming Matches \| Courts — primary operations | Yes (~70vh min) |
 | **Supporting strip** | Collected total, recent match teaser, links | After first check-in |
 
@@ -46,7 +46,7 @@ Top to bottom on the page:
 ┌─────────────────────────────────────────────────────────────────────────────┐
 │ SESSION WORKSPACE BAR (sticky; global app header hidden on this route)       │
 │ Top Seed / Sessions · {Session name} │ venue · time · fee · courts            │
-│ [Active] [Synced] │ ··· overflow → Payments · History · Leaderboard · …      │
+│ [Active] │ ··· overflow → Admin · History · Leaderboard · …      │
 ├─────────────────────────────────────────────────────────────────────────────┤
 │ ATTENTION RAIL (conditional) — e.g. 3 unpaid · Sync failed — Review          │
 ├─────────────────────────────────────────────────────────────────────────────┤
@@ -151,7 +151,9 @@ See `next-queue-panel.md`, `queue-lane-management.md`.
 | User question | What needs my attention right now? |
 | Visual | Full-width warning/info strip; only when triggers fire |
 | Components | See `attention-rail.md` |
-| Primary action | Jump to Payments / Review sync |
+| Primary action | Jump to Admin (payments) |
+
+Sync failures and offline state are **not** shown on the live dashboard. See Admin page and `session-workspace-shell.md`.
 
 **Replaces on desktop:** the six-tile `SessionStatusBar` metric strip (see migration note below).
 
@@ -190,7 +192,7 @@ See `next-queue-panel.md`, `queue-lane-management.md`.
 | `PaymentSummaryPanel` | Payments route only on desktop | Teaser in `SupportingStrip` |
 | `RecentMatchesPanel` | History route; 1–2 inline in strip | No full card on dashboard |
 | `LeaderboardPreview` | Removed from dashboard desktop | Link in strip + `/organizer/leaderboard` |
-| `OfflineBanner` | Inside `AttentionRail` when non-synced | Hidden when synced |
+| `OfflineBanner` | Admin page (`SessionSyncBar`) | Hidden on live dashboard |
 | `SyncStatusBadge` | Session chrome chip | No duplicate full banner when healthy |
 | `ActiveMatchPanel` | Overlay drawer | Unchanged |
 | `PlayerDetailDrawer` | Overlay | Unchanged |
@@ -244,7 +246,7 @@ Apply per `design-system.md` § Aesthetic Direction:
 | Attention | `--color-attention-surface` when warning | — |
 | Supporting | `muted` background, no card chrome | — |
 
-**Court empty slots:** subtle solid fill — not dashed wireframe boxes (dashed reserved for drag targets in future optional DnD).
+**Court empty slots:** subtle solid fill when idle; ring or dashed highlight on valid drop targets during desktop drag. See `desktop-drag-and-drop.md`.
 
 ## Empty States and Progressive Disclosure
 
@@ -252,14 +254,15 @@ See § Empty-State Copy below. Rules:
 
 - Empty session should feel **ready**, not broken.
 - Hide `SupportingStrip` until first check-in.
-- `AttentionRail` hidden when no exceptions (including when synced and unpaid = 0).
+- When no unpaid players, `AttentionRail` hidden on dashboard.
+- No sync badge or sync banner on the live dashboard.
 
 ## Migration from Current Implementation
 
 | Current (`SessionDashboardPage`) | Target |
 |--------------------------------|--------|
 | `SessionStatusBar` with 6 `MetricCard`s | `AttentionRail` on desktop |
-| `OfflineBanner` always visible | Banner only when offline / failed / pending |
+| `OfflineBanner` always visible | Hidden on dashboard; Admin page + background auto-sync |
 | `Complete session` prominent red button in header | Text link in `SupportingStrip` or overflow menu |
 | `lg:grid-cols-2` for `more` | `SupportingStrip` |
 | `CourtBoard` `md:grid-cols-2` for 3 courts | Vertical stack in Courts zone |
@@ -270,7 +273,7 @@ See § Empty-State Copy below. Rules:
 - On desktop ≥1280px, organizer sees Player List, Upcoming Matches, and Courts **without scrolling** for a 3-court session with empty queue (courts column may scroll when more than ~3 courts).
 - No full-width payment/history/leaderboard cards below pegboard on desktop.
 - Three courts render in a **vertical stack** inside Courts zone.
-- When synced and no exceptions, no green “All changes synced” full-width banner — chip only.
+- No sync chip or banner on the live dashboard.
 - Complete session requires confirmation; trigger is not the most prominent red control on the page.
 - Mobile tabs unchanged in IA; only visual polish in later passes.
 
@@ -286,7 +289,7 @@ Canonical strings for live dashboard zones when session has zero or partial data
 | `checkedIn >= 1` | Show `SupportingStrip` |
 | `unpaid === 0` and sync OK | Hide payment line in `AttentionRail` |
 | `unpaid > 0` | Show Attention rail payment line |
-| `failedCount > 0` or offline | Show Attention rail sync line |
+| Sync issues | Background retry; review on Admin page only |
 
 ### Available zone
 
@@ -353,6 +356,7 @@ Target: **5/5 pass** on success signals; qualitative answer favors “running co
 - `attention-rail.md` — Attention region detail
 - `session-header.md` — `SessionWorkspaceBar` (immersive session chrome)
 - `session-workspace-shell.md` — shared shell for payments / history
+- `desktop-drag-and-drop.md` — optional desktop DnD
 - `session-status-bar.md` — Metrics; desktop deprecation note
 - `organizer-session-dashboard.md` — Page route (updated)
 - `organizer-components.md` — Composition tree (updated)

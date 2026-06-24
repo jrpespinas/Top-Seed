@@ -84,7 +84,7 @@ export interface MatchParticipant {
 
 export interface Match {
   id: string;
-  courtId: string;
+  courtId: string | null;
   status: MatchStatus;
   outcome: MatchOutcome | null;
   winningTeam: WinningTeam | null;

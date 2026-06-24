@@ -89,6 +89,29 @@ export function computeSessionPlayerStats(
   return result;
 }
 
+export function countPlayerWinsInSession(playerProfileId: string, matches: LocalMatch[]): number {
+  let wins = 0;
+  for (const match of matches) {
+    if (match.status !== "completed") {
+      continue;
+    }
+    if (match.outcome === "cancelled" || match.outcome === "unscored") {
+      continue;
+    }
+    const participant = match.participants.find((row) => row.playerProfileId === playerProfileId);
+    if (!participant) {
+      continue;
+    }
+    if (
+      (match.outcome === "team_one_win" && participant.team === "team_one") ||
+      (match.outcome === "team_two_win" && participant.team === "team_two")
+    ) {
+      wins += 1;
+    }
+  }
+  return wins;
+}
+
 export function statsForCheckIn(
   checkIn: LocalCheckIn,
   statsMap: Map<string, SessionPlayerStats>,

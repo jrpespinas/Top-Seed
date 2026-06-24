@@ -22,7 +22,7 @@ import { db } from "../db/database";
 
 function RootLayout() {
   const pathname = useRouterState({ select: (state) => state.location.pathname });
-  const isSessionWorkspace = /^\/organizer\/sessions\/[^/]+\/(dashboard|payments|history|players)/.test(
+  const isSessionWorkspace = /^\/organizer\/sessions\/[^/]+\/(dashboard|admin|payments|history|players)/.test(
     pathname,
   );
   const shellWidth = isSessionWorkspace ? "max-w-[1400px]" : "max-w-6xl";
@@ -122,12 +122,28 @@ const dashboardRoute = createRoute({
   component: SessionDashboardPage,
 });
 
+const adminRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/organizer/sessions/$sessionId/admin",
+  validateSearch: z.object({
+    status: z.enum(["all", "unpaid", "partial", "paid", "waived", "refunded"]).optional(),
+  }),
+  component: SessionPaymentsPage,
+});
+
 const paymentsRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/organizer/sessions/$sessionId/payments",
   validateSearch: z.object({
     status: z.enum(["all", "unpaid", "partial", "paid", "waived", "refunded"]).optional(),
   }),
+  beforeLoad: ({ params, search }) => {
+    throw redirect({
+      to: "/organizer/sessions/$sessionId/admin",
+      params: { sessionId: params.sessionId },
+      search,
+    });
+  },
   component: SessionPaymentsPage,
 });
 
@@ -175,6 +191,7 @@ const routeTree = rootRoute.addChildren([
   sessionsRoute,
   newSessionRoute,
   dashboardRoute,
+  adminRoute,
   paymentsRoute,
   historyRoute,
   playersRoute,

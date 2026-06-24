@@ -10,7 +10,7 @@ import { formatSessionStatus } from "../../lib/session-mode.js";
 import type { LocalSession } from "../../db/types.js";
 import type { SessionMode } from "../../components/domain/types.js";
 
-export type SessionWorkspaceView = "dashboard" | "payments" | "history" | "players";
+export type SessionWorkspaceView = "dashboard" | "admin" | "history" | "players";
 
 export interface SessionWorkspaceBarProps {
   session: LocalSession;
@@ -21,6 +21,7 @@ export interface SessionWorkspaceBarProps {
   blockedCount?: number;
   lastSyncedAt?: string;
   activeView?: SessionWorkspaceView;
+  showSyncBadge?: boolean;
   sticky?: boolean;
   className?: string;
 }
@@ -34,6 +35,7 @@ export function SessionWorkspaceBar({
   blockedCount = 0,
   lastSyncedAt,
   activeView = "dashboard",
+  showSyncBadge = activeView !== "dashboard",
   sticky = true,
   className,
 }: SessionWorkspaceBarProps) {
@@ -54,13 +56,13 @@ export function SessionWorkspaceBar({
           },
         ]
       : []),
-    ...(activeView !== "payments"
+    ...(activeView !== "admin"
       ? [
           {
-            label: "Payments",
+            label: "Admin",
             onSelect: () =>
               void navigate({
-                to: "/organizer/sessions/$sessionId/payments",
+                to: "/organizer/sessions/$sessionId/admin",
                 params: { sessionId: session.id },
               }),
           },
@@ -93,8 +95,8 @@ export function SessionWorkspaceBar({
   ];
 
   const viewLabel =
-    activeView === "payments"
-      ? "Payments"
+    activeView === "admin"
+      ? "Admin"
       : activeView === "history"
         ? "History"
         : activeView === "players"
@@ -145,19 +147,21 @@ export function SessionWorkspaceBar({
             {formatSessionStatus(session.status)}
             {!isLive ? " · Read-only" : ""}
           </span>
-          <SyncStatusBadge
-            status={
-              syncStatus === "synced"
-                ? "synced"
-                : syncStatus === "syncing"
-                  ? "syncing"
-                  : syncStatus === "failed"
-                    ? "failed"
-                    : "pending"
-            }
-            pendingCount={pendingCount + blockedCount}
-            lastSyncedAt={lastSyncedAt}
-          />
+          {showSyncBadge ? (
+            <SyncStatusBadge
+              status={
+                syncStatus === "synced"
+                  ? "synced"
+                  : syncStatus === "syncing"
+                    ? "syncing"
+                    : syncStatus === "failed"
+                      ? "failed"
+                      : "pending"
+              }
+              pendingCount={pendingCount + blockedCount}
+              lastSyncedAt={lastSyncedAt}
+            />
+          ) : null}
           <DropdownMenu
             align="end"
             trigger={

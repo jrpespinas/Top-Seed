@@ -3,8 +3,9 @@ import { clearDatabase, db } from "../db/database.js";
 import { createSessionLocal } from "./createSession.js";
 import { checkInPlayerLocal } from "./checkInPlayer.js";
 import { createQueuedMatchLocal } from "./queuedMatches.js";
-import { moveQueuedMatchToCourtLocal } from "./queuedMatches.js";
+import { moveQueuedMatchToCourtLocal, updateQueuedMatchLocal } from "./queuedMatches.js";
 import { listPendingOutboxActions } from "../sync/outbox.js";
+import { addPlayerToQueuedParticipants } from "../lib/queued-match-participants.js";
 
 describe("queued match mutations", () => {
   beforeEach(async () => {
@@ -66,6 +67,55 @@ describe("queued match mutations", () => {
 
     const pending = await listPendingOutboxActions("session-1");
     expect(pending.some((action) => action.type === "CREATE_QUEUED_MATCH")).toBe(true);
+  });
+
+  it("updates a draft match to ready when filling slots via participant helper", async () => {
+    const { laneId } = await seedSessionWithFourPlayers();
+    await createQueuedMatchLocal({
+      id: "queued-draft",
+      sessionId: "session-1",
+      queueLaneId: laneId,
+      participants: [],
+    });
+
+    let participants = addPlayerToQueuedParticipants([], {
+      checkInId: "check-in-0",
+      playerProfileId: "player-0",
+      team: "team_one",
+      slotOrder: 1,
+    });
+    participants = addPlayerToQueuedParticipants(participants, {
+      checkInId: "check-in-1",
+      playerProfileId: "player-1",
+      team: "team_one",
+      slotOrder: 2,
+    });
+    participants = addPlayerToQueuedParticipants(participants, {
+      checkInId: "check-in-2",
+      playerProfileId: "player-2",
+      team: "team_two",
+      slotOrder: 1,
+    });
+    participants = addPlayerToQueuedParticipants(participants, {
+      checkInId: "check-in-3",
+      playerProfileId: "player-3",
+      team: "team_two",
+      slotOrder: 2,
+    });
+
+    const updated = await updateQueuedMatchLocal({
+      sessionId: "session-1",
+      queuedMatchId: "queued-draft",
+      participants,
+    });
+    expect(updated.status).toBe("ready");
+    expect(updated.participants).toHaveLength(4);
+
+    const checkIn = await db.checkIns.get("check-in-0");
+    expect(checkIn?.queueStatus).toBe("assigned");
+
+    const pending = await listPendingOutboxActions("session-1");
+    expect(pending.some((action) => action.type === "UPDATE_QUEUED_MATCH")).toBe(true);
   });
 
   it("promotes a ready queued match to court", async () => {

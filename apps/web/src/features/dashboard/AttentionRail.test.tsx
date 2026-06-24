@@ -74,7 +74,7 @@ describe("AttentionRail", () => {
         failedCount={2}
         blockedCount={0}
         onRetrySync={vi.fn()}
-        onReviewSyncIssues={vi.fn()}
+        showSync={true}
       />,
     );
     expect(await screen.findByText(/Sync failed for 2 changes/i)).toBeInTheDocument();

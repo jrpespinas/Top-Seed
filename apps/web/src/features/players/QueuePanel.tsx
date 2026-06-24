@@ -4,7 +4,8 @@ import { FilterChips } from "../../components/ui/filter-chips.js";
 import { PlayerCard } from "../../components/domain/player-card.js";
 import { PlayerRow } from "../../components/domain/player-row.js";
 import { EmptyState } from "../../components/ui/empty-state.js";
-import type { LocalCheckIn, LocalQueuedMatch, LocalSession } from "../../db/types.js";
+import type { LocalCheckIn, LocalMatch, LocalQueuedMatch, LocalSession } from "../../db/types.js";
+import { countPlayerWinsInSession } from "../../lib/session-stats.js";
 import type { SessionMode } from "../../components/domain/types.js";
 import type { PaymentStatus } from "../../components/domain/payment-badge.js";
 
@@ -16,6 +17,7 @@ export interface QueuePanelProps {
   session: LocalSession;
   checkIns: LocalCheckIn[];
   queuedMatches?: LocalQueuedMatch[];
+  matches?: LocalMatch[];
   sessionMode: SessionMode;
   layout?: "default" | "pegboard";
   activeTab?: string;
@@ -27,6 +29,7 @@ export interface QueuePanelProps {
     suggestionExcludeNote?: string | null;
   }) => Promise<void>;
   onOpenPlayerDetails?: (checkInId: string) => void;
+  dndEnabled?: boolean;
 }
 
 function filterByChip(checkIns: LocalCheckIn[], chip: FilterChip): LocalCheckIn[] {
@@ -63,12 +66,14 @@ export function QueuePanel({
   session,
   checkIns,
   queuedMatches,
+  matches = [],
   sessionMode,
   layout = "default",
   activeTab = "waiting",
   onTabChange,
   onUpdateCheckIn,
   onOpenPlayerDetails,
+  dndEnabled = false,
 }: QueuePanelProps) {
   const [filterChip, setFilterChip] = useState<FilterChip>("all");
 
@@ -105,6 +110,8 @@ export function QueuePanel({
           session={session}
           sessionMode={sessionMode}
           queuedMatches={queuedMatches}
+          matches={matches}
+          dndEnabled={dndEnabled}
           onUpdateCheckIn={onUpdateCheckIn}
           onOpenPlayerDetails={onOpenPlayerDetails}
         />
@@ -143,6 +150,8 @@ function PegboardList({
   session,
   sessionMode,
   queuedMatches,
+  matches = [],
+  dndEnabled,
   onUpdateCheckIn,
   onOpenPlayerDetails,
 }: {
@@ -150,6 +159,8 @@ function PegboardList({
   session: LocalSession;
   sessionMode: SessionMode;
   queuedMatches?: LocalQueuedMatch[];
+  matches?: LocalMatch[];
+  dndEnabled?: boolean;
   onUpdateCheckIn: QueuePanelProps["onUpdateCheckIn"];
   onOpenPlayerDetails?: (checkInId: string) => void;
 }) {
@@ -173,13 +184,16 @@ function PegboardList({
           <li key={checkIn.id}>
             <PlayerCard
               player={{ id: checkIn.playerProfileId, displayName: checkIn.playerDisplayName }}
+              checkInId={checkIn.id}
               checkIn={{
                 queueStatus: checkIn.queueStatus,
                 sessionSkillRating: checkIn.sessionSkillRating,
                 checkedInAt: checkIn.checkedInAt,
                 matchesPlayed: checkIn.matchesPlayedInSession,
+                wins: countPlayerWinsInSession(checkIn.playerProfileId, matches),
                 suggestionExcluded: checkIn.suggestionExcluded,
               }}
+              draggable={dndEnabled}
               payment={{
                 status: checkIn.paymentStatus as PaymentStatus,
                 amountDue: checkIn.paymentAmountDue,

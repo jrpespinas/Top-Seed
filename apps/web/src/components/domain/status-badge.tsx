@@ -42,6 +42,9 @@ const toneByStatus: Record<string, string> = {
   completed: "bg-muted text-muted-foreground",
   done: "bg-muted text-muted-foreground",
   removed: "bg-muted text-muted-foreground line-through",
+  ready: "bg-next/15 text-next",
+  draft: "bg-attention-surface text-attention",
+  queuedIncomplete: "bg-attention-surface text-attention",
 };
 
 export function StatusBadge({ type, status, size = "default" }: StatusBadgeProps) {

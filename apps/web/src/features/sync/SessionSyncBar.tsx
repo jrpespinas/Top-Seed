@@ -1,32 +1,36 @@
 import { OfflineBanner } from "../../components/domain/offline-banner.js";
-import { useSyncReviewDrawer } from "../../hooks/useSyncReviewDrawer.js";
 
-export function SessionSyncBar({ sessionId }: { sessionId?: string }) {
-  const syncReview = useSyncReviewDrawer(sessionId);
-  const sync = syncReview.sync;
+export interface SessionSyncBarProps {
+  connectionStatus: "online" | "offline";
+  syncStatus: "pending" | "syncing" | "synced" | "failed";
+  pendingCount: number;
+  failedCount: number;
+  blockedCount: number;
+  lastSyncedAt?: string;
+  onRetry: () => void;
+  onReview: () => void;
+}
 
-  if (
-    sync.failedCount === 0 &&
-    sync.blockedCount === 0 &&
-    sync.pendingCount === 0 &&
-    sync.connectionStatus === "online"
-  ) {
-    return syncReview.panel;
-  }
-
+export function SessionSyncBar({
+  connectionStatus,
+  syncStatus,
+  pendingCount,
+  failedCount,
+  blockedCount,
+  lastSyncedAt,
+  onRetry,
+  onReview,
+}: SessionSyncBarProps) {
   return (
-    <>
-      <OfflineBanner
-        connectionStatus={sync.connectionStatus}
-        syncStatus={sync.syncStatus}
-        pendingCount={sync.pendingCount}
-        failedCount={sync.failedCount}
-        blockedCount={sync.blockedCount}
-        lastSyncedAt={sync.lastSyncedAt}
-        onRetry={() => void sync.retry()}
-        onReview={syncReview.openReview}
-      />
-      {syncReview.panel}
-    </>
+    <OfflineBanner
+      connectionStatus={connectionStatus}
+      syncStatus={syncStatus}
+      pendingCount={pendingCount}
+      failedCount={failedCount}
+      blockedCount={blockedCount}
+      lastSyncedAt={lastSyncedAt}
+      onRetry={onRetry}
+      onReview={onReview}
+    />
   );
 }
