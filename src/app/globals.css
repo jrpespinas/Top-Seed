@@ -1,0 +1,150 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  /* Raw OKLCH channel values — enables Tailwind opacity modifiers (e.g. bg-primary/20) */
+  --color-bg-raw:                 0.09 0 0;
+  --color-surface-raw:            0.13 0 0;
+  --color-surface-elevated-raw:   0.18 0.004 38;
+  --color-border-raw:             0.28 0.006 38;
+  --color-ink-raw:                0.94 0.005 38;
+  --color-muted-raw:              0.62 0.006 38;
+  --color-primary-raw:            0.71 0.17 38;
+  --color-primary-hover-raw:      0.76 0.16 38;
+  --color-accent-raw:             0.62 0.14 220;
+  --color-success-raw:            0.65 0.17 145;
+  --color-warning-raw:            0.75 0.14 75;
+  --color-error-raw:              0.62 0.21 25;
+
+  /* Semantic aliases (for direct CSS use) */
+  --color-bg:               oklch(var(--color-bg-raw));
+  --color-surface:          oklch(var(--color-surface-raw));
+  --color-surface-elevated: oklch(var(--color-surface-elevated-raw));
+  --color-border:           oklch(var(--color-border-raw));
+  --color-ink:              oklch(var(--color-ink-raw));
+  --color-muted:            oklch(var(--color-muted-raw));
+  --color-primary:          oklch(var(--color-primary-raw));
+  --color-primary-hover:    oklch(var(--color-primary-hover-raw));
+  --color-accent:           oklch(var(--color-accent-raw));
+  --color-success:          oklch(var(--color-success-raw));
+  --color-warning:          oklch(var(--color-warning-raw));
+  --color-error:            oklch(var(--color-error-raw));
+
+  /* Z-index scale */
+  --z-dropdown:       10;
+  --z-sticky:         20;
+  --z-modal-backdrop: 30;
+  --z-modal:          40;
+  --z-popover:        45;
+  --z-toast:          50;
+  --z-tooltip:        60;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  height: 100%;
+}
+
+body {
+  min-height: 100%;
+  background-color: var(--color-bg);
+  color: var(--color-ink);
+  font-family: var(--font-space-grotesk), system-ui, sans-serif;
+  font-size: 15px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+}
+
+@keyframes label-in {
+  from {
+    opacity: 0;
+    transform: translateX(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@layer utilities {
+  .animate-toast {
+    animation: toast-in 200ms ease-out forwards;
+  }
+
+  .animate-label-in {
+    animation: label-in 200ms ease-out forwards;
+  }
+}
+
+/* ─── Light theme ─────────────────────────────────────────────────────────── */
+[data-theme="light"] {
+  --color-bg-raw:               1 0 0;          /* near-white canvas */
+  --color-surface-raw:          1 0 0;             /* white panels */
+  --color-surface-elevated-raw: 0.95 0 0;           /* perceptible hover / elevated surface */
+  --color-border-raw:           0.91 0 0;          /* refined structural gray — premium over strict 3:1 */
+  --color-ink-raw:              0.10 0.005 38;     /* near-black body text */
+  --color-muted-raw:            0.47 0.006 38;     /* ≥4.5:1 against white */
+  --color-primary-raw:          0.44 0.18 38;      /* dark copper — text + button bg */
+  --color-primary-hover-raw:    0.38 0.18 38;      /* deeper copper */
+  --color-accent-raw:           0.35 0.14 220;     /* darkened steel slate */
+  --color-success-raw:          0.35 0.17 145;     /* darkened court green */
+  --color-warning-raw:          0.42 0.14 75;      /* darkened amber */
+  --color-error-raw:            0.38 0.21 25;      /* darkened error */
+
+  /* Semantic aliases */
+  --color-bg:               oklch(var(--color-bg-raw));
+  --color-surface:          oklch(var(--color-surface-raw));
+  --color-surface-elevated: oklch(var(--color-surface-elevated-raw));
+  --color-border:           oklch(var(--color-border-raw));
+  --color-ink:              oklch(var(--color-ink-raw));
+  --color-muted:            oklch(var(--color-muted-raw));
+  --color-primary:          oklch(var(--color-primary-raw));
+  --color-primary-hover:    oklch(var(--color-primary-hover-raw));
+  --color-accent:           oklch(var(--color-accent-raw));
+  --color-success:          oklch(var(--color-success-raw));
+  --color-warning:          oklch(var(--color-warning-raw));
+  --color-error:            oklch(var(--color-error-raw));
+}
+
+/* ─── Theme switching transition (JS-triggered, ~250ms window) ────────────── */
+html.theme-switching *,
+html.theme-switching *::before,
+html.theme-switching *::after {
+  transition-duration: 200ms !important;
+  transition-property: background-color, color, border-color, box-shadow !important;
+  transition-timing-function: ease-out !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+
+  html.theme-switching *,
+  html.theme-switching *::before,
+  html.theme-switching *::after {
+    transition-duration: 0ms !important;
+  }
+}

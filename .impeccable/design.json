@@ -1,0 +1,171 @@
+{
+  "$schema": "https://impeccable.design/sidecar/v1",
+  "project": "Top Seed",
+  "generatedAt": "2026-07-01",
+
+  "colorMeta": {
+    "bg": {
+      "oklch": "oklch(0.09 0 0)",
+      "role": "page background",
+      "ramp": [
+        { "stop": "bg",               "oklch": "oklch(0.09 0 0)",        "note": "Void Black — page canvas" },
+        { "stop": "surface",          "oklch": "oklch(0.13 0 0)",        "note": "Charcoal Panel — card/panel bg" },
+        { "stop": "surface-elevated", "oklch": "oklch(0.18 0.004 38)",   "note": "Lifted Surface — hover, dropdown, modal" },
+        { "stop": "border",           "oklch": "oklch(0.28 0.006 38)",   "note": "Field Border — dividers, outlines" },
+        { "stop": "muted",            "oklch": "oklch(0.62 0.006 38)",   "note": "Graphite Muted — secondary labels, ≥7:1 vs bg" },
+        { "stop": "ink",              "oklch": "oklch(0.94 0.005 38)",   "note": "Ash Ink — primary text, ≥12:1 vs bg" }
+      ]
+    },
+    "primary": {
+      "oklch": "oklch(0.71 0.17 38)",
+      "role": "brand — Court Copper",
+      "ramp": [
+        { "stop": "primary/10",       "oklch": "oklch(0.71 0.17 38 / 10%)",  "note": "tinted chip background" },
+        { "stop": "primary/12",       "oklch": "oklch(0.71 0.17 38 / 12%)",  "note": "selected chip background" },
+        { "stop": "primary/15",       "oklch": "oklch(0.71 0.17 38 / 15%)",  "note": "StatusBadge open bg" },
+        { "stop": "primary/20",       "oklch": "oklch(0.71 0.17 38 / 20%)",  "note": "SkillBadge S bg" },
+        { "stop": "primary/30",       "oklch": "oklch(0.71 0.17 38 / 30%)",  "note": "SkillBadge S border" },
+        { "stop": "primary/40",       "oklch": "oklch(0.71 0.17 38 / 40%)",  "note": "ready-card border, ring" },
+        { "stop": "primary/50",       "oklch": "oklch(0.71 0.17 38 / 50%)",  "note": "focus ring, drop target ring" },
+        { "stop": "primary",          "oklch": "oklch(0.71 0.17 38)",         "note": "button bg, active nav" },
+        { "stop": "primary-hover",    "oklch": "oklch(0.76 0.16 38)",         "note": "button hover — slightly lighter" }
+      ]
+    },
+    "accent": {
+      "oklch": "oklch(0.62 0.14 220)",
+      "role": "Steel Slate — in-progress / in-use states",
+      "ramp": [
+        { "stop": "accent/10",   "oklch": "oklch(0.62 0.14 220 / 10%)",  "note": "SkillBadge B bg (uses /12)" },
+        { "stop": "accent/12",   "oklch": "oklch(0.62 0.14 220 / 12%)",  "note": "SkillBadge B bg" },
+        { "stop": "accent/15",   "oklch": "oklch(0.62 0.14 220 / 15%)",  "note": "StatusBadge in-use/in-progress bg" },
+        { "stop": "accent",      "oklch": "oklch(0.62 0.14 220)",         "note": "SkillBadge B text, StatusBadge in-use text" }
+      ]
+    },
+    "success": {
+      "oklch": "oklch(0.65 0.17 145)",
+      "role": "Court Green — available / paid",
+      "ramp": [
+        { "stop": "success/10",  "oklch": "oklch(0.65 0.17 145 / 10%)" },
+        { "stop": "success/15",  "oklch": "oklch(0.65 0.17 145 / 15%)",  "note": "StatusBadge available/paid bg" },
+        { "stop": "success",     "oklch": "oklch(0.65 0.17 145)",         "note": "StatusBadge text" }
+      ]
+    },
+    "warning": {
+      "oklch": "oklch(0.75 0.14 75)",
+      "role": "Caution Amber — unpaid / outstanding",
+      "ramp": [
+        { "stop": "warning/15",  "oklch": "oklch(0.75 0.14 75 / 15%)",   "note": "StatusBadge unpaid bg" },
+        { "stop": "warning",     "oklch": "oklch(0.75 0.14 75)",          "note": "StatusBadge unpaid text" }
+      ]
+    },
+    "error": {
+      "oklch": "oklch(0.62 0.21 25)",
+      "role": "Error Red — destructive actions",
+      "ramp": [
+        { "stop": "error/10",    "oklch": "oklch(0.62 0.21 25 / 10%)",   "note": "hover bg on destructive button" },
+        { "stop": "error/15",    "oklch": "oklch(0.62 0.21 25 / 15%)",   "note": "destructive button rest bg" },
+        { "stop": "error/25",    "oklch": "oklch(0.62 0.21 25 / 25%)",   "note": "destructive button hover bg" },
+        { "stop": "error/40",    "oklch": "oklch(0.62 0.21 25 / 40%)",   "note": "focus ring on destructive" },
+        { "stop": "error",       "oklch": "oklch(0.62 0.21 25)",          "note": "text on destructive actions" }
+      ]
+    }
+  },
+
+  "motion": {
+    "ease": {
+      "out-quint": [0.25, 1, 0.5, 1],
+      "note": "EASE constant used throughout — ease-out-quint"
+    },
+    "duration": {
+      "micro":   "120ms",
+      "fast":    "150ms",
+      "default": "200ms",
+      "medium":  "220ms",
+      "slow":    "400ms"
+    },
+    "patterns": {
+      "chip-entrance":      { "initial": { "opacity": 0 },            "animate": { "opacity": 1 },           "duration": "200ms" },
+      "card-entrance":      { "initial": { "opacity": 0, "y": 8 },    "animate": { "opacity": 1, "y": 0 },   "duration": "220ms" },
+      "list-exit":          { "initial": { "opacity": 1, "x": 0 },    "exit":    { "opacity": 0, "x": -12 }, "duration": "150ms" },
+      "footer-cross-fade":  { "initial": { "opacity": 0, "y": 4 },    "animate": { "opacity": 1, "y": 0 },   "duration": "150ms", "mode": "wait" },
+      "confirm-in":         { "initial": { "opacity": 0, "x": 8 },    "animate": { "opacity": 1, "x": 0 },   "duration": "120ms", "mode": "wait" },
+      "assign-pulse":       { "type": "web-animations-api",           "keyframes": [{"transform":"scale(1)"},{"transform":"scale(1.08)"},{"transform":"scale(1)"}], "duration": 400, "trigger": "state becomes ready" }
+    },
+    "reducedMotion": "MotionConfig reducedMotion='user' wraps all animated sections; globals.css resets animation-duration to 0.01ms on prefers-reduced-motion: reduce"
+  },
+
+  "shadows": {
+    "none":    "none",
+    "focus":   "0 0 0 2px oklch(0.71 0.17 38 / 50%)",
+    "note": "All cards and panels are flat at rest — no shadows. Only focus rings use glow. Shadow on a resting card is a bug."
+  },
+
+  "zIndex": {
+    "dropdown":       10,
+    "sticky":         20,
+    "modal-backdrop": 30,
+    "modal":          40,
+    "toast":          50,
+    "tooltip":        60
+  },
+
+  "breakpoints": {
+    "mobile":  "375px",
+    "sm":      "640px",
+    "tablet":  "768px",
+    "md":      "768px",
+    "lg":      "1024px",
+    "desktop": "1280px",
+    "xl":      "1280px"
+  },
+
+  "tapTargets": {
+    "minimum":         "44px",
+    "primary-actions": "44px (py-2.5 minimum)",
+    "icon-buttons":    "32px (p-1.5 with 11-12px icon)",
+    "note": "Courtside use demands 44×44px minimum. All interactive elements must meet this. Primary session actions (Start, End, Assign) at 44px min-height."
+  },
+
+  "components": {
+    "button-primary": {
+      "description": "Full copper fill — the single primary action in any screen region",
+      "html": "<button class=\"ds-btn-primary\">Assign to court</button>",
+      "css": ":host { --color-primary: oklch(0.71 0.17 38); --color-primary-hover: oklch(0.76 0.16 38); --color-bg: oklch(0.09 0 0); } .ds-btn-primary { display: inline-flex; align-items: center; justify-content: center; gap: 0.25rem; width: 100%; padding: 10px 12px; background: var(--color-primary); color: var(--color-bg); border: none; border-radius: 8px; font-family: 'Space Grotesk', system-ui, sans-serif; font-size: 0.75rem; font-weight: 600; line-height: 1; cursor: pointer; transition: background 150ms cubic-bezier(0.25,1,0.5,1); } .ds-btn-primary:hover { background: var(--color-primary-hover); } .ds-btn-primary:disabled { background: oklch(0.18 0.004 38); color: oklch(0.62 0.006 38); cursor: not-allowed; opacity: 0.6; } .ds-btn-primary:focus-visible { outline: none; box-shadow: 0 0 0 2px oklch(0.71 0.17 38 / 50%); }"
+    },
+    "button-ghost": {
+      "description": "Borderless secondary action — Add, Cancel, nav controls",
+      "html": "<button class=\"ds-btn-ghost\"><svg width=\"11\" height=\"11\"><!-- Plus icon --></svg> Add</button>",
+      "css": ":host { --color-muted: oklch(0.62 0.006 38); --color-ink: oklch(0.94 0.005 38); --color-surface-elevated: oklch(0.18 0.004 38); --color-border: oklch(0.28 0.006 38); } .ds-btn-ghost { display: inline-flex; align-items: center; gap: 0.25rem; padding: 6px 8px; background: transparent; border: 1px solid oklch(0.28 0.006 38 / 60%); border-radius: 4px; color: var(--color-muted); font-family: 'Space Grotesk', system-ui, sans-serif; font-size: 0.75rem; font-weight: 500; line-height: 1; cursor: pointer; transition: color 150ms, background 150ms; } .ds-btn-ghost:hover { color: var(--color-ink); background: var(--color-surface-elevated); } .ds-btn-ghost:focus-visible { outline: none; box-shadow: 0 0 0 2px oklch(0.28 0.006 38); }"
+    },
+    "button-destructive": {
+      "description": "Error-tinted button for destructive confirm states",
+      "html": "<button class=\"ds-btn-destructive\">Confirm Void</button>",
+      "css": ":host { --color-error: oklch(0.62 0.21 25); } .ds-btn-destructive { display: inline-flex; align-items: center; justify-content: center; padding: 8px 10px; background: oklch(0.62 0.21 25 / 15%); color: var(--color-error); border: none; border-radius: 4px; font-family: 'Space Grotesk', system-ui, sans-serif; font-size: 0.75rem; font-weight: 600; line-height: 1; cursor: pointer; transition: background 150ms; } .ds-btn-destructive:hover { background: oklch(0.62 0.21 25 / 25%); } .ds-btn-destructive:focus-visible { outline: none; box-shadow: 0 0 0 2px oklch(0.62 0.21 25 / 40%); }"
+    },
+    "skill-badge": {
+      "description": "20×20px rank indicator. 7 levels: S=copper, A=copper/80, B=slate, C-F=muted",
+      "html": "<span class=\"ds-skill-badge ds-skill-badge--s\">S</span><span class=\"ds-skill-badge ds-skill-badge--a\">A</span><span class=\"ds-skill-badge ds-skill-badge--b\">B</span><span class=\"ds-skill-badge ds-skill-badge--c\">C</span>",
+      "css": ".ds-skill-badge { display: inline-flex; align-items: center; justify-content: center; width: 20px; height: 20px; border-radius: 4px; font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 11px; font-weight: 700; line-height: 1; flex-shrink: 0; } .ds-skill-badge--s { background: oklch(0.71 0.17 38 / 20%); color: oklch(0.71 0.17 38); border: 1px solid oklch(0.71 0.17 38 / 30%); } .ds-skill-badge--a { background: oklch(0.71 0.17 38 / 12%); color: oklch(0.71 0.17 38 / 80%); } .ds-skill-badge--b { background: oklch(0.62 0.14 220 / 12%); color: oklch(0.62 0.14 220); } .ds-skill-badge--c { background: oklch(0.94 0.005 38 / 8%); color: oklch(0.62 0.006 38 / 60%); } .ds-skill-badge--d, .ds-skill-badge--e, .ds-skill-badge--f { background: oklch(0.94 0.005 38 / 6%); color: oklch(0.62 0.006 38); }"
+    },
+    "status-badge": {
+      "description": "Pill-shaped semantic state label. 10 variants keyed by meaning.",
+      "html": "<span class=\"ds-status-badge ds-status-badge--available\">Available</span><span class=\"ds-status-badge ds-status-badge--in-use\">In Use</span><span class=\"ds-status-badge ds-status-badge--unpaid\">Unpaid</span><span class=\"ds-status-badge ds-status-badge--open\">Open</span>",
+      "css": ".ds-status-badge { display: inline-flex; align-items: center; padding: 2px 8px; border-radius: 9999px; font-family: 'Space Grotesk', system-ui, sans-serif; font-size: 0.75rem; font-weight: 500; line-height: 1.5; font-variant-numeric: tabular-nums; white-space: nowrap; } .ds-status-badge--available, .ds-status-badge--paid { background: oklch(0.65 0.17 145 / 15%); color: oklch(0.65 0.17 145); } .ds-status-badge--in-use, .ds-status-badge--in-progress { background: oklch(0.62 0.14 220 / 15%); color: oklch(0.62 0.14 220); } .ds-status-badge--open { background: oklch(0.71 0.17 38 / 15%); color: oklch(0.71 0.17 38); } .ds-status-badge--completed, .ds-status-badge--closed, .ds-status-badge--waived { background: oklch(0.18 0.004 38); color: oklch(0.62 0.006 38); } .ds-status-badge--voided { background: oklch(0.62 0.21 25 / 10%); color: oklch(0.62 0.21 25); } .ds-status-badge--unpaid { background: oklch(0.75 0.14 75 / 15%); color: oklch(0.75 0.14 75); }"
+    },
+    "player-chip": {
+      "description": "Compact player token inside PlanningCard. Tap to select for swap; × to remove.",
+      "html": "<div class=\"ds-player-chip-wrap\"><button class=\"ds-player-chip\"><span class=\"ds-player-chip__name\">Jordan</span><span class=\"ds-skill-badge ds-skill-badge--b\">B</span></button><button class=\"ds-player-chip__remove\" aria-label=\"Remove Jordan\">×</button></div>",
+      "css": ".ds-player-chip-wrap { position: relative; display: inline-block; } .ds-player-chip { display: flex; align-items: center; gap: 6px; width: 100%; padding: 6px; border: none; border-radius: 4px; background: transparent; cursor: pointer; transition: background 100ms; } .ds-player-chip:hover { background: oklch(0.18 0.004 38); } .ds-player-chip[aria-pressed='true'] { background: oklch(0.71 0.17 38 / 12%); box-shadow: 0 0 0 1px oklch(0.71 0.17 38 / 40%); } .ds-player-chip__name { font-family: 'Space Grotesk', system-ui, sans-serif; font-size: 0.75rem; color: oklch(0.94 0.005 38); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 1; min-width: 0; } .ds-player-chip__remove { position: absolute; top: -4px; right: -4px; width: 14px; height: 14px; background: oklch(0.18 0.004 38); border: 1px solid oklch(0.28 0.006 38); border-radius: 9999px; color: oklch(0.62 0.006 38); font-size: 8px; line-height: 1; cursor: pointer; display: flex; align-items: center; justify-content: center; opacity: 0; transition: opacity 100ms, color 100ms, border-color 100ms; } .ds-player-chip-wrap:hover .ds-player-chip__remove, .ds-player-chip__remove:focus-visible { opacity: 1; } .ds-player-chip__remove:hover { color: oklch(0.62 0.21 25); border-color: oklch(0.62 0.21 25 / 40%); } @media (hover: none) { .ds-player-chip__remove { opacity: 1; } }"
+    },
+    "player-row": {
+      "description": "Queue/bench list item. 44px min-height. Grip + position + name + SkillBadge + game count + hover controls.",
+      "html": "<div class=\"ds-player-row\" draggable=\"true\"><svg class=\"ds-player-row__grip\" width=\"10\" height=\"10\"><!-- GripVertical --></svg><span class=\"ds-player-row__pos\">1</span><span class=\"ds-player-row__name\">Alex</span><span class=\"ds-skill-badge ds-skill-badge--a\">A</span><span class=\"ds-player-row__games\">3g</span><div class=\"ds-player-row__controls\"><!-- PauseCircle + X --></div></div>",
+      "css": ".ds-player-row { display: flex; align-items: center; gap: 6px; padding: 8px 12px; min-height: 44px; border-bottom: 1px solid oklch(0.28 0.006 38 / 40%); cursor: grab; transition: background 150ms; } .ds-player-row:hover { background: oklch(0.18 0.004 38 / 40%); } .ds-player-row:active { cursor: grabbing; } .ds-player-row__grip { color: oklch(0.62 0.006 38 / 60%); flex-shrink: 0; } .ds-player-row:hover .ds-player-row__grip { color: oklch(0.62 0.006 38 / 80%); } .ds-player-row__pos { font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 10px; color: oklch(0.62 0.006 38); width: 20px; text-align: right; flex-shrink: 0; font-variant-numeric: tabular-nums; } .ds-player-row__name { font-family: 'Space Grotesk', system-ui, sans-serif; font-size: 0.875rem; color: oklch(0.94 0.005 38); flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; } .ds-player-row__games { font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 10px; color: oklch(0.62 0.006 38); flex-shrink: 0; font-variant-numeric: tabular-nums; } .ds-player-row__controls { display: flex; align-items: center; opacity: 0; transition: opacity 150ms; flex-shrink: 0; } .ds-player-row:hover .ds-player-row__controls { opacity: 1; } @media (hover: none) { .ds-player-row__controls { opacity: 1; } }"
+    },
+    "planning-card-footer": {
+      "description": "The inline court picker cross-fade inside PlanningCard footer. AnimatePresence mode=wait between assign button and picker expanded state.",
+      "html": "<div class=\"ds-card-footer\"><div class=\"ds-card-footer__assign\"><button class=\"ds-btn-primary\">Assign to court</button></div><div class=\"ds-card-footer__picker\" hidden><p class=\"ds-card-footer__picker-label\">Assign to court:</p><div class=\"ds-card-footer__courts\"><button class=\"ds-court-btn\">Court 1</button><button class=\"ds-court-btn\">Court 2</button></div><button class=\"ds-card-footer__cancel\">Cancel</button></div></div>",
+      "css": ".ds-card-footer { padding: 8px 12px 12px; border-top: 1px solid oklch(0.28 0.006 38 / 60%); } .ds-card-footer__picker-label { font-family: 'Space Grotesk', system-ui, sans-serif; font-size: 10px; color: oklch(0.62 0.006 38); margin-bottom: 8px; } .ds-card-footer__courts { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 8px; } .ds-court-btn { padding: 6px 10px; background: oklch(0.71 0.17 38 / 10%); color: oklch(0.71 0.17 38); border: none; border-radius: 4px; font-family: 'Space Grotesk', system-ui, sans-serif; font-size: 0.75rem; font-weight: 600; cursor: pointer; transition: background 150ms, color 150ms; } .ds-court-btn:hover { background: oklch(0.71 0.17 38); color: oklch(0.09 0 0); } .ds-card-footer__cancel { font-family: 'Space Grotesk', system-ui, sans-serif; font-size: 10px; color: oklch(0.62 0.006 38); background: none; border: none; cursor: pointer; padding: 0; transition: color 150ms; } .ds-card-footer__cancel:hover { color: oklch(0.94 0.005 38); } [hidden] { display: none !important; }"
+    }
+  }
+}
