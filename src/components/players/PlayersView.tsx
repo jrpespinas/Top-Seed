@@ -1,17 +1,17 @@
 "use client";
 
-import { useState, useMemo, useEffect, useCallback, useRef } from "react";
-import { Search, UserPlus, X, ChevronUp, ChevronDown, Check } from "lucide-react";
+import { useState, useMemo, useEffect } from "react";
+import { Search, X, ChevronUp, ChevronDown } from "lucide-react";
 import { SkillBadge } from "@/components/ui/SkillBadge";
 import { GenderIcon } from "@/components/ui/GenderIcon";
 import { PaymentToggle } from "@/components/ui/PaymentToggle";
 import { PlayerDrawer } from "./PlayerDrawer";
+import { useToast, ToastViewport } from "@/components/ui/Toast";
 import { cn, SKILL_LABELS, SKILL_LABELS_SHORT } from "@/lib/utils";
 import { useGamesPlayedMap } from "@/lib/match-log-store";
 import {
   useQueueSnapshot,
   useBenchSnapshot,
-  addPlayerToQueue,
   updateQueuePlayer,
   updateBenchPlayer,
   removeQueueEntry,
@@ -162,7 +162,7 @@ function PlayerTableRow({
 
       {/* Skill — always */}
       <td className="px-3 py-3 w-[100px]">
-        <SkillBadge level={player.skillLevel} />
+        <SkillBadge level={player.skillLevel} compact />
       </td>
 
       {/* Payment — sm+ */}
@@ -230,23 +230,12 @@ export function PlayersView() {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [editingRow, setEditingRow] = useState<SessionPlayerRow | null>(null);
   const [headerShadow, setHeaderShadow] = useState(false);
-  const [toast, setToast] = useState<{ id: number; message: string; onUndo?: () => void } | null>(null);
-  const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const { toast, showToast, dismissAndUndo } = useToast();
 
   useEffect(() => {
     const onScroll = () => setHeaderShadow(window.scrollY > 0);
     window.addEventListener("scroll", onScroll, { passive: true });
     return () => window.removeEventListener("scroll", onScroll);
-  }, []);
-
-  const showToast = useCallback((message: string, onUndo?: () => void) => {
-    if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
-    const id = Date.now();
-    setToast({ id, message, onUndo });
-    toastTimerRef.current = setTimeout(
-      () => setToast((prev) => (prev?.id === id ? null : prev)),
-      onUndo ? 5000 : 2500
-    );
   }, []);
 
   const hasFilters = !!search || skillFilter.size > 0 || genderFilter.size > 0;
@@ -318,11 +307,6 @@ export function PlayersView() {
     setGenderFilter(new Set());
   }
 
-  function handleAdd() {
-    setEditingRow(null);
-    setDrawerOpen(true);
-  }
-
   function handleEdit(row: SessionPlayerRow) {
     setEditingRow(row);
     setDrawerOpen(true);
@@ -334,17 +318,17 @@ export function PlayersView() {
   }
 
   function handleSave(data: PlayerSaveData) {
+    // Players page no longer has an add-player entry point (see AddPlayersModal
+    // on the Dashboard) — the drawer only ever opens via handleEdit now, so
+    // editingRow is always set by the time a save happens. Guard stays for
+    // type-narrowing, not because this can realistically be null here.
+    if (!editingRow) return;
     const patch = {
       name: data.name,
       skillLevel: data.skillLevel,
       gender: data.gender,
       notes: data.notes || undefined,
     };
-    if (!editingRow) {
-      addPlayerToQueue(patch);
-      showToast(`Added ${data.name.split(" ")[0]} to queue`);
-      return;
-    }
     if (editingRow.source === "queue") {
       updateQueuePlayer(editingRow.entryId, patch);
     } else {
@@ -366,12 +350,20 @@ export function PlayersView() {
     if (source === "queue") {
       const removed = removeQueueEntry(entryId);
       if (removed) {
-        showToast(`Removed ${player.name.split(" ")[0]} from the session`, () => restoreQueueEntry(removed));
+        showToast(
+          `Removed ${player.name.split(" ")[0]} from the session`,
+          () => restoreQueueEntry(removed),
+          "Undo remove from session"
+        );
       }
     } else {
       const removed = removeBenchEntry(entryId);
       if (removed) {
-        showToast(`Removed ${player.name.split(" ")[0]} from the session`, () => restoreBenchEntry(removed));
+        showToast(
+          `Removed ${player.name.split(" ")[0]} from the session`,
+          () => restoreBenchEntry(removed),
+          "Undo remove from session"
+        );
       }
     }
   }
@@ -380,27 +372,28 @@ export function PlayersView() {
     <>
       <div className="flex flex-col min-h-full">
         {/* ── Sticky title + filter bar ────────────────────── */}
-        <div className={cn("sticky top-0 z-[var(--z-sticky)] bg-bg transition-shadow duration-200", headerShadow && "shadow-[0_1px_0_var(--color-border),0_2px_8px_oklch(0_0_0/0.08)]")}>
+        <div
+          className={cn(
+            "sticky top-0 z-[var(--z-sticky)] transition-colors duration-200",
+            // Dark mode reads elevation as surface lightness, not shadow color
+            // (a black shadow blur is nearly invisible on a near-black bg) —
+            // surface-elevated already IS this app's lighter-elevation step in
+            // dark mode, and a legible tint-darker step in light mode, so one
+            // token covers the "scrolled, lifted header" cue in both themes.
+            headerShadow ? "bg-surface-elevated shadow-[0_1px_0_var(--color-border)]" : "bg-bg"
+          )}
+        >
           {/* Title bar */}
-          <div className="flex items-center justify-between px-4 sm:px-6 h-14">
-            <div className="flex items-center gap-2.5">
-              <h1 className="text-base font-semibold text-ink">Players</h1>
-              <span className="font-mono text-xs text-muted tabular-nums">
-                ({filteredAndSorted.length})
+          <div className="flex items-center gap-2.5 px-4 sm:px-6 h-14">
+            <h1 className="text-base font-semibold text-ink">Players</h1>
+            <span className="font-mono text-xs text-muted tabular-nums">
+              ({filteredAndSorted.length})
+            </span>
+            {filteredAndSorted.length > 0 && (
+              <span className="text-xs text-muted">
+                <span className="font-mono tabular-nums text-success">{paidCount}</span> paid
               </span>
-              {filteredAndSorted.length > 0 && (
-                <span className="text-xs text-muted">
-                  <span className="font-mono tabular-nums text-success">{paidCount}</span> paid
-                </span>
-              )}
-            </div>
-            <button
-              onClick={handleAdd}
-              className="flex items-center gap-1.5 bg-primary hover:bg-primary-hover text-bg text-sm font-semibold px-3 py-1.5 rounded-md transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 min-h-[44px]"
-            >
-              <UserPlus size={14} strokeWidth={2.5} aria-hidden />
-              Add Player
-            </button>
+            )}
           </div>
 
           {/* Filter bar — single non-wrapping scrollable row */}
@@ -514,7 +507,7 @@ export function PlayersView() {
         {filteredAndSorted.length > 0 ? (
           <table className="w-full border-collapse" role="grid" aria-label="Players roster">
               {/* Sticky thead — sits directly below the 109px sticky header */}
-              <thead className="sticky top-[109px] z-[var(--z-sticky)] bg-bg">
+              <thead className={cn("sticky top-[109px] z-[var(--z-sticky)] transition-colors duration-200", headerShadow ? "bg-surface-elevated" : "bg-bg")}>
                 <tr className="border-b border-border">
                   <SortHeader
                     label="Name"
@@ -610,12 +603,7 @@ export function PlayersView() {
             ) : (
               <>
                 <p className="text-sm text-muted">No players in this session yet</p>
-                <button
-                  onClick={handleAdd}
-                  className="text-xs text-primary hover:text-primary-hover mt-3 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 rounded px-1"
-                >
-                  Add first player
-                </button>
+                <p className="text-xs text-muted mt-1">Add players from the Dashboard to get started</p>
               </>
             )}
           </div>
@@ -630,37 +618,7 @@ export function PlayersView() {
         onRemove={handleRemove}
       />
 
-      {toast && (
-        <div
-          key={toast.id}
-          role={toast.onUndo ? "alert" : "status"}
-          aria-live={toast.onUndo ? "assertive" : "polite"}
-          className={cn(
-            "fixed bottom-[76px] md:bottom-6 left-1/2 -translate-x-1/2 flex items-center gap-2 bg-surface-elevated border border-border text-ink text-xs font-medium px-4 py-2.5 rounded-full shadow-lg z-[var(--z-toast)] animate-toast whitespace-nowrap",
-            toast.onUndo ? "pointer-events-auto" : "pointer-events-none"
-          )}
-        >
-          <Check size={12} strokeWidth={2.5} className="text-success flex-shrink-0" aria-hidden />
-          {toast.message}
-          {toast.onUndo && (
-            <>
-              <span className="w-px h-3 bg-border mx-0.5 flex-shrink-0" aria-hidden />
-              <button
-                onClick={() => {
-                  if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
-                  const undo = toast.onUndo;
-                  setToast(null);
-                  undo?.();
-                }}
-                className="text-primary hover:text-primary-hover font-semibold transition-colors focus-visible:outline-none focus-visible:underline"
-                aria-label="Undo remove from session"
-              >
-                Undo
-              </button>
-            </>
-          )}
-        </div>
-      )}
+      <ToastViewport toast={toast} onDismissAndUndo={dismissAndUndo} />
     </>
   );
 }

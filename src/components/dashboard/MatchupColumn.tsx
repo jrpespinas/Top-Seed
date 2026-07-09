@@ -23,6 +23,9 @@ interface Props {
   onPlayerDropOnCard: (cardId: string, player: Player) => void;
   onRemovePlayerFromCard: (cardId: string, side: "A" | "B", index: number) => void;
   onAddCard: () => void;
+  onSuggestCard: () => void;
+  onResuggestCard: (cardId: string) => void;
+  justSuggestedCardId?: string | null;
   selectedPlayer?: Player | null;
 }
 
@@ -41,6 +44,9 @@ export function MatchupColumn({
   onPlayerDropOnCard,
   onRemovePlayerFromCard,
   onAddCard,
+  onSuggestCard,
+  onResuggestCard,
+  justSuggestedCardId,
   selectedPlayer,
 }: Props) {
   const availableCourts = courts.filter((c) => c.status === "AVAILABLE");
@@ -52,17 +58,16 @@ export function MatchupColumn({
         <div className="flex items-center justify-between px-3 pt-3 pb-2.5 flex-shrink-0 border-b border-border">
           <h2 className="flex items-center gap-2 text-sm font-semibold text-ink">
             <Swords size={14} strokeWidth={2} className="text-muted" aria-hidden />
-            Matchups
+            Queue
             <span className="font-mono text-xs text-muted font-normal tabular-nums">
               ({planningCards.length})
             </span>
           </h2>
           <div className="flex items-center gap-1.5">
             <button
-              disabled
-              title="Coming soon — build matchups manually below for now"
-              className="flex items-center gap-1 text-xs font-semibold bg-surface-elevated text-muted px-2.5 py-1.5 rounded-sm cursor-not-allowed opacity-60"
-              aria-label="Suggest a matchup from the queue — coming soon"
+              onClick={onSuggestCard}
+              className="flex items-center gap-1 text-xs font-semibold bg-primary/10 hover:bg-primary text-primary hover:text-bg px-2.5 py-1.5 rounded-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
+              aria-label="Suggest a matchup from the queue"
             >
               <Shuffle size={11} strokeWidth={2.5} aria-hidden />
               Suggest
@@ -116,6 +121,8 @@ export function MatchupColumn({
                       fullWidth
                       availableCourts={availableCourts}
                       onDismiss={() => onCardDismiss(card.id)}
+                      onResuggest={() => onResuggestCard(card.id)}
+                      justSuggested={card.id === justSuggestedCardId}
                       onMatchTypeChange={(type) => onCardMatchTypeChange(card.id, type)}
                       onSwap={(from, to) => onCardSwap(card.id, from, to)}
                       onCourtsAssign={(courtId) => onCardAssign(card.id, courtId)}

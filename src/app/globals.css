@@ -17,6 +17,21 @@
   --color-warning-raw:            0.75 0.14 75;
   --color-error-raw:              0.62 0.21 25;
 
+  /* Skill-level ramp (F→S) — one continuous hue arc, not seven arbitrary
+     colors. Endpoints are exact matches for --color-accent (F) and
+     --color-primary (S); L/C/H all interpolate smoothly between them. The
+     arc deliberately routes around the warning (75°) and error (25°) hues —
+     PlayersView shows a SkillBadge next to a PaymentToggle in the same row,
+     and a mid-tier skill badge should never visually echo "unpaid"/"error"
+     a few columns over. See docs/specs or DESIGN.md for the design rationale. */
+  --color-skill-f-raw:            0.620 0.140 220;
+  --color-skill-e-raw:            0.635 0.145 192;
+  --color-skill-d-raw:            0.650 0.150 164;
+  --color-skill-c-raw:            0.665 0.155 138;
+  --color-skill-b-raw:            0.680 0.160 108;
+  --color-skill-a-raw:            0.695 0.165 55;
+  --color-skill-s-raw:            0.710 0.170 38;
+
   /* Semantic aliases (for direct CSS use) */
   --color-bg:               oklch(var(--color-bg-raw));
   --color-surface:          oklch(var(--color-surface-raw));
@@ -30,6 +45,13 @@
   --color-success:          oklch(var(--color-success-raw));
   --color-warning:          oklch(var(--color-warning-raw));
   --color-error:            oklch(var(--color-error-raw));
+  --color-skill-s:          oklch(var(--color-skill-s-raw));
+  --color-skill-a:          oklch(var(--color-skill-a-raw));
+  --color-skill-b:          oklch(var(--color-skill-b-raw));
+  --color-skill-c:          oklch(var(--color-skill-c-raw));
+  --color-skill-d:          oklch(var(--color-skill-d-raw));
+  --color-skill-e:          oklch(var(--color-skill-e-raw));
+  --color-skill-f:          oklch(var(--color-skill-f-raw));
 
   /* Z-index scale */
   --z-dropdown:       10;
@@ -84,6 +106,19 @@ body {
   }
 }
 
+/* Feedback for a just-clicked Suggest/Resuggest — the card that was touched
+   glows so the click reads as acknowledged even when no players moved
+   (e.g. the queue couldn't fill it). Box-shadow only, no layout impact. */
+@keyframes card-suggest-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 oklch(var(--color-primary-raw) / 0);
+  }
+  50% {
+    box-shadow: 0 0 16px 2px oklch(var(--color-primary-raw) / 0.45);
+  }
+}
+
 @layer utilities {
   .animate-toast {
     animation: toast-in 200ms ease-out forwards;
@@ -91,6 +126,10 @@ body {
 
   .animate-label-in {
     animation: label-in 200ms ease-out forwards;
+  }
+
+  .animate-suggest-pulse {
+    animation: card-suggest-pulse 1s ease-in-out 2;
   }
 }
 
@@ -109,6 +148,17 @@ body {
   --color-warning-raw:          0.42 0.14 75;      /* darkened amber */
   --color-error-raw:            0.38 0.21 25;      /* darkened error */
 
+  /* Skill-level ramp — same construction as dark theme (see :root), just
+     interpolated between this theme's own darker accent/primary endpoints
+     for correct contrast against a white surface. */
+  --color-skill-f-raw:          0.350 0.140 220;
+  --color-skill-e-raw:          0.365 0.147 192;
+  --color-skill-d-raw:          0.380 0.153 164;
+  --color-skill-c-raw:          0.395 0.160 138;
+  --color-skill-b-raw:          0.410 0.167 108;
+  --color-skill-a-raw:          0.425 0.173 55;
+  --color-skill-s-raw:          0.440 0.180 38;
+
   /* Semantic aliases */
   --color-bg:               oklch(var(--color-bg-raw));
   --color-surface:          oklch(var(--color-surface-raw));
@@ -122,6 +172,13 @@ body {
   --color-success:          oklch(var(--color-success-raw));
   --color-warning:          oklch(var(--color-warning-raw));
   --color-error:            oklch(var(--color-error-raw));
+  --color-skill-s:          oklch(var(--color-skill-s-raw));
+  --color-skill-a:          oklch(var(--color-skill-a-raw));
+  --color-skill-b:          oklch(var(--color-skill-b-raw));
+  --color-skill-c:          oklch(var(--color-skill-c-raw));
+  --color-skill-d:          oklch(var(--color-skill-d-raw));
+  --color-skill-e:          oklch(var(--color-skill-e-raw));
+  --color-skill-f:          oklch(var(--color-skill-f-raw));
 }
 
 /* ─── Theme switching transition (JS-triggered, ~250ms window) ────────────── */
@@ -146,5 +203,13 @@ html.theme-switching *::after {
   html.theme-switching *::before,
   html.theme-switching *::after {
     transition-duration: 0ms !important;
+  }
+
+  /* The pulse's whole point is the oscillation — collapsing it via the
+     blanket rule above would make it disappear rather than degrade. Hold a
+     steady glow instead; the parent still removes the class after ~2.2s. */
+  .animate-suggest-pulse {
+    animation: none !important;
+    box-shadow: 0 0 16px 2px oklch(var(--color-primary-raw) / 0.45) !important;
   }
 }

@@ -6,6 +6,7 @@ import { X, Plus } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { SkillLevelSelect } from "@/components/ui/SkillLevelSelect";
 import { GenderToggle } from "@/components/ui/GenderToggle";
+import { useConfirmFocus } from "@/hooks/useConfirmFocus";
 import type { SkillLevel, Gender } from "@/types";
 
 interface DraftRow {
@@ -24,6 +25,38 @@ function makeBlankRow(): DraftRow {
   };
 }
 
+type DuplicateReason = "existing" | "batch";
+
+// Case-sensitive on purpose — "Alex" and "alex" are treated as different
+// names, not normalized to the same identity. Flags a row if its trimmed
+// name exactly matches either an existing session player or an earlier row
+// in this same batch (both rows in an in-batch collision get flagged, not
+// just the second one, so it's clear which two are in conflict) — the
+// reason is kept per-row so the UI can explain which case it is.
+function findDuplicateRowIds(
+  rows: DraftRow[],
+  existingNames: Set<string>
+): Map<string, DuplicateReason> {
+  const seenInBatch = new Map<string, string>();
+  const duplicates = new Map<string, DuplicateReason>();
+  for (const row of rows) {
+    const name = row.name.trim();
+    if (!name) continue;
+    if (existingNames.has(name)) {
+      duplicates.set(row.id, "existing");
+      continue;
+    }
+    const firstId = seenInBatch.get(name);
+    if (firstId) {
+      duplicates.set(row.id, "batch");
+      duplicates.set(firstId, "batch");
+    } else {
+      seenInBatch.set(name, row.id);
+    }
+  }
+  return duplicates;
+}
+
 export interface NewPlayerInput {
   name: string;
   skillLevel: SkillLevel;
@@ -34,20 +67,25 @@ interface AddPlayersModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSubmit: (players: NewPlayerInput[]) => void;
+  existingPlayerNames: Set<string>;
 }
 
-export function AddPlayersModal({ isOpen, onClose, onSubmit }: AddPlayersModalProps) {
+export function AddPlayersModal({ isOpen, onClose, onSubmit, existingPlayerNames }: AddPlayersModalProps) {
   const [rows, setRows] = useState<DraftRow[]>([makeBlankRow()]);
   const [error, setError] = useState("");
   const [mounted, setMounted] = useState(false);
   const [discardConfirm, setDiscardConfirm] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [attemptedSubmit, setAttemptedSubmit] = useState(false);
   const isSubmittingRef = useRef(false);
   const [pendingFocusId, setPendingFocusId] = useState<string | null>(null);
   const [lastRemoved, setLastRemoved] = useState<{ row: DraftRow; index: number } | null>(null);
   const dialogRef = useRef<HTMLDivElement>(null);
   const nameInputRefs = useRef<Map<string, HTMLInputElement>>(new Map());
   const lastRemovedTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // "Keep editing" is the safe default focused on entering confirm mode;
+  // the footer's own Cancel button is what regains focus on exit.
+  const { triggerRef: cancelBtnRef, cancelRef: keepEditingBtnRef } = useConfirmFocus(discardConfirm);
 
   const isDirty = rows.some((r) => r.name.trim().length > 0);
 
@@ -63,6 +101,7 @@ export function AddPlayersModal({ isOpen, onClose, onSubmit }: AddPlayersModalPr
     setError("");
     setDiscardConfirm(false);
     setIsSaving(false);
+    setAttemptedSubmit(false);
     isSubmittingRef.current = false;
     setLastRemoved(null);
     if (lastRemovedTimerRef.current) clearTimeout(lastRemovedTimerRef.current);
@@ -215,6 +254,19 @@ export function AddPlayersModal({ isOpen, onClose, onSubmit }: AddPlayersModalPr
       nameInputRefs.current.get(rows[0]?.id)?.focus();
       return;
     }
+    const duplicateRowIds = findDuplicateRowIds(rows, existingPlayerNames);
+    if (duplicateRowIds.size > 0) {
+      setAttemptedSubmit(true);
+      setError("Two players can't share the same name");
+      const firstDuplicateId = duplicateRowIds.keys().next().value;
+      if (firstDuplicateId) nameInputRefs.current.get(firstDuplicateId)?.focus();
+      return;
+    }
+    if (validRows.some((r) => !r.gender)) {
+      setAttemptedSubmit(true);
+      setError("Select a gender for every player");
+      return;
+    }
     isSubmittingRef.current = true;
     setIsSaving(true);
     await new Promise((r) => setTimeout(r, 300));
@@ -225,6 +277,16 @@ export function AddPlayersModal({ isOpen, onClose, onSubmit }: AddPlayersModalPr
     isSubmittingRef.current = false;
     onClose();
   }
+
+  const missingGenderRowIds = new Set(
+    attemptedSubmit
+      ? rows.filter((r) => r.name.trim().length > 0 && !r.gender).map((r) => r.id)
+      : []
+  );
+
+  const duplicateNameRowIds = attemptedSubmit
+    ? findDuplicateRowIds(rows, existingPlayerNames)
+    : new Map<string, DuplicateReason>();
 
   const validCount = rows.filter((r) => r.name.trim()).length;
   const skippedCount = rows.length - validCount;
@@ -299,16 +361,29 @@ export function AddPlayersModal({ isOpen, onClose, onSubmit }: AddPlayersModalPr
                     onPaste={(e) => handleNamePaste(e, row)}
                     placeholder="Player's full name"
                     aria-label="Player's full name"
+                    aria-invalid={duplicateNameRowIds.has(row.id) ? true : undefined}
                     autoComplete="off"
                     className={cn(
-                      "w-full bg-bg border border-border rounded-md px-3 py-2.5 text-sm text-ink",
+                      "w-full bg-bg border rounded-md px-3 py-2.5 text-sm text-ink",
                       "placeholder:text-muted",
-                      "focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary/50",
-                      "transition-colors duration-150"
+                      "focus:outline-none focus:ring-2 focus:border-primary/50",
+                      "transition-colors duration-150",
+                      duplicateNameRowIds.has(row.id)
+                        ? "border-error/50 focus:ring-error/40"
+                        : "border-border focus:ring-primary/50"
                     )}
                   />
-                  {rows.length > 1 && row.name.trim().length === 0 && (
-                    <p className="text-xs text-muted">Blank rows are skipped when you add players</p>
+                  {duplicateNameRowIds.has(row.id) ? (
+                    <p className="text-xs text-error">
+                      {duplicateNameRowIds.get(row.id) === "existing"
+                        ? "Already in this session"
+                        : "Matches another row"}
+                    </p>
+                  ) : (
+                    rows.length > 1 &&
+                    row.name.trim().length === 0 && (
+                      <p className="text-xs text-muted">Blank rows are skipped when you add players</p>
+                    )
                   )}
                   {idx === 0 && (
                     <div className="flex items-center gap-2">
@@ -326,6 +401,7 @@ export function AddPlayersModal({ isOpen, onClose, onSubmit }: AddPlayersModalPr
                       value={row.gender}
                       onChange={(gender) => updateRow(row.id, { gender })}
                       variant="compact"
+                      error={missingGenderRowIds.has(row.id)}
                     />
                   </div>
                 </div>
@@ -386,6 +462,7 @@ export function AddPlayersModal({ isOpen, onClose, onSubmit }: AddPlayersModalPr
                 Discard
               </button>
               <button
+                ref={keepEditingBtnRef}
                 onClick={() => setDiscardConfirm(false)}
                 className="text-sm font-semibold text-ink bg-surface-elevated hover:bg-surface-elevated/80 transition-colors px-3 py-2.5 rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-border min-h-[44px]"
               >
@@ -420,6 +497,7 @@ export function AddPlayersModal({ isOpen, onClose, onSubmit }: AddPlayersModalPr
                   {isSaving ? "Adding…" : submitLabel}
                 </button>
                 <button
+                  ref={cancelBtnRef}
                   onClick={handleClose}
                   disabled={isSaving}
                   className="text-sm text-muted hover:text-ink transition-colors px-4 py-2.5 rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-border min-h-[44px] disabled:opacity-40"

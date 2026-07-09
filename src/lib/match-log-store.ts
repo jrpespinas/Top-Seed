@@ -45,6 +45,19 @@ export function removeMatchRecord(id: string) {
   notifyListeners();
 }
 
+/**
+ * Bulk purge for a set of sessions — used when their archived SessionRecord
+ * is deleted or evicted (see session-store.ts's deleteArchivedSession and the
+ * 50-session cap in closeSession) so match history doesn't outlive the
+ * record that references it. A no-op for an empty list.
+ */
+export function removeMatchRecordsForSessions(sessionIds: string[]) {
+  if (sessionIds.length === 0) return;
+  const idSet = new Set(sessionIds);
+  writeStoredMatches(readStoredMatches().filter((m) => !idSet.has(m.sessionId)));
+  notifyListeners();
+}
+
 export function updateMatchRecord(id: string, patch: Partial<MatchRecord>) {
   writeStoredMatches(
     readStoredMatches().map((m) => (m.id === id ? { ...m, ...patch } : m))

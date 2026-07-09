@@ -1,21 +1,23 @@
 "use client";
 
-import { useState, useCallback, useMemo, useRef } from "react";
+import { useState, useCallback, useMemo, useRef, useEffect } from "react";
 import type { ActiveMatch, Court, QueueEntry, PlanningCard, MatchType, MatchResult, MatchRecord, Player } from "@/types";
 import { CourtsSection } from "./CourtsSection";
 import { MatchupColumn } from "./MatchupColumn";
 import { PlayerPoolColumn } from "./PlayerPoolColumn";
 import type { NewPlayerInput } from "./AddPlayersModal";
-import { addMatchRecord, removeMatchRecord, useGamesPlayedMap } from "@/lib/match-log-store";
+import { addMatchRecord, removeMatchRecord, useGamesPlayedMap, useMatchLog } from "@/lib/match-log-store";
 import {
   useSessionQueue,
   useSessionBench,
   useSessionCourts,
   useSessionPlanningCards,
+  useSmartMatchupSkipCounts,
   appendSortedByCheckIn,
   buildDefaultPlanningCards,
 } from "@/lib/session-store";
-import { Check } from "lucide-react";
+import { suggestMatchup } from "@/lib/smart-matchup";
+import { useToast, ToastViewport } from "@/components/ui/Toast";
 
 function firstNames(players: Player[]): string {
   return players.map((p) => p.name.split(" ")[0]).join("/");
@@ -51,19 +53,46 @@ export function DashboardClient({ sessionId }: Props) {
   const [bench, setBench] = useSessionBench([]);
   const [draggingCardId, setDraggingCardId] = useState<string | null>(null);
   const [selectedPlayer, setSelectedPlayer] = useState<Player | null>(null);
-  const [toast, setToast] = useState<{ id: number; message: string; onUndo?: () => void } | null>(null);
-  const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [justSuggestedCardId, setJustSuggestedCardId] = useState<string | null>(null);
+  const justSuggestedTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const { toast, showToast, dismissAndUndo } = useToast();
   const gamesPlayedMap = useGamesPlayedMap();
 
-  const showToast = useCallback((message: string, onUndo?: () => void) => {
-    if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
-    const id = Date.now();
-    setToast({ id, message, onUndo });
-    toastTimerRef.current = setTimeout(
-      () => setToast((prev) => (prev?.id === id ? null : prev)),
-      onUndo ? 5000 : 2500
-    );
+  useEffect(() => {
+    return () => {
+      if (justSuggestedTimerRef.current) clearTimeout(justSuggestedTimerRef.current);
+    };
   }, []);
+
+  // Feedback for a just-clicked Suggest/Resuggest — pulses the touched card's
+  // border even when the algorithm couldn't fill it, so the click always
+  // reads as acknowledged. See .animate-suggest-pulse in globals.css.
+  const triggerSuggestPulse = useCallback((cardId: string) => {
+    if (justSuggestedTimerRef.current) clearTimeout(justSuggestedTimerRef.current);
+    setJustSuggestedCardId(cardId);
+    justSuggestedTimerRef.current = setTimeout(() => setJustSuggestedCardId(null), 2200);
+  }, []);
+  const matches = useMatchLog();
+  const [skipCounts, setSkipCounts] = useSmartMatchupSkipCounts();
+  const sessionMatches = useMemo(
+    () => matches.filter((m) => m.sessionId === sessionId),
+    [matches, sessionId]
+  );
+
+  // Every player currently part of this session — queue, bench, and anyone
+  // mid-match — so AddPlayersModal can block a duplicate name regardless of
+  // where the existing player currently sits. Case-sensitive on purpose: an
+  // exact-string match, not a normalized/lowercased one.
+  const existingPlayerNames = useMemo(() => {
+    const names = new Set<string>();
+    for (const entry of queue) names.add(entry.player.name);
+    for (const entry of bench) names.add(entry.player.name);
+    for (const court of courts) {
+      if (!court.activeMatch) continue;
+      for (const p of [...court.activeMatch.sideA, ...court.activeMatch.sideB]) names.add(p.name);
+    }
+    return names;
+  }, [queue, bench, courts]);
 
   const slottedPlayerIds = useMemo(() => {
     const ids = new Set<string>();
@@ -190,7 +219,8 @@ export function DashboardClient({ sessionId }: Props) {
                 setPlanningCards((prev) =>
                   prev.map((c) => (c.id === id ? originalCard : c))
                 );
-              }
+              },
+              "Undo switch to singles"
             );
           }
         }
@@ -397,7 +427,8 @@ export function DashboardClient({ sessionId }: Props) {
                   ];
                 });
               }
-            : undefined
+            : undefined,
+          "Undo court assignment"
         );
       }
     },
@@ -469,7 +500,8 @@ export function DashboardClient({ sessionId }: Props) {
                   ];
                 });
               }
-            : undefined
+            : undefined,
+          "Undo court assignment"
         );
       }
     },
@@ -482,6 +514,83 @@ export function DashboardClient({ sessionId }: Props) {
       { id: `pc-${Date.now()}`, matchType: "DOUBLES" as const, state: "empty" as const, suggestion: null },
     ]);
   }, [setPlanningCards]);
+
+  // Pure algorithm call (see docs/specs/07-smart-matchup.md); this hook owns
+  // threading the returned skip counts back into the persisted store.
+  const runSmartSuggest = useCallback(
+    (matchType: MatchType, excludedPlayerIds: string[]) => {
+      const result = suggestMatchup({
+        queue,
+        matches: sessionMatches,
+        matchType,
+        excludedPlayerIds,
+        skipCounts,
+      });
+      setSkipCounts(result.updatedSkipCounts);
+      return result.suggestion;
+    },
+    [queue, sessionMatches, skipCounts, setSkipCounts]
+  );
+
+  const handleSuggestCard = useCallback(() => {
+    // Fills the topmost empty card if one exists — an empty card has no
+    // suggestion, so it never contributes to slottedPlayerIds and needs no
+    // self-exclusion handling (unlike handleResuggestCard below). Only adds a
+    // new card when every existing one already has players placed.
+    const availableCard = planningCards.find((c) => c.state === "empty");
+    const matchType: MatchType = availableCard?.matchType ?? "DOUBLES";
+    const suggestion = runSmartSuggest(matchType, Array.from(slottedPlayerIds));
+
+    if (availableCard) {
+      setPlanningCards((prev) =>
+        prev.map((c) =>
+          c.id === availableCard.id
+            ? { ...c, suggestion, state: suggestion ? ("ready" as const) : ("empty" as const) }
+            : c
+        )
+      );
+      triggerSuggestPulse(availableCard.id);
+      return;
+    }
+
+    const newCardId = `pc-${Date.now()}`;
+    setPlanningCards((prev) => [
+      ...prev,
+      {
+        id: newCardId,
+        matchType,
+        state: suggestion ? ("ready" as const) : ("empty" as const),
+        suggestion,
+      },
+    ]);
+    triggerSuggestPulse(newCardId);
+  }, [planningCards, runSmartSuggest, slottedPlayerIds, setPlanningCards, triggerSuggestPulse]);
+
+  const handleResuggestCard = useCallback(
+    (cardId: string) => {
+      const card = planningCards.find((c) => c.id === cardId);
+      if (!card) return;
+
+      // A card resuggesting itself shouldn't exclude its own current players.
+      const claimedByOtherCards = new Set(slottedPlayerIds);
+      if (card.suggestion) {
+        for (const p of [...card.suggestion.sideA, ...card.suggestion.sideB]) {
+          if (p) claimedByOtherCards.delete(p.id);
+        }
+      }
+
+      const suggestion = runSmartSuggest(card.matchType, Array.from(claimedByOtherCards));
+      setPlanningCards((prev) =>
+        prev.map((c) =>
+          c.id === cardId
+            ? { ...c, suggestion, state: suggestion ? ("ready" as const) : ("empty" as const) }
+            : c
+        )
+      );
+      triggerSuggestPulse(cardId);
+    },
+    [planningCards, slottedPlayerIds, runSmartSuggest, setPlanningCards, triggerSuggestPulse]
+  );
 
   const handleAddCourt = useCallback(() => {
     setCourts((prev) => [
@@ -522,13 +631,17 @@ export function DashboardClient({ sessionId }: Props) {
       );
       setQueue((prev) => appendSortedByCheckIn(prev, newEntries));
 
-      showToast(message, () => {
-        setCourts((prev) => prev.map((c) => (c.id === courtId ? originalCourt : c)));
-        setQueue((prev) =>
-          prev.filter((e) => !newEntryIds.has(e.id)).map((e, i) => ({ ...e, position: i + 1 }))
-        );
-        onUndo?.();
-      });
+      showToast(
+        message,
+        () => {
+          setCourts((prev) => prev.map((c) => (c.id === courtId ? originalCourt : c)));
+          setQueue((prev) =>
+            prev.filter((e) => !newEntryIds.has(e.id)).map((e, i) => ({ ...e, position: i + 1 }))
+          );
+          onUndo?.();
+        },
+        "Undo match result"
+      );
     },
     [courts, showToast, setQueue, setCourts]
   );
@@ -650,6 +763,7 @@ export function DashboardClient({ sessionId }: Props) {
             onPlayerDragStart={() => {}}
             onPlayerDragEnd={() => {}}
             onAddPlayers={handleAddPlayers}
+            existingPlayerNames={existingPlayerNames}
             selectedPlayerId={selectedPlayer?.id ?? null}
             onSelectPlayer={handleSelectPlayer}
           />
@@ -670,39 +784,15 @@ export function DashboardClient({ sessionId }: Props) {
             onPlayerDropOnCard={handlePlayerDropOnCard}
             onRemovePlayerFromCard={handleRemovePlayerFromCard}
             onAddCard={handleAddCard}
+            onSuggestCard={handleSuggestCard}
+            onResuggestCard={handleResuggestCard}
+            justSuggestedCardId={justSuggestedCardId}
             selectedPlayer={selectedPlayer}
           />
         </div>
       </div>
 
-      {toast && (
-        <div
-          key={toast.id}
-          role={toast.onUndo ? "alert" : "status"}
-          aria-live={toast.onUndo ? "assertive" : "polite"}
-          className={`fixed bottom-[76px] md:bottom-6 left-1/2 -translate-x-1/2 flex items-center gap-2 bg-surface-elevated border border-border text-ink text-xs font-medium px-4 py-2.5 rounded-full shadow-lg z-[var(--z-toast)] animate-toast whitespace-nowrap ${toast.onUndo ? "pointer-events-auto" : "pointer-events-none"}`}
-        >
-          <Check size={12} strokeWidth={2.5} className="text-success flex-shrink-0" aria-hidden />
-          {toast.message}
-          {toast.onUndo && (
-            <>
-              <span className="w-px h-3 bg-border mx-0.5 flex-shrink-0" aria-hidden />
-              <button
-                onClick={() => {
-                  if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
-                  const undo = toast.onUndo;
-                  setToast(null);
-                  undo?.();
-                }}
-                className="text-primary hover:text-primary-hover font-semibold transition-colors focus-visible:outline-none focus-visible:underline"
-                aria-label="Undo court assignment"
-              >
-                Undo
-              </button>
-            </>
-          )}
-        </div>
-      )}
+      <ToastViewport toast={toast} onDismissAndUndo={dismissAndUndo} />
     </>
   );
 }

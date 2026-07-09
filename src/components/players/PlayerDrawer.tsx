@@ -5,6 +5,7 @@ import { X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { SkillLevelSelect } from "@/components/ui/SkillLevelSelect";
 import { GenderToggle, GENDER_LABELS } from "@/components/ui/GenderToggle";
+import { useConfirmFocus } from "@/hooks/useConfirmFocus";
 import type { Player, SkillLevel, Gender } from "@/types";
 
 interface PlayerFormData {
@@ -44,6 +45,9 @@ export function PlayerDrawer({
   const isSavingRef = useRef(false);
   const nameInputRef = useRef<HTMLInputElement>(null);
   const drawerRef = useRef<HTMLElement>(null);
+  // "Keep editing" is the safe default focused on entering confirm mode;
+  // the footer's own Cancel button is what regains focus on exit.
+  const { triggerRef: cancelBtnRef, cancelRef: keepEditingBtnRef } = useConfirmFocus(discardConfirm);
 
   // Sync form data when drawer opens
   useEffect(() => {
@@ -337,6 +341,7 @@ export function PlayerDrawer({
               Discard
             </button>
             <button
+              ref={keepEditingBtnRef}
               onClick={() => setDiscardConfirm(false)}
               className="text-sm font-semibold text-ink bg-surface-elevated hover:bg-surface-elevated/80 transition-colors px-3 py-2.5 rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-border min-h-[44px]"
             >
@@ -375,6 +380,7 @@ export function PlayerDrawer({
                 : "Add Player"}
             </button>
             <button
+              ref={cancelBtnRef}
               onClick={handleClose}
               disabled={isSaving}
               className="text-sm text-muted hover:text-ink transition-colors px-4 py-2.5 rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-border min-h-[44px] disabled:opacity-40"

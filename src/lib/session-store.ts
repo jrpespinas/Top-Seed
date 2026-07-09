@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type {
   QueueEntry,
   BenchEntry,
@@ -21,6 +21,12 @@ const COURTS_KEY = "top-seed:session-courts";
 const PLANNING_CARDS_KEY = "top-seed:session-planning-cards";
 const CURRENT_SESSION_KEY = "top-seed:current-session";
 const SESSION_ARCHIVE_KEY = "top-seed:sessions";
+// Keeps the archive itself small (~4KB/session) and bounds the far larger,
+// separately-stored match log (match-log-store.ts) from growing forever —
+// closeSession purges evicted sessions' matches via the caller (page.tsx),
+// same decoupled-stores handoff this file already uses for `matches`.
+const MAX_ARCHIVED_SESSIONS = 50;
+const SKIP_COUNTS_KEY = "top-seed:smart-matchup-skip-counts";
 
 function readListOrNull<T>(key: string): T[] | null {
   if (typeof window === "undefined") return null;
@@ -68,6 +74,15 @@ const courtsListeners = new Set<Listener>();
 const planningCardsListeners = new Set<Listener>();
 const currentSessionListeners = new Set<Listener>();
 const sessionArchiveListeners = new Set<Listener>();
+const skipCountsListeners = new Set<Listener>();
+const selectedSessionListeners = new Set<Listener>();
+
+// Deliberately in-memory only, not localStorage-backed like the stores above
+// — this is shared UI navigation state (which session Leaderboard/Matches are
+// currently viewing), the same category as sort/search/filter state, which
+// this app never persists across a refresh. Shared across components via the
+// same listener pattern so the two pages stay in sync within a tab.
+let selectedSessionId: string | null = null;
 
 type Updater<T> = T | ((prev: T) => T);
 function resolve<T>(updater: Updater<T>, prev: T): T {
@@ -296,6 +311,54 @@ export function useSessionPlanningCards(
   return [cards, setCards];
 }
 
+/**
+ * Owner hook — Smart Suggest's fairness backstop (docs/specs/07-smart-matchup.md).
+ * playerId -> consecutive times skipped, session-scoped.
+ */
+export function useSmartMatchupSkipCounts(): [
+  Record<string, number>,
+  (updater: Updater<Record<string, number>>) => void
+] {
+  const [skipCounts, setSkipCountsState] = useState<Record<string, number>>({});
+  const skipCountsRef = useRef<Record<string, number>>({});
+
+  useEffect(() => {
+    const stored = readOrNull<Record<string, number>>(SKIP_COUNTS_KEY);
+    if (stored) {
+      skipCountsRef.current = stored;
+      setSkipCountsState(stored);
+    } else {
+      writeOrNull(SKIP_COUNTS_KEY, {});
+    }
+
+    const sync = () => {
+      const s = readOrNull<Record<string, number>>(SKIP_COUNTS_KEY);
+      if (s) {
+        skipCountsRef.current = s;
+        setSkipCountsState(s);
+      }
+    };
+    skipCountsListeners.add(sync);
+    window.addEventListener("storage", sync);
+    return () => {
+      skipCountsListeners.delete(sync);
+      window.removeEventListener("storage", sync);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // See setQueue's comment above — same StrictMode-double-invoke hazard, same fix.
+  const setSkipCounts = useCallback((updater: Updater<Record<string, number>>) => {
+    const next = resolve(updater, skipCountsRef.current);
+    skipCountsRef.current = next;
+    writeOrNull(SKIP_COUNTS_KEY, next);
+    setSkipCountsState(next);
+    skipCountsListeners.forEach((l) => l());
+  }, []);
+
+  return [skipCounts, setSkipCounts];
+}
+
 // PRD default: every fresh session starts with 3 blank matchup cards; the
 // organizer can add or dismiss more during the session.
 export function buildDefaultPlanningCards(): PlanningCard[] {
@@ -477,14 +540,93 @@ export function useSessionArchive(): SessionRecord[] {
   return records;
 }
 
+export interface SessionOption {
+  id: string;
+  label: string;
+  isOpen: boolean;
+}
+
+/**
+ * Shared by Leaderboard and Matches — the open session (if any) followed by
+ * the archive newest-first, plus a selection that defaults to the open
+ * session or the most recent closed one, exactly once post-hydration. Never
+ * re-defaults after that: closing the currently-viewed session moves it from
+ * `currentSession` into `archive` under the same id, so the selection stays
+ * valid and the view doesn't jump out from under whoever's looking at it.
+ */
+export function useSessionOptions(): {
+  sessions: SessionOption[];
+  selectedSessionId: string | null;
+  setSelectedSessionId: (id: string) => void;
+} {
+  const currentSession = useCurrentSession();
+  const archive = useSessionArchive();
+  const [selected, setSelected] = useState<string | null>(selectedSessionId);
+
+  useEffect(() => {
+    const sync = () => setSelected(selectedSessionId);
+    selectedSessionListeners.add(sync);
+    return () => {
+      selectedSessionListeners.delete(sync);
+    };
+  }, []);
+
+  const setSelectedSessionId = useCallback((id: string) => {
+    selectedSessionId = id;
+    selectedSessionListeners.forEach((l) => l());
+  }, []);
+
+  const sessions = useMemo<SessionOption[]>(() => {
+    const openOption: SessionOption[] = currentSession
+      ? [{ id: currentSession.id, label: currentSession.date, isOpen: true }]
+      : [];
+    const closedOptions: SessionOption[] = archive.map((r) => ({
+      id: r.id,
+      label: r.date,
+      isOpen: false,
+    }));
+    return [...openOption, ...closedOptions];
+  }, [currentSession, archive]);
+
+  // Defaults to the open session, or the most recent closed one — only once,
+  // the first time either becomes available. Shared across every mounted
+  // instance via the module-level variable, so whichever page loads first
+  // decides the default and the other one just sees it already set.
+  useEffect(() => {
+    if (selectedSessionId !== null) return;
+    if (sessions.length > 0) setSelectedSessionId(sessions[0].id);
+  }, [sessions, setSelectedSessionId]);
+
+  return { sessions, selectedSessionId: selected, setSelectedSessionId };
+}
+
 /**
  * Settings "Clear session history" — wipes only the closed-session archive.
  * Deliberately narrower than the full data reset: the currently open session
- * (if any) and its live queue/bench/courts/matches are untouched.
+ * (if any) and its live queue/bench/courts/matches are untouched. Returns the
+ * cleared session ids so the caller can also purge their match records (see
+ * removeMatchRecordsForSessions in match-log-store.ts) — this file never
+ * imports match-log-store, to keep the two stores decoupled.
  */
-export function clearSessionArchive() {
+export function clearSessionArchive(): string[] {
+  const archive = readListOrNull<SessionRecord>(SESSION_ARCHIVE_KEY) ?? [];
   writeList(SESSION_ARCHIVE_KEY, []);
   sessionArchiveListeners.forEach((l) => l());
+  return archive.map((r) => r.id);
+}
+
+/**
+ * Sessions page inline delete — permanently removes one archived session.
+ * Returns the removed record's id (for the caller to also purge its match
+ * records), or null if it was already gone.
+ */
+export function deleteArchivedSession(sessionId: string): string | null {
+  const archive = readListOrNull<SessionRecord>(SESSION_ARCHIVE_KEY) ?? [];
+  const removed = archive.find((r) => r.id === sessionId);
+  if (!removed) return null;
+  writeList(SESSION_ARCHIVE_KEY, archive.filter((r) => r.id !== sessionId));
+  sessionArchiveListeners.forEach((l) => l());
+  return removed.id;
 }
 
 /** Dashboard's "Start Session" — clean slate: empty courts/queue/bench, 3 blank planning cards. */
@@ -498,14 +640,22 @@ export function startSession(): CurrentSession {
   writeList(BENCH_KEY, []);
   writeList(COURTS_KEY, []);
   writeList(PLANNING_CARDS_KEY, buildDefaultPlanningCards());
+  writeOrNull(SKIP_COUNTS_KEY, {});
 
   currentSessionListeners.forEach((l) => l());
   queueListeners.forEach((l) => l());
   benchListeners.forEach((l) => l());
   courtsListeners.forEach((l) => l());
   planningCardsListeners.forEach((l) => l());
+  skipCountsListeners.forEach((l) => l());
 
   return session;
+}
+
+export interface CloseSessionResult {
+  record: SessionRecord;
+  /** Session ids dropped by the 50-session cap — caller purges their matches. */
+  evictedSessionIds: string[];
 }
 
 /**
@@ -514,7 +664,7 @@ export function startSession(): CurrentSession {
  * NoSessionState. `matches` comes from the caller's own useMatchLog() call —
  * this file never imports match-log-store, to keep the two stores decoupled.
  */
-export function closeSession(matches: MatchRecord[]): SessionRecord | null {
+export function closeSession(matches: MatchRecord[]): CloseSessionResult | null {
   const current = readOrNull<CurrentSession>(CURRENT_SESSION_KEY);
   if (!current) return null;
 
@@ -542,13 +692,16 @@ export function closeSession(matches: MatchRecord[]): SessionRecord | null {
   };
 
   const archive = readListOrNull<SessionRecord>(SESSION_ARCHIVE_KEY) ?? [];
-  writeList(SESSION_ARCHIVE_KEY, [record, ...archive]);
+  const combinedArchive = [record, ...archive];
+  const evictedSessionIds = combinedArchive.slice(MAX_ARCHIVED_SESSIONS).map((r) => r.id);
+  writeList(SESSION_ARCHIVE_KEY, combinedArchive.slice(0, MAX_ARCHIVED_SESSIONS));
 
   writeOrNull(CURRENT_SESSION_KEY, null);
   writeList(QUEUE_KEY, []);
   writeList(BENCH_KEY, []);
   writeList(COURTS_KEY, []);
   writeList(PLANNING_CARDS_KEY, []);
+  writeOrNull(SKIP_COUNTS_KEY, {});
 
   sessionArchiveListeners.forEach((l) => l());
   currentSessionListeners.forEach((l) => l());
@@ -556,6 +709,7 @@ export function closeSession(matches: MatchRecord[]): SessionRecord | null {
   benchListeners.forEach((l) => l());
   courtsListeners.forEach((l) => l());
   planningCardsListeners.forEach((l) => l());
+  skipCountsListeners.forEach((l) => l());
 
-  return record;
+  return { record, evictedSessionIds };
 }

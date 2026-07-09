@@ -19,17 +19,17 @@ export function formatSessionDate(iso: string): string {
 }
 
 export const SKILL_LABELS: Record<string, string> = {
-  S: "Seeded",
+  S: "Professional",
   A: "Advanced",
-  B: "Intermediate+",
+  B: "Upper Intermediate",
   C: "Intermediate",
-  D: "Beginner+",
+  D: "Upper Beginner",
   E: "Beginner",
   F: "Newbie",
 };
 
 export const SKILL_LABELS_SHORT: Record<string, string> = {
-  S: "Seed",
+  S: "Pro",
   A: "Adv",
   B: "Int+",
   C: "Int",

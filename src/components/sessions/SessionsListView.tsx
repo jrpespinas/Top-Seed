@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { Check, Trash2, X } from "lucide-react";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { cn, formatSessionDate } from "@/lib/utils";
 import {
@@ -10,9 +11,63 @@ import {
   useCourtsSnapshot,
   useQueueSnapshot,
   useBenchSnapshot,
+  deleteArchivedSession,
 } from "@/lib/session-store";
-import { useMatchLog } from "@/lib/match-log-store";
+import { useMatchLog, removeMatchRecordsForSessions } from "@/lib/match-log-store";
+import { useConfirmFocus } from "@/hooks/useConfirmFocus";
 import type { PaymentStatus, Player } from "@/types";
+
+function DeleteArchivedSessionButton({ sessionId }: { sessionId: string }) {
+  const [isConfirming, setIsConfirming] = useState(false);
+  const { triggerRef, cancelRef } = useConfirmFocus(isConfirming);
+
+  function handleConfirm(e: React.MouseEvent) {
+    e.stopPropagation();
+    deleteArchivedSession(sessionId);
+    removeMatchRecordsForSessions([sessionId]);
+  }
+
+  if (isConfirming) {
+    return (
+      <div className="flex items-center justify-end gap-1">
+        <button
+          onClick={handleConfirm}
+          aria-label="Confirm delete this session"
+          className="p-1.5 text-error hover:bg-error/10 rounded-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-error/40"
+        >
+          <Check size={13} strokeWidth={2.5} aria-hidden />
+        </button>
+        <button
+          ref={cancelRef}
+          onClick={(e) => {
+            e.stopPropagation();
+            setIsConfirming(false);
+          }}
+          aria-label="Cancel delete"
+          className="p-1.5 text-muted hover:text-ink hover:bg-surface-elevated rounded-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-border"
+        >
+          <X size={13} strokeWidth={2} aria-hidden />
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex justify-end">
+      <button
+        ref={triggerRef}
+        onClick={(e) => {
+          e.stopPropagation();
+          setIsConfirming(true);
+        }}
+        aria-label="Delete this archived session"
+        className="p-1.5 text-muted opacity-0 group-hover:opacity-100 [@media(hover:none)]:opacity-100 hover:text-error hover:bg-error/10 rounded-sm transition-colors focus-visible:outline-none focus-visible:opacity-100 focus-visible:ring-1 focus-visible:ring-error/40"
+      >
+        <Trash2 size={13} strokeWidth={2} aria-hidden />
+      </button>
+    </div>
+  );
+}
 
 interface SessionListRow {
   id: string;
@@ -56,6 +111,7 @@ function PaymentSummary({ paid, unpaid, waived }: { paid: number; unpaid: number
 }
 
 export function SessionsListView() {
+  const router = useRouter();
   const currentSession = useCurrentSession();
   const archive = useSessionArchive();
   const courts = useCourtsSnapshot();
@@ -111,8 +167,13 @@ export function SessionsListView() {
       {/* Title bar */}
       <div
         className={cn(
-          "sticky top-0 z-[var(--z-sticky)] bg-bg transition-shadow duration-200",
-          headerShadow && "shadow-[0_1px_0_var(--color-border),0_2px_8px_oklch(0_0_0/0.08)]"
+          "sticky top-0 z-[var(--z-sticky)] transition-colors duration-200",
+          // Dark mode reads elevation as surface lightness, not shadow color
+          // (a black shadow blur is nearly invisible on a near-black bg) —
+          // surface-elevated already IS this app's lighter-elevation step in
+          // dark mode, and a legible tint-darker step in light mode, so one
+          // token covers the "scrolled, lifted header" cue in both themes.
+          headerShadow ? "bg-surface-elevated shadow-[0_1px_0_var(--color-border)]" : "bg-bg"
         )}
       >
         <div className="flex items-center justify-between px-4 sm:px-6 h-14 border-b border-border">
@@ -128,26 +189,37 @@ export function SessionsListView() {
       {/* Table */}
       {rows.length > 0 ? (
         <table className="w-full border-collapse" role="grid" aria-label="Session history">
-          <thead className="sticky top-14 z-[var(--z-sticky)] bg-bg">
+          <thead className={cn("sticky top-14 z-[var(--z-sticky)] transition-colors duration-200", headerShadow ? "bg-surface-elevated" : "bg-bg")}>
             <tr className="border-b border-border">
-              <th className="text-left text-xs font-medium text-muted pl-4 sm:pl-6 pr-3 py-2.5 whitespace-nowrap">Date</th>
-              <th className="text-left text-xs font-medium text-muted px-3 py-2.5 whitespace-nowrap w-[84px]">Status</th>
-              <th className="hidden sm:table-cell text-right text-xs font-medium text-muted px-3 py-2.5 whitespace-nowrap w-[64px]">Players</th>
-              <th className="hidden md:table-cell text-right text-xs font-medium text-muted px-3 py-2.5 whitespace-nowrap w-[64px]">Matches</th>
-              <th className="hidden md:table-cell text-right text-xs font-medium text-muted px-3 py-2.5 whitespace-nowrap w-[64px]">Courts</th>
-              <th className="hidden lg:table-cell text-left text-xs font-medium text-muted pl-3 pr-4 sm:pr-6 py-2.5 whitespace-nowrap">Payments</th>
+              <th scope="col" className="text-left text-xs font-medium text-muted pl-4 sm:pl-6 pr-3 py-2.5 whitespace-nowrap">Date</th>
+              <th scope="col" className="text-left text-xs font-medium text-muted px-3 py-2.5 whitespace-nowrap w-[84px]">Status</th>
+              <th scope="col" className="hidden sm:table-cell text-right text-xs font-medium text-muted px-3 py-2.5 whitespace-nowrap w-[64px]">Players</th>
+              <th scope="col" className="hidden md:table-cell text-right text-xs font-medium text-muted px-3 py-2.5 whitespace-nowrap w-[64px]">Matches</th>
+              <th scope="col" className="hidden md:table-cell text-right text-xs font-medium text-muted px-3 py-2.5 whitespace-nowrap w-[64px]">Courts</th>
+              <th scope="col" className="hidden lg:table-cell text-left text-xs font-medium text-muted pl-3 pr-4 sm:pr-6 py-2.5 whitespace-nowrap">Payments</th>
+              <th scope="col" className="text-right text-xs font-medium text-muted pl-3 pr-4 sm:pr-6 py-2.5 whitespace-nowrap w-[52px]">
+                <span className="sr-only">Actions</span>
+              </th>
             </tr>
           </thead>
           <tbody>
             {rows.map((row) => (
-              <tr key={row.id} className="border-b border-border/50 transition-colors duration-100 hover:bg-surface-elevated/40">
+              <tr
+                key={row.id}
+                onClick={() => router.push(`/sessions/${row.id}`)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    router.push(`/sessions/${row.id}`);
+                  }
+                }}
+                tabIndex={0}
+                role="row"
+                aria-label={`${formatSessionDate(row.date)}, ${row.status === "OPEN" ? "open" : "closed"}`}
+                className="group border-b border-border/50 cursor-pointer transition-colors duration-100 hover:bg-surface-elevated/40 focus-visible:outline-none focus-visible:bg-surface-elevated/40"
+              >
                 <td className="pl-4 sm:pl-6 pr-3 py-3">
-                  <Link
-                    href={`/sessions/${row.id}`}
-                    className="text-sm font-medium text-ink hover:text-primary transition-colors focus-visible:outline-none focus-visible:underline"
-                  >
-                    {formatSessionDate(row.date)}
-                  </Link>
+                  <span className="text-sm font-medium text-ink">{formatSessionDate(row.date)}</span>
                 </td>
                 <td className="px-3 py-3">
                   <StatusBadge status={row.status === "OPEN" ? "open" : "closed"} />
@@ -163,6 +235,9 @@ export function SessionsListView() {
                 </td>
                 <td className="hidden lg:table-cell pl-3 pr-4 sm:pr-6 py-3">
                   <PaymentSummary paid={row.paid} unpaid={row.unpaid} waived={row.waived} />
+                </td>
+                <td className="pl-3 pr-4 sm:pr-6 py-3">
+                  {row.status === "CLOSED" && <DeleteArchivedSessionButton sessionId={row.id} />}
                 </td>
               </tr>
             ))}

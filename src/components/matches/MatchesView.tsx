@@ -1,15 +1,16 @@
 "use client";
 
 import { useState, useRef, useEffect, useMemo, useCallback } from "react";
-import { Search, X, Activity, Download, Check, ListChecks } from "lucide-react";
+import { Search, X, Activity, ListChecks } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useMatchLog, updateMatchRecord } from "@/lib/match-log-store";
-import { downloadMatchLogCsv } from "@/lib/export-matches";
+import { useSessionOptions } from "@/lib/session-store";
+import { SessionSelect } from "@/components/ui/SessionSelect";
+import { useToast, ToastViewport } from "@/components/ui/Toast";
 import type { MatchRecord, Player } from "@/types";
 
 type ResultFilter = "all" | "wins" | "losses" | "draws" | "voided";
 type BadgeVariant = "win" | "loss" | "draw" | "side_a" | "side_b" | "voided";
-type ToastPayload = { message: string; onUndo?: () => void };
 type MatchListItem =
   | { type: "match"; data: MatchRecord }
   | { type: "group-header"; label: string };
@@ -135,23 +136,14 @@ function passesResultFilter(
 
 export function MatchesView() {
   const matches = useMatchLog();
+  const { sessions, selectedSessionId, setSelectedSessionId } = useSessionOptions();
   const [search, setSearch] = useState("");
   const [resultFilter, setResultFilter] = useState<ResultFilter>("all");
   const [confirmingId, setConfirmingId] = useState<string | null>(null);
-  const [toast, setToast] = useState<ToastPayload | null>(null);
-  const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const { toast, showToast, dismissAndUndo } = useToast();
   const [selectMode, setSelectMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [batchConfirming, setBatchConfirming] = useState(false);
-
-  // Matches the Dashboard's own toast timing/urgency convention (DashboardClient.tsx)
-  // for this identical void-with-undo action — previously diverged (3000ms/polite
-  // here vs. 5000ms/assertive there) despite writing through the same store.
-  const showToast = useCallback((message: string, onUndo?: () => void) => {
-    if (toastTimer.current) clearTimeout(toastTimer.current);
-    setToast({ message, onUndo });
-    toastTimer.current = setTimeout(() => setToast(null), onUndo ? 5000 : 2500);
-  }, []);
 
   // Voiding is a real soft-delete, not toast-window-only: a voided row keeps a
   // persistent "Restore" action indefinitely, not just during the undo toast.
@@ -171,14 +163,10 @@ export function MatchesView() {
       const match = matches.find((m) => m.id === id);
       updateMatchRecord(id, { status: "VOIDED", result: null, previousResult: match?.result ?? null });
       setConfirmingId(null);
-      showToast("Match voided", () => handleRestore(id));
+      showToast("Match voided", () => handleRestore(id), "Undo void");
     },
     [matches, showToast, handleRestore]
   );
-
-  const handleExport = useCallback(() => {
-    downloadMatchLogCsv(matches);
-  }, [matches]);
 
   // A match can only be selected while it's COMPLETED (voiding an already-voided
   // match makes no sense). Prune stale ids if a selected match is restored,
@@ -215,9 +203,13 @@ export function MatchesView() {
       updateMatchRecord(id, { status: "VOIDED", result: null, previousResult: match.result });
     }
     exitSelectMode();
-    showToast(`Voided ${ids.length} match${ids.length !== 1 ? "es" : ""}`, () => {
-      for (const id of ids) handleRestore(id);
-    });
+    showToast(
+      `Voided ${ids.length} match${ids.length !== 1 ? "es" : ""}`,
+      () => {
+        for (const id of ids) handleRestore(id);
+      },
+      "Undo batch void"
+    );
   }, [selectedIds, matches, exitSelectMode, showToast, handleRestore]);
 
   // Escape steps back one level: confirm → selecting → default, matching the
@@ -233,8 +225,13 @@ export function MatchesView() {
     return () => window.removeEventListener("keydown", handleKey);
   }, [selectMode, batchConfirming, exitSelectMode]);
 
+  const sessionMatches = useMemo(
+    () => matches.filter((m) => m.sessionId === selectedSessionId),
+    [matches, selectedSessionId]
+  );
+
   const filteredMatches = useMemo(() => {
-    return matches.filter((match) => {
+    return sessionMatches.filter((match) => {
       if (search.trim()) {
         const q = search.toLowerCase();
         const hasPlayer = [...match.sideA, ...match.sideB].some((p) =>
@@ -245,7 +242,7 @@ export function MatchesView() {
       const matchedPlayer = getMatchedPlayer(match, search);
       return passesResultFilter(match, resultFilter, matchedPlayer);
     });
-  }, [matches, search, resultFilter]);
+  }, [sessionMatches, search, resultFilter]);
 
   const visibleSelectableCount = useMemo(
     () => filteredMatches.filter((m) => m.status === "COMPLETED").length,
@@ -284,6 +281,20 @@ export function MatchesView() {
     setResultFilter("all");
   };
 
+  if (sessions.length === 0) {
+    return (
+      <div className="flex flex-col min-h-full">
+        <div className="flex items-center px-4 sm:px-6 h-14 border-b border-border">
+          <h1 className="text-lg font-semibold text-ink">Matches</h1>
+        </div>
+        <div className="flex flex-col items-center justify-center py-24 px-4 text-center">
+          <p className="text-sm text-muted">No sessions yet</p>
+          <p className="text-xs text-muted mt-1">Start your first session from the Dashboard.</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className={cn("flex flex-col min-h-full", selectMode && "pb-20")}>
       {/* Sticky header + filter bar */}
@@ -291,11 +302,14 @@ export function MatchesView() {
         {/* Title bar */}
         <div className="flex items-center gap-2.5 px-4 sm:px-6 h-14 border-b border-border">
           <h1 className="text-lg font-semibold text-ink">Matches</h1>
-          <span className="font-mono text-xs text-muted tabular-nums">
+          {/* Hidden on mobile — SessionSelect joining this row on the right
+              left no room for it at 375px; the filtered list itself already
+              communicates count there. */}
+          <span className="hidden sm:inline font-mono text-xs text-muted tabular-nums">
             (
-            {filteredMatches.length !== matches.length
-              ? `${filteredMatches.length} of ${matches.length}`
-              : matches.length}
+            {filteredMatches.length !== sessionMatches.length
+              ? `${filteredMatches.length} of ${sessionMatches.length}`
+              : sessionMatches.length}
             )
           </span>
           <span className="hidden sm:inline text-xs text-muted">
@@ -305,30 +319,26 @@ export function MatchesView() {
             {!selectMode && (
               <button
                 onClick={() => setSelectMode(true)}
-                disabled={matches.length === 0}
+                disabled={sessionMatches.length === 0}
                 className="flex items-center gap-1.5 text-xs text-muted hover:text-ink hover:bg-surface-elevated transition-colors px-2.5 py-1.5 rounded-md border border-border/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-border disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:text-muted disabled:hover:bg-transparent min-h-[36px]"
                 aria-label="Select multiple matches to void at once"
               >
                 <ListChecks size={13} strokeWidth={2} aria-hidden />
-                Select
+                {/* Text label hidden on mobile — the icon + aria-label carry
+                    the meaning, and the space is needed for SessionSelect. */}
+                <span className="hidden sm:inline">Select</span>
               </button>
             )}
-            <button
-              onClick={handleExport}
-              disabled={matches.length === 0}
-              title={matches.length === 0 ? "No matches to export yet" : undefined}
-              className="flex items-center gap-1.5 text-xs text-muted hover:text-ink hover:bg-surface-elevated transition-colors px-2.5 py-1.5 rounded-md border border-border/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-border disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:text-muted disabled:hover:bg-transparent min-h-[36px]"
-              aria-label="Export match log as a spreadsheet"
-            >
-              <Download size={13} strokeWidth={2} aria-hidden />
-              Export
-            </button>
+            <SessionSelect sessions={sessions} value={selectedSessionId} onChange={setSelectedSessionId} />
           </div>
         </div>
 
         {/* Mobile-only local-storage transparency line — shown inline in the title
             bar at sm+, but that's hidden on phones, which is exactly the device
-            class this app targets first courtside. */}
+            class this app targets first courtside. Deliberately the global
+            total, not session-scoped — "how much is stored" is a different
+            question than "what am I looking at right now" (the count badge
+            above already answers that one). */}
         <p className="sm:hidden px-4 pt-2 pb-1.5 text-xs text-muted border-b border-border">
           {matches.length} match{matches.length !== 1 ? "es" : ""} recorded locally
         </p>
@@ -348,13 +358,13 @@ export function MatchesView() {
               placeholder="Search by player…"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="w-full bg-surface border border-border rounded-md pl-7 pr-7 py-1.5 text-sm text-ink placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary/40 transition-colors duration-150 h-8"
+              className="w-full bg-surface border border-border rounded-md pl-7 pr-8 py-1.5 text-sm text-ink placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary/40 transition-colors duration-150 h-10"
               aria-label="Search by player name"
             />
             {search && (
               <button
                 onClick={() => setSearch("")}
-                className="absolute right-2 top-1/2 -translate-y-1/2 text-muted hover:text-ink transition-colors focus-visible:outline-none rounded"
+                className="absolute right-1 top-1/2 -translate-y-1/2 p-2 flex items-center justify-center text-muted hover:text-ink transition-colors focus-visible:outline-none rounded"
                 aria-label="Clear search"
               >
                 <X size={12} strokeWidth={2.5} aria-hidden />
@@ -376,7 +386,7 @@ export function MatchesView() {
                   onClick={() => setResultFilter(key)}
                   aria-pressed={active}
                   className={cn(
-                    "h-7 px-2.5 flex items-center rounded-md text-xs font-medium flex-shrink-0",
+                    "h-9 px-2.5 flex items-center rounded-md text-xs font-medium flex-shrink-0",
                     "transition-all duration-150",
                     "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50",
                     active
@@ -511,37 +521,7 @@ export function MatchesView() {
         </div>
       )}
 
-      {/* Toast — matches DashboardClient's chrome/urgency for the identical action */}
-      {toast && (
-        <div
-          role={toast.onUndo ? "alert" : "status"}
-          aria-live={toast.onUndo ? "assertive" : "polite"}
-          className={cn(
-            "fixed bottom-[76px] md:bottom-6 left-1/2 -translate-x-1/2 flex items-center gap-2 bg-surface-elevated border border-border text-ink text-xs font-medium px-4 py-2.5 rounded-full shadow-lg z-[var(--z-toast)] animate-toast whitespace-nowrap",
-            toast.onUndo ? "pointer-events-auto" : "pointer-events-none"
-          )}
-        >
-          <Check size={12} strokeWidth={2.5} className="text-success flex-shrink-0" aria-hidden />
-          {toast.message}
-          {toast.onUndo && (
-            <>
-              <span className="w-px h-3 bg-border mx-0.5 flex-shrink-0" aria-hidden />
-              <button
-                onClick={() => {
-                  if (toastTimer.current) clearTimeout(toastTimer.current);
-                  const undo = toast.onUndo;
-                  setToast(null);
-                  undo?.();
-                }}
-                className="text-primary hover:text-primary-hover font-semibold transition-colors focus-visible:outline-none focus-visible:underline"
-                aria-label="Undo void"
-              >
-                Undo
-              </button>
-            </>
-          )}
-        </div>
-      )}
+      <ToastViewport toast={toast} onDismissAndUndo={dismissAndUndo} />
     </div>
   );
 }

@@ -19,10 +19,10 @@ export interface LeaderboardRow {
 }
 
 // Only COMPLETED matches count — voided matches are excluded from every
-// calculation here, per docs/PRD.md's leaderboard acceptance criteria. There's
-// no date-range filter: this app has no real Session entity yet (everything
-// is one continuous local match log — see docs/ARCHITECTURE.md), so the whole
-// log already IS "this session" until real multi-session support exists.
+// calculation here, per docs/PRD.md's leaderboard acceptance criteria. This
+// function itself is session-agnostic; both the /leaderboard page and the
+// per-session Excel export (export-session.ts) pre-filter `matches` to one
+// session before calling it, rather than this function knowing about sessions.
 export function computeLeaderboard(
   matches: MatchRecord[],
   options: { matchType: MatchTypeFilter; sort: LeaderboardSort }

@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useEffect } from "react";
 import { formatElapsedMs, cn } from "@/lib/utils";
+import { useTick } from "@/hooks/useTick";
 
 // Past this duration, whatever this timer represents (a match running long, a
 // player waiting a long time) is worth an organizer's attention during a fast scan.
@@ -18,14 +18,8 @@ export function ElapsedTimer({
   // contexts (e.g. queue waiting time) so screen readers get accurate text.
   ariaLabel?: (elapsed: string, isLong: boolean) => string;
 }) {
-  const [elapsedMs, setElapsedMs] = useState(() => Date.now() - new Date(startedAtISO).getTime());
-
-  useEffect(() => {
-    const id = setInterval(() => {
-      setElapsedMs(Date.now() - new Date(startedAtISO).getTime());
-    }, 1000);
-    return () => clearInterval(id);
-  }, [startedAtISO]);
+  const now = useTick();
+  const elapsedMs = now - new Date(startedAtISO).getTime();
 
   const isLong = elapsedMs >= ATTENTION_THRESHOLD_MS;
   const elapsed = formatElapsedMs(elapsedMs);

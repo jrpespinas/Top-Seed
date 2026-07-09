@@ -30,6 +30,7 @@ interface Props {
   onPlayerDragStart: (playerId: string) => void;
   onPlayerDragEnd: () => void;
   onAddPlayers: (players: NewPlayerInput[]) => void;
+  existingPlayerNames: Set<string>;
   selectedPlayerId?: string | null;
   onSelectPlayer: (player: Player) => void;
 }
@@ -166,18 +167,18 @@ function PlayerRow({
                 animate={{ opacity: 1, x: 0 }}
                 exit={{ opacity: 0, x: 6 }}
                 transition={{ duration: 0.12, ease: EASE }}
-                className="flex items-center gap-0"
+                className="flex items-center gap-1"
               >
                 <button
                   onClick={(e) => { e.stopPropagation(); onRemove?.(); setConfirmRemove(false); }}
-                  className="p-1.5 text-error hover:bg-error/10 active:bg-error/15 rounded-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-error/40"
+                  className="p-3 text-error hover:bg-error/10 active:bg-error/15 rounded-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-error/40"
                   aria-label={`Confirm remove ${firstName}`}
                 >
                   <Check size={11} strokeWidth={2.5} aria-hidden />
                 </button>
                 <button
                   onClick={(e) => { e.stopPropagation(); setConfirmRemove(false); }}
-                  className="p-1.5 text-muted hover:text-ink hover:bg-surface-elevated active:text-ink active:bg-surface-elevated rounded-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-border"
+                  className="p-3 text-muted hover:text-ink hover:bg-surface-elevated active:text-ink active:bg-surface-elevated rounded-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-border"
                   aria-label="Cancel"
                 >
                   <X size={11} strokeWidth={2} aria-hidden />
@@ -190,12 +191,12 @@ function PlayerRow({
                 animate={{ opacity: 1, x: 0 }}
                 exit={{ opacity: 0, x: -6 }}
                 transition={{ duration: 0.12, ease: EASE }}
-                className="flex items-center gap-0 opacity-0 group-hover:opacity-100 [@media(hover:none)]:opacity-100 transition-opacity"
+                className="flex items-center gap-1 opacity-0 group-hover:opacity-100 [@media(hover:none)]:opacity-100 transition-opacity"
               >
                 {onMoveToBench && (
                   <button
                     onClick={(e) => { e.stopPropagation(); onMoveToBench(); }}
-                    className="p-1.5 text-muted hover:text-ink hover:bg-surface-elevated rounded-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-border"
+                    className="p-3 text-muted hover:text-ink hover:bg-surface-elevated rounded-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-border"
                     aria-label={`Move ${firstName} to bench`}
                   >
                     <PauseCircle size={11} strokeWidth={2} aria-hidden />
@@ -204,7 +205,7 @@ function PlayerRow({
                 {onReturnToQueue && (
                   <button
                     onClick={(e) => { e.stopPropagation(); onReturnToQueue(); }}
-                    className="p-1.5 text-muted hover:text-ink hover:bg-surface-elevated rounded-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-border"
+                    className="p-3 text-muted hover:text-ink hover:bg-surface-elevated rounded-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-border"
                     aria-label={`Return ${firstName} to queue`}
                   >
                     <PlayCircle size={11} strokeWidth={2} aria-hidden />
@@ -213,7 +214,7 @@ function PlayerRow({
                 {onRemove && (
                   <button
                     onClick={(e) => { e.stopPropagation(); setConfirmRemove(true); }}
-                    className="p-1.5 text-muted hover:text-error hover:bg-error/10 active:text-error active:bg-error/10 rounded-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-error/40"
+                    className="p-3 text-muted hover:text-error hover:bg-error/10 active:text-error active:bg-error/10 rounded-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-error/40"
                     aria-label={`Remove ${firstName}`}
                   >
                     <X size={11} strokeWidth={2} aria-hidden />
@@ -240,6 +241,7 @@ export function PlayerPoolColumn({
   onPlayerDragStart,
   onPlayerDragEnd,
   onAddPlayers,
+  existingPlayerNames,
   selectedPlayerId,
   onSelectPlayer,
 }: Props) {
@@ -365,6 +367,7 @@ export function PlayerPoolColumn({
         isOpen={isAddModalOpen}
         onClose={() => setIsAddModalOpen(false)}
         onSubmit={onAddPlayers}
+        existingPlayerNames={existingPlayerNames}
       />
     </MotionConfig>
   );

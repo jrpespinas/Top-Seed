@@ -12,9 +12,11 @@ interface GenderToggleProps {
   onChange: (gender: Gender | undefined) => void;
   variant?: "compact" | "full";
   className?: string;
+  /** Draws an error outline on the unselected pills — for callers where gender is required. */
+  error?: boolean;
 }
 
-export function GenderToggle({ value, onChange, variant = "full", className }: GenderToggleProps) {
+export function GenderToggle({ value, onChange, variant = "full", className, error }: GenderToggleProps) {
   return (
     <div
       className={cn(
@@ -23,6 +25,8 @@ export function GenderToggle({ value, onChange, variant = "full", className }: G
       )}
       role="radiogroup"
       aria-label="Gender"
+      aria-required={error ? true : undefined}
+      aria-invalid={error ? true : undefined}
     >
       {GENDERS.map((g) => (
         <button
@@ -37,6 +41,8 @@ export function GenderToggle({ value, onChange, variant = "full", className }: G
             variant === "compact" ? "h-9 w-9 text-sm" : "h-10 text-sm",
             value === g
               ? "bg-surface-elevated text-ink border border-border ring-1 ring-primary/50"
+              : error
+              ? "bg-surface-elevated text-muted hover:text-ink border border-error/50 ring-1 ring-error/30"
               : "bg-surface-elevated text-muted hover:text-ink border border-transparent"
           )}
         >

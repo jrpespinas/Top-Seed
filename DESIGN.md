@@ -91,6 +91,10 @@ components:
     rounded: "{rounded.pill}"
     padding: "2px 8px"
     typography: "{typography.label}"
+  payment-toggle:
+    rounded: "{rounded.sm}"
+    padding: "2px"
+    typography: "{typography.label}"
 ---
 
 # Design System: Top Seed
@@ -104,6 +108,8 @@ Top Seed is a professional operations tool — the kind an experienced tournamen
 The typographic system does the heavy lifting. Bold geometric headings (Space Grotesk) for player names, session titles, and labels; monospace (JetBrains Mono) for every number that matters — queue positions, win rates, match counts, payment amounts. Data is data. It gets its own voice. The brand color (a warm copper-coral, `oklch(0.71 0.17 38)`) is used sparingly: primary actions, active states, the moment when a match begins. Its rarity is the point. Everything else is ink on near-black.
 
 This is not a friendly app. It does not use soft card shadows, grid layouts with identical tiles, or welcoming illustrations. It is a precision tool for someone running a competitive session where speed and clarity matter more than aesthetics. The premium feel comes from restraint, precision, and zero visual noise.
+
+The surface has grown since this system was first documented — Sessions (list + detail, with an Excel export), Settings (a Danger Zone for data resets), and manual Payment tracking are now real, shipped pages, not just the Dashboard/Players/Matches/Leaderboard core. None of them earned a register change: same dark canvas, same restraint, same two-step confirm for anything destructive.
 
 **Key Characteristics:**
 - Near-pure black background; warmth lives in the brand copper only, never in the surface
@@ -172,6 +178,8 @@ Interactive states use two elevation signals: `bg-surface-elevated` for hover (t
 
 **The Tonal Stack Rule.** Depth is expressed through the three-step neutral ramp: bg → surface → surface-elevated. A component that sits on `surface` uses `surface-elevated` for its hover state, and `bg` for its bottom border/divider. The stack always goes bg → surface → surface-elevated, never in reverse.
 
+Sticky headers use the same rule for a second trigger: scroll position, not just hover. A sticky title bar sitting at `bg` switches to `bg-surface-elevated` once the page has scrolled past it, paired with a plain `0 1px 0 var(--color-border)` line — never a black-tinted blur shadow. A blurred black shadow is nearly invisible against the near-black default theme; lightness is this system's only valid depth signal, in both themes. (This replaced an earlier interim fix that tried to fix the shadow's color instead of abandoning shadow-for-depth in dark mode — the color-based fix was the wrong instinct, corrected during the session-page audit.)
+
 ## 5. Components
 
 Precision tools for the organizer who is standing, glancing, and acting. Every component has complete states: default, hover, focus-visible, active, disabled. Tap targets are minimum 44×44px — courtside use demands it.
@@ -186,7 +194,13 @@ Three variants, one shared radius (8px / `rounded-md`). All use 150ms ease-out t
 
 - **Destructive**: `bg-error/15 text-error hover:bg-error/25`, radius `rounded-sm` (4px) to visually differentiate from primary. Always inline-confirmed with a two-step cross-fade pattern (see Inline Confirm).
 
-**The Two-Step Confirm Pattern.** Destructive actions (Remove, Void, Delete) use an inline cross-fade: the action button cross-fades into a confirmation row (Confirm / Cancel) at the same row height without opening a modal. Animated via `AnimatePresence mode="wait"` with 120ms opacity + translate transitions. No modal, no navigation interruption.
+**The Two-Step Confirm Pattern.** Destructive actions (Remove, Void, Delete, Close Session, Reset Data) use an inline cross-fade: the action button cross-fades into a confirmation row (Confirm / Cancel) at the same row height without opening a modal. Animated via `AnimatePresence mode="wait"` with 120ms opacity + translate transitions. No modal, no navigation interruption.
+
+Every instance of this pattern also moves keyboard focus explicitly on each transition — to Cancel when the confirm row appears, back to the original trigger button when it's dismissed (a `useRef` pair + a "was this confirming last render" ref, not React state, since the swap unmounts the focused element and drops focus to `<body>` otherwise). A confirm row a keyboard user can't immediately act on without re-tabbing from the page top is a broken instance of this pattern, not an acceptable variant.
+
+Extracted to `useConfirmFocus(isConfirming, swapped?)` in `src/hooks/useConfirmFocus.ts` for the four sites whose confirm row always returns to one fixed trigger button (SessionHeader, PlayerDrawer, AddPlayersModal, SettingsView's DangerAction — the last passes `isConfirming || justDone` as the `swapped` override, since its transient "Done" state also counts as "away from idle"). MatchesView's Void/Restore confirm keeps its own bespoke ref handling rather than using the hook — its return target depends on `match.status`, not a single fixed button, a genuinely different shape than the other four share.
+
+**The Ring-Not-Underline Rule.** Every focusable interactive element gets `focus-visible:ring-2` (color depends on context — `ring-primary/50` for primary actions, `ring-border` for neutral ones, `ring-error/40` for destructive). This includes bare inline-text actions (e.g. "Undo" inside a toast) that have no natural padding for a ring to sit in — give them `rounded-sm px-1 -mx-1` (padding counteracted by an equal negative margin) so the ring has room without shifting the surrounding text's position. Underline-only focus indicators are not a valid secondary convention in this system, even for dense inline contexts.
 
 ### Skill Badge
 
@@ -216,6 +230,12 @@ Pill-shaped (`rounded-pill`, `px-2 py-0.5`) in Label type (Space Grotesk 500, 12
 | unpaid | `warning/15` | `warning` |
 
 Text inside StatusBadge uses `tabular-nums` to prevent layout shift when badge labels of different widths appear in the same column.
+
+### Payment Toggle
+
+A three-segment inline control for the manual payment ledger (Paid / Unpaid / Waived) — appears on the Players table and the Sessions detail table. One tap sets the exact state directly; it never cycles through unwanted states first. Container: `rounded-sm` (4px), `bg-bg`, `border border-border/60`, 2px internal padding. Each segment is content-sized (not a fixed square) so full words fit without truncation.
+
+Active-state colors are semantic, not decorative: Paid uses `success/15` background + `success` text (the same pairing as StatusBadge's paid variant); Waived uses `primary/12` + `primary` (a deliberate, distinct third color so it's never mistaken for "still owing"); Unpaid uses a neutral `surface-elevated` + `ink` fill — it's the default state every player starts in, so it stays quiet rather than reading as an alarm. Inactive segments are bare `text-muted`, no background, until hovered.
 
 ### Navigation
 
@@ -272,7 +292,19 @@ The atomic list item in the PlayerPoolColumn — used for both queue entries and
 
 **Remove confirm**: `×` click enters confirm mode via `AnimatePresence mode="wait"` cross-fade to Check + `×` pair. Check executes removal; `×` cancels. Duration 120ms. This prevents accidental removal without adding a modal.
 
-**"Playing" state**: Players currently in an active match are hidden from the queue list entirely (filtered server-side). A "Playing" informational badge exists for legacy contexts (`text-muted bg-surface-elevated`, not the accent color — it's a status-of-fact, not an action).
+**"Playing" state**: Players currently in an active match are hidden from the queue list entirely — court/match state is client-side only and not yet a shared store other pages (Players, Sessions) can read, so an in-match player simply isn't visible anywhere off the Dashboard until they return to the queue. Not a deliberate filter; a known gap (see `docs/specs/08-sessions.md`). A "Playing" informational badge exists for legacy contexts (`text-muted bg-surface-elevated`, not the accent color — it's a status-of-fact, not an action).
+
+### Session Row
+
+The navigable table row on `/sessions` — a different interaction model from Player Row (no drag, no hover-reveal controls): the entire `<tr>` is the click/keyboard target (`onClick`, `tabIndex={0}`, `role="row"`, `onKeyDown` for Enter/Space), not an inline link inside one cell. Hover and focus share one treatment (`bg-surface-elevated/40`) so the affordance matches what's actually clickable — a row that only responds to a link buried inside it, while the whole row visually hovers, is the wrong version of this component. Every session-history table (list and detail) also sets `scope="col"` on every header cell; this is non-negotiable baseline semantics, not a nice-to-have.
+
+### Toast / Undo Notification
+
+A rounded-full pill (`rounded-full`, `bg-surface-elevated border border-border`, `px-4 py-2.5`, `shadow-lg`) fixed to the bottom center of the viewport, above the mobile bottom bar. Every reversible action across the app (queue removal, court assignment, card changes, player removal) confirms through this one shape — never a separate toast design per feature.
+
+Leads with a `success`-colored Check icon (12px), then the message in `text-ink text-xs font-medium`, then — only when the action has an undo — a `border-border` divider (`w-px h-3`) and an "Undo" text-action in `text-primary font-semibold`. Two timing/ARIA modes: with `onUndo`, 5000ms and `role="alert" aria-live="assertive"`; without it, 2500ms and `role="status" aria-live="polite"`. The longer timeout for undoable actions is deliberate — it's the difference between "FYI" and "you might want to act on this."
+
+Extracted to `useToast()` + `<ToastViewport />` in `src/components/ui/Toast.tsx`, migrated onto every one of its three previously-independent implementations (Dashboard, Matches, Players). `showToast(message, onUndo?, undoLabel?)` — the third argument is a per-call `aria-label` for the Undo button (e.g. "Undo court assignment"), since the visible text is always just "Undo" but what's actually being undone varies by call site.
 
 ## 6. Do's and Don'ts
 
@@ -286,6 +318,10 @@ The atomic list item in the PlayerPoolColumn — used for both queue entries and
 - **Do** respect `prefers-reduced-motion`: the global CSS rule (`animation-duration: 0.01ms`, `transition-duration: 0.01ms`) handles this system-wide.
 - **Do** use the two-step inline confirm pattern for all destructive actions. No modals for deletions — the confirm replaces the action in the same row at the same height.
 - **Do** keep court picker and other contextual action pickers spatially anchored to the element that triggered them. Never render pickers in a column footer detached from the triggering card.
+- **Do** move focus explicitly on every confirm-swap transition (to Cancel on entry, back to the trigger on exit). A ref pair, not React state — the swap unmounts the focused element.
+- **Do** give every focusable element a `focus-visible:ring-2`, including bare inline-text actions — add `rounded-sm px-1 -mx-1` if there's no natural padding for the ring to sit in.
+- **Do** use `bg-surface-elevated` (lightness, not shadow blur) as the depth signal for anything that needs to read as "lifted" in dark mode — hover, scroll position, or otherwise.
+- **Do** set `scope="col"` on every `<th>` in every data table, no exceptions.
 
 ### Don't:
 - **Don't** use generic SaaS blue-and-white palettes (`#0052CC` primary buttons, white card surfaces, enterprise-software visual language). Top Seed is a precision sports tool, not a Jira clone.
@@ -300,3 +336,6 @@ The atomic list item in the PlayerPoolColumn — used for both queue entries and
 - **Don't** ship placeholder chrome. Disabled buttons for unbuilt features ("coming soon" tooltips) erode organizer trust. If a feature isn't built, the button doesn't exist yet.
 - **Don't** use the centered icon-in-circle + heading + CTA empty state template. It's the most common AI-generated empty state. Use a single plain text line + minimal CTA instead.
 - **Don't** use the accent color (Steel Slate) for status-of-fact badges like "Playing." Reserve accent for interactive signals (in-progress matches, navigational highlights). Informational-only states use `text-muted bg-surface-elevated`.
+- **Don't** use `focus-visible:underline` as a substitute for a ring, even on dense inline text inside a toast or pill. It's a deprecated pattern in this system, not a legitimate secondary convention — every instance of it has been migrated to a padded ring.
+- **Don't** "fix" a dark-mode shadow by tinting its color instead of dropping it. If a shadow is invisible against `oklch(0.09 0 0)`, the answer is `bg-surface-elevated`, never a lighter-colored shadow.
+- **Don't** make a table row look hoverable everywhere but only respond to a link buried in one cell. If the row highlights on hover, the whole row is the click target.

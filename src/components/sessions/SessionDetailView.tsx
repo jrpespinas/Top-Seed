@@ -2,7 +2,7 @@
 
 import { useMemo } from "react";
 import Link from "next/link";
-import { ArrowLeft, CalendarDays } from "lucide-react";
+import { ArrowLeft, CalendarDays, Download } from "lucide-react";
 import { SkillBadge } from "@/components/ui/SkillBadge";
 import { GenderIcon } from "@/components/ui/GenderIcon";
 import { StatusBadge } from "@/components/ui/StatusBadge";
@@ -64,6 +64,14 @@ export function SessionDetailView({ sessionId }: { sessionId: string }) {
     };
   }, [currentSession, archive, sessionId, courts, queue, bench, matches]);
 
+  // The match log is never purged on session close (see docs/specs/08-sessions.md),
+  // so filtering by sessionId works identically whether this session is open or
+  // closed — no need to branch like `summary` above does.
+  const sessionMatches = useMemo(
+    () => matches.filter((m) => m.sessionId === sessionId),
+    [matches, sessionId]
+  );
+
   if (!summary) {
     return (
       <div className="flex flex-col min-h-full">
@@ -93,8 +101,22 @@ export function SessionDetailView({ sessionId }: { sessionId: string }) {
       <div className="px-4 sm:px-6 py-4 border-b border-border flex flex-col gap-2">
         <div className="flex items-center gap-2.5 flex-wrap">
           <CalendarDays size={14} strokeWidth={2} className="text-muted flex-shrink-0" aria-hidden />
-          <h1 className="text-base font-semibold text-ink">{formatSessionDate(summary.date)}</h1>
+          <h1 className="text-base font-semibold text-ink flex-1">{formatSessionDate(summary.date)}</h1>
           <StatusBadge status={summary.status === "OPEN" ? "open" : "closed"} />
+          <button
+            onClick={async () => {
+              // Dynamically imported: xlsx is a large library that should only
+              // ever load when someone actually clicks Export, not on every
+              // view of this page (courtside, tablet — see PRD "Speed over
+              // completeness").
+              const { downloadSessionWorkbook } = await import("@/lib/export-session");
+              downloadSessionWorkbook(summary.date, sessionMatches, summary.players);
+            }}
+            className="flex items-center gap-1.5 text-xs text-muted hover:text-ink hover:bg-surface-elevated transition-colors px-2.5 py-1.5 rounded-md border border-border/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-border"
+          >
+            <Download size={12} strokeWidth={2} aria-hidden />
+            Export to Excel
+          </button>
         </div>
         <p className="text-xs text-muted">
           <span className="font-mono tabular-nums">{summary.players.length}</span> players
@@ -120,10 +142,10 @@ export function SessionDetailView({ sessionId }: { sessionId: string }) {
         <table className="w-full border-collapse" role="grid" aria-label="Session players">
           <thead className="bg-bg">
             <tr className="border-b border-border">
-              <th className="text-left text-xs font-medium text-muted pl-4 sm:pl-6 pr-3 py-2.5 whitespace-nowrap">Name</th>
-              <th className="text-left text-xs font-medium text-muted px-3 py-2.5 whitespace-nowrap w-[100px]">Skill</th>
-              <th className="hidden sm:table-cell text-left text-xs font-medium text-muted px-3 py-2.5 whitespace-nowrap w-[56px]">Gender</th>
-              <th className="text-left text-xs font-medium text-muted pl-3 pr-4 sm:pr-6 py-2.5 whitespace-nowrap w-[92px]">Payment</th>
+              <th scope="col" className="text-left text-xs font-medium text-muted pl-4 sm:pl-6 pr-3 py-2.5 whitespace-nowrap">Name</th>
+              <th scope="col" className="text-left text-xs font-medium text-muted px-3 py-2.5 whitespace-nowrap w-[100px]">Skill</th>
+              <th scope="col" className="hidden sm:table-cell text-left text-xs font-medium text-muted px-3 py-2.5 whitespace-nowrap w-[56px]">Gender</th>
+              <th scope="col" className="text-left text-xs font-medium text-muted pl-3 pr-4 sm:pr-6 py-2.5 whitespace-nowrap w-[92px]">Payment</th>
             </tr>
           </thead>
           <tbody>
@@ -133,7 +155,7 @@ export function SessionDetailView({ sessionId }: { sessionId: string }) {
                   <span className="text-sm font-medium text-ink truncate">{player.name}</span>
                 </td>
                 <td className="px-3 py-3">
-                  <SkillBadge level={player.skillLevel} />
+                  <SkillBadge level={player.skillLevel} compact />
                 </td>
                 <td className="hidden sm:table-cell px-3 py-3">
                   {player.gender ? (

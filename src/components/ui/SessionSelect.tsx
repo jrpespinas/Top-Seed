@@ -2,37 +2,39 @@
 
 import { useState, useEffect, useRef, useId } from "react";
 import { createPortal } from "react-dom";
-import { ChevronDown, Check } from "lucide-react";
-import { cn, SKILL_LABELS } from "@/lib/utils";
-import { SkillBadge } from "./SkillBadge";
-import type { SkillLevel } from "@/types";
+import { ChevronDown, Check, CalendarDays } from "lucide-react";
+import { cn, formatSessionDate } from "@/lib/utils";
+import { StatusBadge } from "@/components/ui/StatusBadge";
+import type { SessionOption } from "@/lib/session-store";
 
-const SKILL_LEVELS: SkillLevel[] = ["S", "A", "B", "C", "D", "E", "F"];
-
-export function SkillLevelSelect({
+// Portal-rendered combobox mirroring SkillLevelSelect.tsx's pattern (fixed
+// positioning escapes a sticky header's stacking context, full keyboard nav).
+// Shared by Leaderboard and Matches — both scope their data to one session
+// via useSessionOptions() and hand its result straight to this component.
+export function SessionSelect({
+  sessions,
   value,
   onChange,
-  className,
 }: {
-  value: SkillLevel;
-  onChange: (level: SkillLevel) => void;
-  className?: string;
+  sessions: SessionOption[];
+  value: string | null;
+  onChange: (id: string) => void;
 }) {
   const [isOpen, setIsOpen] = useState(false);
-  const [highlighted, setHighlighted] = useState<SkillLevel>(value);
+  const [highlighted, setHighlighted] = useState<string | null>(value);
   const [position, setPosition] = useState({ top: 0, left: 0, width: 0 });
   const triggerRef = useRef<HTMLButtonElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
   const listboxId = useId();
 
+  const selected = sessions.find((s) => s.id === value) ?? null;
+
   const open = () => {
     const rect = triggerRef.current?.getBoundingClientRect();
     if (rect) {
-      // Clamp so a left-anchored panel can't run past the viewport's right
-      // edge — this trigger doesn't sit at the screen edge today, but
-      // SessionSelect's identical positioning logic just demonstrated this
-      // exact clipping bug once its trigger moved there, so fixing it here
-      // too rather than waiting for the same report on this component.
+      // This trigger now lives in the header's upper-right corner, so a
+      // strictly left-anchored panel regularly runs past the viewport's
+      // right edge. Clamp so the panel's right edge stays on-screen instead.
       const panelWidth = Math.max(rect.width, 220);
       const maxLeft = window.innerWidth - panelWidth - 8;
       const left = Math.min(rect.left, Math.max(maxLeft, 8));
@@ -44,8 +46,8 @@ export function SkillLevelSelect({
 
   const close = () => setIsOpen(false);
 
-  const select = (level: SkillLevel) => {
-    onChange(level);
+  const select = (id: string) => {
+    onChange(id);
     close();
     triggerRef.current?.focus();
   };
@@ -79,16 +81,16 @@ export function SkillLevelSelect({
       }
       return;
     }
-    const idx = SKILL_LEVELS.indexOf(highlighted);
+    const idx = sessions.findIndex((s) => s.id === highlighted);
     if (e.key === "ArrowDown") {
       e.preventDefault();
-      setHighlighted(SKILL_LEVELS[Math.min(idx + 1, SKILL_LEVELS.length - 1)]);
+      setHighlighted(sessions[Math.min(idx + 1, sessions.length - 1)]?.id ?? highlighted);
     } else if (e.key === "ArrowUp") {
       e.preventDefault();
-      setHighlighted(SKILL_LEVELS[Math.max(idx - 1, 0)]);
+      setHighlighted(sessions[Math.max(idx - 1, 0)]?.id ?? highlighted);
     } else if (e.key === "Enter" || e.key === " ") {
       e.preventDefault();
-      select(highlighted);
+      if (highlighted) select(highlighted);
     } else if (e.key === "Escape") {
       e.preventDefault();
       e.stopPropagation();
@@ -108,20 +110,32 @@ export function SkillLevelSelect({
         aria-haspopup="listbox"
         aria-expanded={isOpen}
         aria-controls={listboxId}
-        aria-label="Skill level"
+        aria-label="Session"
         className={cn(
-          "flex items-center gap-1.5 bg-bg border border-border rounded-md pl-2.5 pr-2 py-2 text-sm text-ink min-w-0",
+          "flex items-center gap-1.5 bg-surface border border-border rounded-md pl-2.5 pr-2 h-10 text-sm text-ink min-w-0 flex-shrink-0",
           "focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary/50",
-          "transition-colors duration-150",
-          className
+          "transition-colors duration-150"
         )}
       >
-        <SkillBadge level={value} compact />
-        <span className="truncate">{SKILL_LABELS[value]}</span>
+        <CalendarDays size={13} strokeWidth={2} className="text-muted flex-shrink-0" aria-hidden />
+        <span className="truncate max-w-[88px] sm:max-w-none">
+          {selected ? formatSessionDate(selected.label) : "Select session"}
+        </span>
+        {selected?.isOpen && (
+          <>
+            {/* Full badge at sm+; a compact dot on mobile so "which session am I
+                on" doesn't require reopening the dropdown to find out. */}
+            <span
+              className="sm:hidden w-1.5 h-1.5 rounded-full bg-primary flex-shrink-0"
+              aria-hidden
+            />
+            <StatusBadge status="open" className="hidden sm:inline-flex flex-shrink-0" />
+          </>
+        )}
         <ChevronDown
           size={13}
           strokeWidth={2}
-          className={cn("text-muted flex-shrink-0 ml-auto transition-transform duration-150", isOpen && "rotate-180")}
+          className={cn("text-muted flex-shrink-0 ml-0.5 transition-transform duration-150", isOpen && "rotate-180")}
           aria-hidden
         />
       </button>
@@ -132,34 +146,31 @@ export function SkillLevelSelect({
             ref={listRef}
             id={listboxId}
             role="listbox"
-            aria-label="Skill level"
+            aria-label="Session"
             style={{
               position: "fixed",
               top: position.top,
               left: position.left,
-              // 220px comfortably fits "Upper Intermediate," the longest
-              // label, without wrapping — this list shows full labels on
-              // purpose (unlike the trigger, which truncates by design).
               width: Math.max(position.width, 220),
             }}
-            className="z-[var(--z-popover)] bg-surface border border-border rounded-md shadow-lg py-1 max-h-64 overflow-y-auto"
+            className="z-[var(--z-popover)] bg-surface border border-border rounded-md shadow-lg py-1 max-h-72 overflow-y-auto"
           >
-            {SKILL_LEVELS.map((level) => (
+            {sessions.map((s) => (
               <div
-                key={level}
+                key={s.id}
                 role="option"
-                aria-selected={value === level}
-                onMouseEnter={() => setHighlighted(level)}
-                onClick={() => select(level)}
+                aria-selected={value === s.id}
+                onMouseEnter={() => setHighlighted(s.id)}
+                onClick={() => select(s.id)}
                 className={cn(
                   "flex items-center gap-2 mx-1 px-2 py-2 rounded-md cursor-pointer text-sm text-ink",
                   "transition-colors duration-100",
-                  level === highlighted && "bg-surface-elevated"
+                  s.id === highlighted && "bg-surface-elevated"
                 )}
               >
-                <SkillBadge level={level} compact />
-                <span className="flex-1">{SKILL_LABELS[level]}</span>
-                {value === level && (
+                <span className="flex-1 truncate">{formatSessionDate(s.label)}</span>
+                {s.isOpen && <StatusBadge status="open" className="flex-shrink-0" />}
+                {value === s.id && (
                   <Check size={14} strokeWidth={2.5} className="text-primary flex-shrink-0" aria-hidden />
                 )}
               </div>

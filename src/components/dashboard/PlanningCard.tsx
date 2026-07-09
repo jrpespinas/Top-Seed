@@ -6,13 +6,15 @@ import type { Court, PlanningCard, MatchType, Player } from "@/types";
 import { SkillBadge } from "@/components/ui/SkillBadge";
 import { GenderIcon } from "@/components/ui/GenderIcon";
 import { cn } from "@/lib/utils";
-import { X, GripVertical } from "lucide-react";
+import { X, GripVertical, RotateCcw } from "lucide-react";
 
 interface Props {
   card: PlanningCard;
   availableCourts: Court[];
   fullWidth?: boolean;
   onDismiss: () => void;
+  onResuggest?: () => void;
+  justSuggested?: boolean;
   onMatchTypeChange: (type: MatchType) => void;
   onSwap: (
     from: { side: "A" | "B"; index: number },
@@ -64,7 +66,7 @@ function PlayerChip({
       <button
         onClick={onClick}
         className={cn(
-          "flex items-center gap-1.5 w-full rounded-sm px-1.5 py-1.5 text-left transition-all duration-100 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary/50",
+          "flex items-center gap-1.5 w-full min-h-[36px] rounded-sm px-1.5 py-1.5 text-left transition-all duration-100 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary/50",
           isSelected
             ? "bg-primary/12 ring-1 ring-primary/40"
             : "hover:bg-surface-elevated active:bg-surface-elevated"
@@ -97,6 +99,8 @@ export function PlanningCard({
   availableCourts,
   fullWidth = false,
   onDismiss,
+  onResuggest,
+  justSuggested,
   onMatchTypeChange,
   onSwap,
   onCourtsAssign,
@@ -211,7 +215,8 @@ export function PlanningCard({
         fullWidth ? "w-full" : "w-[76vw] md:w-[252px]",
         borderClass,
         isDraggable && "cursor-grab active:cursor-grabbing",
-        isDraggingAny && isDraggable && "opacity-50 scale-[0.98]"
+        isDraggingAny && isDraggable && "opacity-50 scale-[0.98]",
+        justSuggested && "animate-suggest-pulse"
       )}
     >
       {/* Custom drag image — offscreen, only rasterized by the browser during drag */}
@@ -268,6 +273,16 @@ export function PlanningCard({
           {isDraggable && (
             <GripVertical size={12} strokeWidth={1.75} className="text-muted/40 mx-0.5" aria-hidden />
           )}
+          {onResuggest && (
+            <button
+              onClick={onResuggest}
+              className="p-1.5 text-muted hover:text-primary hover:bg-primary/10 rounded-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary/40"
+              aria-label="Resuggest this matchup"
+              title="Resuggest"
+            >
+              <RotateCcw size={11} strokeWidth={2} aria-hidden />
+            </button>
+          )}
           <button
             onClick={onDismiss}
             className="p-1.5 text-muted hover:text-error hover:bg-error/10 rounded-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-error/40"
@@ -321,7 +336,7 @@ export function PlanningCard({
                     role={canPlaceHere ? "button" : undefined}
                     aria-label={canPlaceHere ? `Place ${selectedFirstName} here` : undefined}
                     className={cn(
-                      "h-7 rounded-sm border border-dashed transition-colors",
+                      "h-9 rounded-sm border border-dashed transition-colors",
                       highlightA
                         ? "border-primary/50 bg-primary/10"
                         : canPlaceHere
@@ -354,7 +369,7 @@ export function PlanningCard({
                     role={canPlaceHere ? "button" : undefined}
                     aria-label={canPlaceHere ? `Place ${selectedFirstName} here` : undefined}
                     className={cn(
-                      "h-7 rounded-sm border border-dashed transition-colors",
+                      "h-9 rounded-sm border border-dashed transition-colors",
                       highlightB
                         ? "border-primary/50 bg-primary/10"
                         : canPlaceHere
@@ -365,6 +380,11 @@ export function PlanningCard({
                 );
               })}
             </div>
+          )}
+          {suggestion?.pairsExhausted && (
+            <p className="text-[10px] text-muted mt-1.5 px-1.5">
+              All unique pairs used — suggesting least recently repeated
+            </p>
           )}
           {selectedChip && (
             <div className="flex items-center justify-between mt-2 px-1.5">

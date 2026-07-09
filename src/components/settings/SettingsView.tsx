@@ -3,6 +3,8 @@
 import { useState } from "react";
 import { AlertTriangle, Check } from "lucide-react";
 import { clearSessionArchive } from "@/lib/session-store";
+import { removeMatchRecordsForSessions } from "@/lib/match-log-store";
+import { useConfirmFocus } from "@/hooks/useConfirmFocus";
 
 function resetAllData() {
   const keys = Object.keys(window.localStorage).filter((k) => k.startsWith("top-seed:"));
@@ -32,6 +34,14 @@ function DangerAction({
   onCancel: () => void;
   onConfirm: () => void;
 }) {
+  // "Done" is a third, transient state (cleared after 2.5s) that also counts
+  // as "away from idle" — passed as the hook's swapped override so focus
+  // returns to the trigger once "Done" clears, not just on confirm→idle.
+  const { triggerRef: triggerBtnRef, cancelRef: cancelBtnRef } = useConfirmFocus(
+    isConfirming,
+    isConfirming || justDone
+  );
+
   return (
     <div className="px-4 sm:px-5 py-4">
       <p className="text-sm font-medium text-ink mb-1">{title}</p>
@@ -44,6 +54,7 @@ function DangerAction({
         </p>
       ) : !isConfirming ? (
         <button
+          ref={triggerBtnRef}
           onClick={onRequestConfirm}
           className="text-sm font-semibold bg-error/15 text-error hover:bg-error/25 transition-colors px-3 py-2.5 rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-error/40 min-h-[44px]"
         >
@@ -59,6 +70,7 @@ function DangerAction({
             {confirmLabel}
           </button>
           <button
+            ref={cancelBtnRef}
             onClick={onCancel}
             className="text-sm text-muted hover:text-ink transition-colors px-3 py-2.5 rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-border min-h-[44px]"
           >
@@ -75,7 +87,8 @@ export function SettingsView() {
   const [justDone, setJustDone] = useState<ActionId | null>(null);
 
   function handleClearHistory() {
-    clearSessionArchive();
+    const clearedSessionIds = clearSessionArchive();
+    removeMatchRecordsForSessions(clearedSessionIds);
     setConfirmingAction(null);
     setJustDone("clear-history");
     setTimeout(() => setJustDone((d) => (d === "clear-history" ? null : d)), 2500);
@@ -127,6 +140,11 @@ export function SettingsView() {
             onConfirm={handleReset}
           />
         </section>
+
+        <footer className="mt-8 px-1">
+          <p className="text-sm text-muted italic">&ldquo;Be thankful in all circumstances, for this is God&apos;s will for you who belong to Christ Jesus. <br />1 Thessalonians 5:18 NLT&rdquo;</p>
+          <p className="text-xs text-muted/70 mt-1">Developed by Bogs Espinas</p>
+        </footer>
       </div>
     </div>
   );

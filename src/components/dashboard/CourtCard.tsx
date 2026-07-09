@@ -106,7 +106,7 @@ export function CourtCard({
                 aria-disabled
                 tabIndex={-1}
                 title="End the match first"
-                className="p-1 text-muted/35 cursor-not-allowed focus-visible:outline-none"
+                className="p-3 text-muted/35 cursor-not-allowed focus-visible:outline-none"
                 aria-label="Cannot delete a court with an active match"
               >
                 <Trash2 size={13} strokeWidth={1.75} aria-hidden />
@@ -114,7 +114,7 @@ export function CourtCard({
             ) : (
               <button
                 onClick={() => setConfirmMode("delete")}
-                className="p-1 text-muted hover:text-error transition-colors rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-error/40"
+                className="p-3 text-muted hover:text-error transition-colors rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-error/40"
                 aria-label={`Delete Court ${number}`}
               >
                 <Trash2 size={13} strokeWidth={1.75} aria-hidden />
@@ -143,7 +143,7 @@ export function CourtCard({
                 </button>
                 <button
                   onClick={() => setConfirmMode(null)}
-                  className="px-3 text-xs text-muted hover:text-ink hover:bg-surface-elevated transition-colors rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-border"
+                  className="px-3 text-xs text-muted hover:text-ink hover:bg-surface-elevated transition-colors rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-border min-h-[44px]"
                   aria-label="Cancel delete"
                 >
                   Cancel
@@ -207,7 +207,7 @@ export function CourtCard({
                   setConfirmMode(null);
                   onEndMatch?.(court.id, "SIDE_A");
                 }}
-                className="w-full text-xs font-semibold text-ink bg-surface-elevated hover:bg-primary/15 hover:text-primary transition-colors py-2 rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 min-h-[40px]"
+                className="w-full text-xs font-semibold text-ink bg-surface-elevated hover:bg-primary/15 hover:text-primary transition-colors py-2 rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 min-h-[36px]"
               >
                 {sideLabel(activeMatch.sideA)} won
               </button>
@@ -216,7 +216,7 @@ export function CourtCard({
                   setConfirmMode(null);
                   onEndMatch?.(court.id, "SIDE_B");
                 }}
-                className="w-full text-xs font-semibold text-ink bg-surface-elevated hover:bg-primary/15 hover:text-primary transition-colors py-2 rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 min-h-[40px]"
+                className="w-full text-xs font-semibold text-ink bg-surface-elevated hover:bg-primary/15 hover:text-primary transition-colors py-2 rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 min-h-[36px]"
               >
                 {sideLabel(activeMatch.sideB)} won
               </button>
@@ -247,13 +247,13 @@ export function CourtCard({
                     setConfirmMode(null);
                     onVoidMatch?.(court.id);
                   }}
-                  className="flex-1 text-xs font-semibold bg-error/15 text-error hover:bg-error/25 transition-colors py-2 rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-error/40 min-h-[40px]"
+                  className="flex-1 text-xs font-semibold bg-error/15 text-error hover:bg-error/25 transition-colors py-2 rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-error/40 min-h-[36px]"
                 >
                   Confirm Void
                 </button>
                 <button
                   onClick={() => setConfirmMode(null)}
-                  className="px-3 text-xs text-muted hover:text-ink hover:bg-surface-elevated transition-colors rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-border"
+                  className="px-3 text-xs text-muted hover:text-ink hover:bg-surface-elevated transition-colors rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-border min-h-[36px]"
                 >
                   Cancel
                 </button>

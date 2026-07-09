@@ -1,44 +1,55 @@
 # Spec: Smart Matchup Suggestion
 
 ## Scope
-Algorithm-driven matchup suggestion that balances competitive fairness and pair novelty. Extends the basic queue-order suggestion in `05-queue-matchup.md`.
+Algorithm-driven matchup suggestion that balances competitive fairness, game intensity, pairing variety, and gender composition. Extends the basic queue-order suggestion in `05-queue-matchup.md`.
 
 ---
 
 ## What Changed From Basic Suggestion
 Basic suggestion: take the next N players in queue order.
-Smart suggestion: score all possible arrangements from the candidate pool and return the best one.
+Smart suggestion: draw a small rolling window of eligible players, score all valid arrangements within it, and return the best one.
 
 ---
 
 ## Candidate Pool
 
-Eligible players are those who are:
+### Eligibility
+A player is eligible to appear in the window if they are:
 - In the **queue** for the current session (bench players are excluded)
 - Not currently in an `IN_PROGRESS` match
 
 Arrival order is determined by `sessionJoinedAt` on `QueueEntry` — the timestamp when the player first entered the session, which never resets on re-queue. This ensures players who checked in earlier retain their seniority even after returning from a match.
 
-**Pool size used:**
-- Take the earliest-added **4 candidates** from the queue
-- Score all possible arrangements within that cohort
-- If fewer than 2 (singles) or 4 (doubles) eligible players exist, "Smart Suggest" is disabled
+### The Rolling Window
+Each planning card evaluates a **window of 8 eligible players**, drawn in arrival order. The window is not a fixed slice — it's a rolling buffer that stays at size 8 across the whole planning-card sequence for a round:
+
+1. **Card 1** opens with the earliest 8 eligible players in the queue.
+2. It selects the best-scoring group (4 for doubles, 2 for singles) out of that window. The players **not** selected remain in the window.
+3. **Card 2's** window is topped back up to 8 by pulling in exactly as many *new* players from further down the queue as were just selected out — e.g. 4 leftover + 4 fresh arrivals for doubles.
+4. This repeats for every additional card/court opened in the same round: leftovers always carry forward, new arrivals only backfill the difference.
+
+This keeps every card's decision scoped to the same constant field of 8, rather than a pool that grows with each additional court. A player who scores poorly against one window's competition isn't compared against an ever-larger field in the next round — they reappear in a same-sized window, which keeps their odds of eventually being picked from silently shrinking round over round.
+
+**Minimum thresholds:**
+- Doubles needs at least 4 eligible players in the window; singles needs at least 2.
+- If the queue can't fill the window to that minimum (including all remaining eligible players), Smart Suggest is disabled for that card — no button rendered.
 
 ---
 
 ## Scoring a Matchup
 
-For doubles with 4 candidates [P1, P2, P3, P4], there are 3 possible team arrangements:
-- [P1,P2] vs [P3,P4]
-- [P1,P3] vs [P2,P4]
-- [P1,P4] vs [P2,P3]
+For a given window, every valid group of players (a group of 4 for doubles, 2 for singles) drawn from that window, and every way to split that group into two sides, is a candidate arrangement. Each is scored; the highest-scoring one is suggested — subject to the gender preference gate below, which is applied before scoring narrows the candidate set.
 
-For singles with 4 candidates, there are 6 possible opponent pairs:
-- P1vP2, P1vP3, P1vP4, P2vP3, P2vP4, P3vP4
+### 0. Gender Preference (gate, applied before scoring)
+Real badminton has same-gender and mixed-gender formats; the suggestion prefers the more specific one when the window supports it, in this order:
 
-Each arrangement is scored; the highest-scoring one is suggested.
+1. **Same-gender** — all 4 players (doubles) or both players (singles) share a gender. If at least one same-gender group exists in the window, only same-gender groups are scored.
+2. **Mixed Doubles convention** (doubles only) — if no same-gender group exists but the window has at least 2 men and 2 women, only groups of exactly 2-and-2 are considered, and only splits where each side has one of each gender (true mixed doubles, not an arbitrary split).
+3. **Unrestricted** — if neither tier is possible, gender is dropped for this round and all groups/splits are scored normally.
 
-### 1. Balance Score (primary, weight: 60%)
+Players with `gender` unset act as wildcards: they don't block a same-gender or mixed-doubles arrangement, and they aren't the reason one gets chosen either — they're simply excluded from the gender check itself.
+
+### 1. Balance Score (weight: 60%)
 Measures how evenly matched the two sides are using skill level and current-session win rate.
 
 ```typescript
@@ -59,7 +70,10 @@ function balanceScore(sideA: Player[], sideB: Player[], sessionId: string): numb
 
 `getSessionWinRate(playerId, sessionId)`: wins ÷ matchesPlayed within this session. Returns 0.5 (neutral) if the player has no matches yet this session — defaulting to neutral avoids penalising new players.
 
-### 2. Novelty Score (tiebreaker, weight: 40%)
+### 2. Challenge Preference (tiebreak within Balance)
+Balanced sides are usually competitive, but balance alone doesn't guarantee a player faces real opposition — two weak players paired together can look "balanced" against another weak pair without pushing anyone. When multiple arrangements land within a small margin of each other on Balance Score, prefer the one that gives the most players an opponent at or above their own skill level, rather than the one that gives anyone an easy win. This only breaks near-ties; it never overrides a clearly better Balance Score, and it never forces a pairing the window can't support — if every option in the window pairs someone down, that's simply the best available game this round.
+
+### 3. Novelty Score (weight: 40%)
 Penalises recently repeated pairings within the current session.
 
 - **Doubles**: A "pair" is two players on the same side
@@ -82,15 +96,41 @@ function noveltyScore(sideA: Player[], sideB: Player[], sessionId: string): numb
 ### Final Score
 ```typescript
 const finalScore = 0.6 * balanceScore + 0.4 * noveltyScore
+// Challenge Preference applies as a tiebreak among near-equal finalScores,
+// after the Gender Preference gate has already narrowed the candidate set.
 ```
+
+---
+
+## Fairness Safeguard: Skip Cap
+
+Because scoring can legitimately pass over a player in the window in favor of a better-scoring group, the system tracks how many consecutive times each player has been present in a window but not selected into the winning arrangement.
+
+- Each time a suggestion runs and a player is in the window but not chosen, their skip count increments.
+- Each time a player is chosen, their skip count resets to 0.
+- Skip counts are session-scoped — they don't carry over between sessions.
+- If a player's skip count reaches the cap (default: **2**), the next time they appear in a window they are **force-included** in the selected group regardless of score; the remaining slots and side-split are still chosen to score as well as possible around that forced inclusion.
+
+This is a backstop, not the common case — with an 8-wide window, most players are picked well before hitting the cap. It exists for the rare outlier (an unusual skill level, or the only player of a given gender) who could otherwise be repeatedly out-scored round after round.
 
 ---
 
 ## Repeat Pair Exhaustion
 
-When every possible arrangement within the candidate pool has been played at least once this session:
-- Falls back to least-recently-paired arrangement
+When every possible arrangement available in the current window (after the gender gate) has already been played this session:
+- Falls back to the least-recently-paired arrangement among them
 - UI shows a subtle note: "All unique pairs used — suggesting least recently repeated"
+
+With an 8-wide window this is now a much rarer fallback than under a fixed 4-player pool, since the number of valid arrangements is far larger — but it can still happen in a small or long-running session.
+
+---
+
+## Multi-Court Handling
+
+When multiple planning cards are open at once (multiple courts to fill in the same round):
+- Card 1 draws the first window of 8 and selects its group.
+- Card 2's window tops back up to 8 using leftovers from Card 1's window plus fresh arrivals (see "The Rolling Window" above), and so on for each additional card.
+- Selected players are excluded from all subsequent cards' windows in the same round — nobody is suggested for two courts at once.
 
 ---
 
@@ -100,7 +140,7 @@ When every possible arrangement within the candidate pool has been played at lea
 Each planning card on the Dashboard is independently powered by the Smart Suggest algorithm:
 - Cards are auto-generated on session load (default 3); the `↺ Resuggest` button re-runs the algorithm for a single card
 - No scores or percentages are shown — just the suggested players on each side
-- Cards are generated with the same exclusion chain: Card 1 draws from the full pool; Card 2 excludes Card 1's players; and so on
+- Cards draw from the rolling 8-wide window described above, in card order
 - If fewer eligible candidates exist than the match type requires, the card shows an **Empty** state with a "Not enough players" note — no button rendered
 
 ### Within a Planning Card
@@ -114,7 +154,7 @@ Each planning card on the Dashboard is independently powered by the Smart Sugges
 ## Server Actions (`src/server/actions/smart-matchup.ts`)
 
 ```typescript
-getSuggestedMatchup(sessionId: string, matchType: MatchType): Promise<MatchupSuggestion>
+getSuggestedMatchup(sessionId: string, matchType: MatchType, excludedPlayerIds: string[]): Promise<MatchupSuggestion>
 
 type MatchupSuggestion = {
   sideA:           Player[]
@@ -122,6 +162,8 @@ type MatchupSuggestion = {
   pairsExhausted:  boolean   // true = all unique arrangements used this session
 }
 ```
+
+`excludedPlayerIds` carries the players already selected by earlier cards in the same round, so each card's window correctly excludes them.
 
 ---
 
@@ -131,6 +173,13 @@ type MatchupSuggestion = {
 |---|---|---|
 | `balanceWeight` | 0.6 | Weight for balance score (novelty weight = 1 − this) |
 | `smartMatchupEnabled` | true | Show/hide the Smart Suggest button entirely |
+
+## Constants (not organizer-configurable)
+
+| Constant | Default | Description |
+|---|---|---|
+| `matchupWindowSize` | 8 | Size of the rolling candidate window per card |
+| `skipCapThreshold` | 2 | Consecutive skips before a player is force-included |
 
 ---
 
@@ -154,6 +203,13 @@ async function countSessionPairings(
 ): Promise<number>
 ```
 
+**Session skip count** (fairness safeguard):
+```typescript
+// How many consecutive times this player has appeared in a suggestion
+// window without being selected, this session. Resets to 0 when selected.
+async function getSessionSkipCount(playerId: string, sessionId: string): Promise<number>
+```
+
 ---
 
 ## Edge Cases
@@ -163,3 +219,6 @@ async function countSessionPairings(
 - **Bench player manually dragged into a planning card**: allowed — the drag-to-card flow is a manual override, not algorithm-driven
 - **`balanceWeight` set to 1.0**: novelty ignored entirely; pure skill/win-rate balance
 - **`balanceWeight` set to 0.0**: novelty only; ignores skill balance
+- **Window can't support any same-gender or mixed-doubles group**: gender preference silently drops to unrestricted for that card; no UI note needed
+- **Fewer than 8 eligible players remain in the queue**: window is simply capped at whatever's available; falls through to the standard "not enough players" disable if it drops below the match-type minimum
+- **A player hits the skip cap while also being the only option for a same-gender/mixed-doubles slot**: force-inclusion still respects the active gender tier — they're forced into a valid arrangement within that tier, not into a tier the window doesn't support

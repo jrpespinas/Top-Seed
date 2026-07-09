@@ -4,6 +4,7 @@ import { useState } from "react";
 import { CalendarDays, Users } from "lucide-react";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { formatSessionDate } from "@/lib/utils";
+import { useConfirmFocus } from "@/hooks/useConfirmFocus";
 import type { SessionStatus } from "@/types";
 
 interface SessionHeaderProps {
@@ -25,6 +26,7 @@ export function SessionHeader({
   onClose,
 }: SessionHeaderProps) {
   const [closeConfirm, setCloseConfirm] = useState(false);
+  const { triggerRef: closeBtnRef, cancelRef: cancelBtnRef } = useConfirmFocus(closeConfirm);
 
   return (
     <header className="flex items-center justify-between px-4 sm:px-6 h-14 border-b border-border flex-shrink-0 gap-3">
@@ -56,10 +58,11 @@ export function SessionHeader({
       <div className="flex items-center gap-2 flex-shrink-0">
         {!closeConfirm ? (
           <button
+            ref={closeBtnRef}
             onClick={() => setCloseConfirm(true)}
             className="text-xs font-medium text-muted hover:text-ink hover:bg-surface-elevated transition-colors px-3 py-1.5 rounded-md border border-border focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-border min-h-[36px]"
           >
-            Close
+            Close Session
           </button>
         ) : (
           <div className="flex items-center gap-1.5">
@@ -74,6 +77,7 @@ export function SessionHeader({
               Confirm
             </button>
             <button
+              ref={cancelBtnRef}
               onClick={() => setCloseConfirm(false)}
               className="text-xs text-muted hover:text-ink transition-colors px-2 py-1.5 rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-border min-h-[36px]"
             >

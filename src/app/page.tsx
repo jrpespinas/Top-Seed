@@ -11,7 +11,7 @@ import {
   startSession,
   closeSession,
 } from "@/lib/session-store";
-import { useMatchLog } from "@/lib/match-log-store";
+import { useMatchLog, removeMatchRecordsForSessions } from "@/lib/match-log-store";
 
 export default function DashboardPage() {
   const session = useCurrentSession();
@@ -33,7 +33,10 @@ export default function DashboardPage() {
         session={{ id: session.id, date: session.date, status: "OPEN", playerCount }}
         activeCourts={activeCourts}
         totalCourts={courts.length}
-        onClose={() => closeSession(matches)}
+        onClose={() => {
+          const result = closeSession(matches);
+          if (result) removeMatchRecordsForSessions(result.evictedSessionIds);
+        }}
       />
       <DashboardClient key={session.id} sessionId={session.id} />
     </div>
