@@ -170,7 +170,7 @@ export function SessionsListView() {
       {/* Title bar */}
       <div
         className={cn(
-          "sticky top-0 z-[var(--z-sticky)] transition-colors duration-200",
+          "sticky top-0 z-[var(--z-sticky)] pt-[env(safe-area-inset-top)] transition-colors duration-200",
           // Dark mode reads elevation as surface lightness, not shadow color
           // (a black shadow blur is nearly invisible on a near-black bg) —
           // surface-elevated already IS this app's lighter-elevation step in
@@ -192,7 +192,10 @@ export function SessionsListView() {
       {/* Table */}
       {rows.length > 0 ? (
         <table className="w-full border-collapse" role="grid" aria-label="Session history">
-          <thead className={cn("sticky top-14 z-[var(--z-sticky)] transition-colors duration-200", headerShadow ? "bg-surface-elevated" : "bg-bg")}>
+          {/* top-14 = 56px, the title bar's own height — plus whatever
+              env(safe-area-inset-top) added to the sticky wrapper above it
+              (0 on non-notched devices, a no-op there). */}
+          <thead className={cn("sticky top-[calc(3.5rem+env(safe-area-inset-top))] z-[var(--z-sticky)] transition-colors duration-200", headerShadow ? "bg-surface-elevated" : "bg-bg")}>
             <tr className="border-b border-border">
               <th scope="col" className="text-left text-xs font-medium text-muted pl-4 sm:pl-6 pr-3 py-2.5 whitespace-nowrap">Session</th>
               <th scope="col" className="text-left text-xs font-medium text-muted px-3 py-2.5 whitespace-nowrap w-[84px]">Status</th>

@@ -103,7 +103,7 @@ export function SettingsView() {
 
   return (
     <div className="flex flex-col min-h-full">
-      <div className="flex items-center px-4 sm:px-6 h-14 border-b border-border">
+      <div className="flex items-center px-4 sm:px-6 min-h-[56px] pt-[env(safe-area-inset-top)] border-b border-border">
         <h1 className="text-base font-semibold text-ink">Settings</h1>
       </div>
 

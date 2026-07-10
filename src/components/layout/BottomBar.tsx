@@ -31,7 +31,14 @@ export function BottomBar() {
 
   return (
     <nav
-      className="md:hidden fixed bottom-0 left-0 right-0 bg-surface border-t border-border z-[var(--z-sticky)]"
+      className={cn(
+        "md:hidden fixed bottom-0 left-0 right-0 bg-surface border-t border-border z-[var(--z-sticky)]",
+        // The 60px row below sits above this padding, not inside it — icons
+        // stay clear of the home indicator / rounded corners, while the
+        // surface background still bleeds all the way to the true edges
+        // (0 on non-notched devices, so this is a no-op there).
+        "pb-[env(safe-area-inset-bottom)] pl-[env(safe-area-inset-left)] pr-[env(safe-area-inset-right)]"
+      )}
       aria-label="Mobile navigation"
     >
       <div className="flex h-[60px]">

@@ -364,7 +364,7 @@ export function AddPlayersModal({ isOpen, onClose, onSubmit, existingPlayerNames
                     aria-invalid={duplicateNameRowIds.has(row.id) ? true : undefined}
                     autoComplete="off"
                     className={cn(
-                      "w-full bg-bg border rounded-md px-3 py-2.5 text-sm text-ink",
+                      "w-full bg-bg border rounded-md px-3 py-2.5 text-base lg:text-sm text-ink",
                       "placeholder:text-muted",
                       "focus:outline-none focus:ring-2 focus:border-primary/50",
                       "transition-colors duration-150",

@@ -56,7 +56,17 @@ export function Sidebar() {
 
   return (
     <aside
-      className="hidden md:flex flex-col fixed left-0 top-0 bottom-0 w-20 bg-surface border-r border-border z-[var(--z-sticky)]"
+      className={cn(
+        "hidden md:flex flex-col fixed left-0 top-0 bottom-0 bg-surface border-r border-border z-[var(--z-sticky)]",
+        // Sidebar only ever renders at md:+ — an iPad, or a large iPhone
+        // rotated to landscape (where the notch/Dynamic Island lands on the
+        // left edge, not the top). Width grows by the same inset rather than
+        // padding eating into the fixed 80px content area — otherwise a
+        // ~44-59px landscape notch inset would squeeze this down to nearly
+        // nothing. AppShell's md:ml-20 must match this width exactly.
+        "w-[calc(5rem+env(safe-area-inset-left))] pl-[env(safe-area-inset-left)]",
+        "pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]"
+      )}
       aria-label="Main navigation"
     >
       {/* Logo */}

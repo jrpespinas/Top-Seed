@@ -459,7 +459,7 @@ export function PlayersView() {
         {/* ── Sticky title + filter bar ────────────────────── */}
         <div
           className={cn(
-            "sticky top-0 z-[var(--z-sticky)] transition-colors duration-200",
+            "sticky top-0 z-[var(--z-sticky)] pt-[env(safe-area-inset-top)] transition-colors duration-200",
             // Dark mode reads elevation as surface lightness, not shadow color
             // (a black shadow blur is nearly invisible on a near-black bg) —
             // surface-elevated already IS this app's lighter-elevation step in
@@ -499,7 +499,7 @@ export function PlayersView() {
                 placeholder="Search…"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                className="w-full bg-surface border border-border rounded-md pl-7 pr-7 py-1.5 text-xs text-ink placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary/40 transition-colors duration-150 h-8"
+                className="w-full bg-surface border border-border rounded-md pl-7 pr-7 py-1.5 text-base lg:text-xs text-ink placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary/40 transition-colors duration-150 h-10 lg:h-8"
                 aria-label="Search players by name"
               />
               {search && (
@@ -522,7 +522,7 @@ export function PlayersView() {
                 value={sortKey}
                 onChange={(e) => setSortKey(e.target.value as SortKey)}
                 aria-label="Sort players by"
-                className="bg-surface border border-border rounded-md pl-2 pr-6 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary/40 transition-colors duration-150 h-8"
+                className="bg-surface border border-border rounded-md pl-2 pr-6 text-base text-ink focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary/40 transition-colors duration-150 h-10"
               >
                 {SORT_KEYS.map((key) => (
                   <option key={key} value={key}>{SORT_KEY_LABELS[key]}</option>
@@ -531,7 +531,7 @@ export function PlayersView() {
               <button
                 onClick={() => setSortDir((d) => (d === "asc" ? "desc" : "asc"))}
                 aria-label={sortDir === "asc" ? "Sort ascending, click for descending" : "Sort descending, click for ascending"}
-                className="flex-shrink-0 h-8 w-8 flex items-center justify-center rounded-md border border-border text-muted hover:text-ink hover:bg-surface-elevated transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
+                className="flex-shrink-0 h-10 w-10 flex items-center justify-center rounded-md border border-border text-muted hover:text-ink hover:bg-surface-elevated transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
               >
                 {sortDir === "asc" ? (
                   <ChevronUp size={13} strokeWidth={2.5} aria-hidden />
@@ -619,8 +619,10 @@ export function PlayersView() {
         {filteredAndSorted.length > 0 ? (
           <>
           <table className="hidden lg:table w-full border-collapse" role="grid" aria-label="Players roster">
-              {/* Sticky thead — sits directly below the 109px sticky header */}
-              <thead className={cn("sticky top-[109px] z-[var(--z-sticky)] transition-colors duration-200", headerShadow ? "bg-surface-elevated" : "bg-bg")}>
+              {/* Sticky thead — sits directly below the 109px sticky header, plus
+                  whatever the notch/status bar's safe-area inset adds on top
+                  of that (0 on non-notched devices, so this is a no-op there). */}
+              <thead className={cn("sticky top-[calc(109px+env(safe-area-inset-top))] z-[var(--z-sticky)] transition-colors duration-200", headerShadow ? "bg-surface-elevated" : "bg-bg")}>
                 <tr className="border-b border-border">
                   <SortHeader
                     label="Name"

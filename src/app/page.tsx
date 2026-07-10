@@ -113,7 +113,7 @@ function NoSessionState({ onStart }: { onStart: (name: string) => void }) {
               if (e.key === "Enter") handleStart();
             }}
             autoComplete="off"
-            className="w-full bg-bg border border-border rounded-md px-3 py-2.5 text-sm text-ink placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary/50 transition-colors duration-150 min-h-[44px]"
+            className="w-full bg-bg border border-border rounded-md px-3 py-2.5 text-base lg:text-sm text-ink placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary/50 transition-colors duration-150 min-h-[44px]"
           />
         </div>
 

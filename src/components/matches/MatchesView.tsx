@@ -284,7 +284,7 @@ export function MatchesView() {
   if (sessions.length === 0) {
     return (
       <div className="flex flex-col min-h-full">
-        <div className="flex items-center px-4 sm:px-6 h-14 border-b border-border">
+        <div className="flex items-center px-4 sm:px-6 min-h-[56px] pt-[env(safe-area-inset-top)] border-b border-border">
           <h1 className="text-lg font-semibold text-ink">Matches</h1>
         </div>
         <div className="flex flex-col items-center justify-center py-24 px-4 text-center">
@@ -298,7 +298,7 @@ export function MatchesView() {
   return (
     <div className={cn("flex flex-col min-h-full", selectMode && "pb-20")}>
       {/* Sticky header + filter bar */}
-      <div className="sticky top-0 z-[var(--z-sticky)] bg-bg">
+      <div className="sticky top-0 z-[var(--z-sticky)] pt-[env(safe-area-inset-top)] bg-bg">
         {/* Title bar */}
         <div className="flex items-center gap-2.5 px-4 sm:px-6 h-14 border-b border-border">
           <h1 className="text-lg font-semibold text-ink">Matches</h1>
@@ -358,7 +358,7 @@ export function MatchesView() {
               placeholder="Search by player…"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="w-full bg-surface border border-border rounded-md pl-7 pr-8 py-1.5 text-sm text-ink placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary/40 transition-colors duration-150 h-10"
+              className="w-full bg-surface border border-border rounded-md pl-7 pr-8 py-1.5 text-base lg:text-sm text-ink placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary/40 transition-colors duration-150 h-10"
               aria-label="Search by player name"
             />
             {search && (
@@ -482,7 +482,14 @@ export function MatchesView() {
         <div
           role="region"
           aria-label="Batch void selected matches"
-          className="fixed bottom-[60px] md:bottom-0 left-0 right-0 z-[var(--z-toast)] bg-surface border-t border-border px-4 sm:px-6 py-3 shadow-lg"
+          className={cn(
+            // Below md: stacks above BottomBar, whose own height already grew
+            // by the same inset — no extra padding needed here, just a taller
+            // offset to match. At md+: BottomBar doesn't exist, so this bar
+            // sits flush at the true bottom edge and needs its own inset.
+            "fixed bottom-[calc(60px+env(safe-area-inset-bottom))] md:bottom-0 left-0 right-0 z-[var(--z-toast)]",
+            "bg-surface border-t border-border px-4 sm:px-6 pt-3 pb-3 md:pb-[calc(0.75rem+env(safe-area-inset-bottom))] shadow-lg"
+          )}
         >
           {!batchConfirming ? (
             <div className="flex items-center gap-3">

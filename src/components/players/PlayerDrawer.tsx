@@ -219,7 +219,7 @@ export function PlayerDrawer({
               placeholder="Player's full name"
               autoComplete="off"
               className={cn(
-                "w-full bg-bg border rounded-md px-3 py-2.5 text-sm text-ink",
+                "w-full bg-bg border rounded-md px-3 py-2.5 text-base lg:text-sm text-ink",
                 "placeholder:text-muted",
                 "focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary/50",
                 "transition-colors duration-150",
@@ -297,7 +297,7 @@ export function PlayerDrawer({
               }}
               placeholder="Organizer notes about this player…"
               className={cn(
-                "w-full bg-bg border border-border rounded-md px-3 py-2.5 text-sm text-ink",
+                "w-full bg-bg border border-border rounded-md px-3 py-2.5 text-base lg:text-sm text-ink",
                 "placeholder:text-muted",
                 "resize-none",
                 "focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary/50",

@@ -55,7 +55,7 @@ export function SessionHeader({
   }
 
   return (
-    <header className="flex items-center justify-between px-4 sm:px-6 h-14 border-b border-border flex-shrink-0 gap-3">
+    <header className="flex items-center justify-between px-4 sm:px-6 min-h-[56px] pt-[env(safe-area-inset-top)] border-b border-border flex-shrink-0 gap-3">
       {/* Left: session identity */}
       <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
         <div className="flex items-center gap-2 min-w-0">
@@ -78,7 +78,7 @@ export function SessionHeader({
               }}
               autoComplete="off"
               aria-label="Session name"
-              className="text-sm font-semibold text-ink bg-bg border border-primary/50 rounded-sm px-1.5 py-0.5 -my-0.5 min-w-0 w-36 sm:w-48 focus:outline-none focus:ring-2 focus:ring-primary/50"
+              className="text-base lg:text-sm font-semibold text-ink bg-bg border border-primary/50 rounded-sm px-1.5 py-0.5 -my-0.5 min-w-0 w-36 sm:w-48 focus:outline-none focus:ring-2 focus:ring-primary/50"
             />
           ) : (
             <button

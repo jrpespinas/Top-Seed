@@ -101,7 +101,7 @@ export function LeaderboardView() {
   if (sessions.length === 0) {
     return (
       <div className="flex flex-col min-h-full">
-        <div className="flex items-center px-4 sm:px-6 h-14 border-b border-border">
+        <div className="flex items-center px-4 sm:px-6 min-h-[56px] pt-[env(safe-area-inset-top)] border-b border-border">
           <h1 className="text-lg font-semibold text-ink">Leaderboard</h1>
         </div>
         <div className="flex flex-col items-center justify-center py-24 px-4 text-center">
@@ -115,7 +115,7 @@ export function LeaderboardView() {
   return (
     <div className="flex flex-col min-h-full">
       {/* Sticky header + filter bar */}
-      <div className="sticky top-0 z-[var(--z-sticky)] bg-bg">
+      <div className="sticky top-0 z-[var(--z-sticky)] pt-[env(safe-area-inset-top)] bg-bg">
         {/* Title bar */}
         <div className="flex items-center gap-2.5 px-4 sm:px-6 h-14 border-b border-border">
           <h1 className="text-lg font-semibold text-ink flex-shrink-0">Leaderboard</h1>
@@ -143,7 +143,7 @@ export function LeaderboardView() {
               placeholder="Find a player…"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="w-full bg-surface border border-border rounded-md pl-7 pr-8 py-1.5 text-sm text-ink placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary/40 transition-colors duration-150 h-10"
+              className="w-full bg-surface border border-border rounded-md pl-7 pr-8 py-1.5 text-base lg:text-sm text-ink placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary/40 transition-colors duration-150 h-10"
               aria-label="Find a player on the leaderboard"
             />
             {search && (
@@ -193,8 +193,11 @@ export function LeaderboardView() {
                        + border 1) = 56+61=117
               Recalculate both if the header stack above changes — this is
               the exact fragility the prior critique of this page named as
-              a risk, now doubled by the responsive split. */}
-          <thead className="sticky top-[161px] sm:top-[117px] z-[var(--z-sticky)] bg-bg">
+              a risk, now doubled by the responsive split. Each also adds
+              env(safe-area-inset-top) — 0 on non-notched devices, the actual
+              notch/status-bar height on ones that have it — since the sticky
+              wrapper above gained that same inset as padding-top. */}
+          <thead className="sticky top-[calc(161px+env(safe-area-inset-top))] sm:top-[calc(117px+env(safe-area-inset-top))] z-[var(--z-sticky)] bg-bg">
             <tr className="border-b border-border">
               <th className="text-left text-xs font-medium text-muted pl-4 sm:pl-6 pr-3 py-2.5 w-[52px]">
                 Rank

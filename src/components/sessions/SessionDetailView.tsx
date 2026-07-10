@@ -188,7 +188,7 @@ export function SessionDetailView({ sessionId }: { sessionId: string }) {
 
 function DetailHeader() {
   return (
-    <div className="sticky top-0 z-[var(--z-sticky)] bg-bg border-b border-border">
+    <div className="sticky top-0 z-[var(--z-sticky)] pt-[env(safe-area-inset-top)] bg-bg border-b border-border">
       <div className="flex items-center px-4 sm:px-6 h-14">
         <Link
           href="/sessions"
