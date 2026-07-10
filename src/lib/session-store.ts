@@ -14,6 +14,7 @@ import type {
   SessionRecord,
   SessionPlayerSnapshot,
 } from "@/types";
+import { getDefaultSessionName } from "@/lib/utils";
 
 const QUEUE_KEY = "top-seed:session-queue";
 const BENCH_KEY = "top-seed:session-bench";
@@ -543,6 +544,7 @@ export function useSessionArchive(): SessionRecord[] {
 export interface SessionOption {
   id: string;
   label: string;
+  date: string; // ISO — secondary text, disambiguates same-named sessions
   isOpen: boolean;
 }
 
@@ -578,11 +580,12 @@ export function useSessionOptions(): {
 
   const sessions = useMemo<SessionOption[]>(() => {
     const openOption: SessionOption[] = currentSession
-      ? [{ id: currentSession.id, label: currentSession.date, isOpen: true }]
+      ? [{ id: currentSession.id, label: currentSession.name, date: currentSession.date, isOpen: true }]
       : [];
     const closedOptions: SessionOption[] = archive.map((r) => ({
       id: r.id,
-      label: r.date,
+      label: r.name,
+      date: r.date,
       isOpen: false,
     }));
     return [...openOption, ...closedOptions];
@@ -630,9 +633,11 @@ export function deleteArchivedSession(sessionId: string): string | null {
 }
 
 /** Dashboard's "Start Session" — clean slate: empty courts/queue/bench, 3 blank planning cards. */
-export function startSession(): CurrentSession {
+export function startSession(name: string): CurrentSession {
+  const trimmed = name.trim();
   const session: CurrentSession = {
     id: `sess-${Date.now()}`,
+    name: trimmed.length > 0 ? trimmed : getDefaultSessionName(),
     date: new Date().toISOString(),
   };
   writeOrNull(CURRENT_SESSION_KEY, session);
@@ -650,6 +655,25 @@ export function startSession(): CurrentSession {
   skipCountsListeners.forEach((l) => l());
 
   return session;
+}
+
+/**
+ * SessionHeader's inline rename — open session only. Closed sessions are a
+ * frozen SessionRecord snapshot (see closeSession), so there's nothing to
+ * rename once archived.
+ */
+export function renameSession(name: string): CurrentSession | null {
+  const current = readOrNull<CurrentSession>(CURRENT_SESSION_KEY);
+  if (!current) return null;
+
+  const trimmed = name.trim();
+  const updated: CurrentSession = {
+    ...current,
+    name: trimmed.length > 0 ? trimmed : getDefaultSessionName(),
+  };
+  writeOrNull(CURRENT_SESSION_KEY, updated);
+  currentSessionListeners.forEach((l) => l());
+  return updated;
 }
 
 export interface CloseSessionResult {
@@ -684,6 +708,7 @@ export function closeSession(matches: MatchRecord[]): CloseSessionResult | null 
 
   const record: SessionRecord = {
     id: current.id,
+    name: current.name,
     date: current.date,
     closedAt: new Date().toISOString(),
     players: Array.from(playersById.values()),

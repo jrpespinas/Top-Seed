@@ -27,6 +27,19 @@ type SortDir = "asc" | "desc";
 
 const SKILL_LEVELS: SkillLevel[] = ["S", "A", "B", "C", "D", "E", "F"];
 const GENDERS: Gender[] = ["M", "F"];
+// Below `lg:`, the table (and its clickable SortHeader cells) is replaced by
+// a card list with no column headers — this label set drives a compact
+// sort <select> so sorting stays available, not just filtering.
+const SORT_KEY_LABELS: Record<SortKey, string> = {
+  name: "Name",
+  skillLevel: "Skill",
+  paymentStatus: "Payment",
+  gender: "Gender",
+  state: "State",
+  gamesPlayed: "Games",
+  sessionJoinedAt: "Check-in",
+};
+const SORT_KEYS: SortKey[] = ["name", "skillLevel", "paymentStatus", "gender", "state", "gamesPlayed", "sessionJoinedAt"];
 const SKILL_ORDER: Record<SkillLevel, number> = { S: 0, A: 1, B: 2, C: 3, D: 4, E: 5, F: 6 };
 const STATE_ORDER: Record<Source, number> = { queue: 0, bench: 1 };
 // Ascending surfaces who still owes money first — the organizer's most useful default.
@@ -165,13 +178,13 @@ function PlayerTableRow({
         <SkillBadge level={player.skillLevel} compact />
       </td>
 
-      {/* Payment — sm+ */}
-      <td className="hidden sm:table-cell px-3 py-3 w-[190px]">
+      {/* Payment */}
+      <td className="px-3 py-3 w-[190px]">
         <PaymentToggle value={player.paymentStatus} onChange={onPaymentChange} />
       </td>
 
-      {/* Gender — sm+ */}
-      <td className="hidden sm:table-cell px-3 py-3 w-[56px]">
+      {/* Gender */}
+      <td className="px-3 py-3 w-[56px]">
         {player.gender ? (
           <GenderIcon gender={player.gender} size={14} />
         ) : (
@@ -179,27 +192,27 @@ function PlayerTableRow({
         )}
       </td>
 
-      {/* State — sm+ */}
-      <td className="hidden sm:table-cell px-3 py-3 w-[84px]">
+      {/* State */}
+      <td className="px-3 py-3 w-[84px]">
         <StateCell source={row.source} />
       </td>
 
-      {/* Games — md+ */}
-      <td className="hidden md:table-cell px-3 py-3 w-[60px] text-right">
+      {/* Games */}
+      <td className="px-3 py-3 w-[60px] text-right">
         <span className="font-mono text-sm tabular-nums text-muted">
           {gamesPlayed}
         </span>
       </td>
 
-      {/* Check-in time — lg+ */}
-      <td className="hidden lg:table-cell px-3 py-3 w-[88px] text-right">
+      {/* Check-in time */}
+      <td className="px-3 py-3 w-[88px] text-right">
         <span className="font-mono text-sm tabular-nums text-muted">
           {formatCheckinTime(row.sessionJoinedAt)}
         </span>
       </td>
 
-      {/* Notes — lg+ */}
-      <td className="hidden lg:table-cell pl-3 pr-4 sm:pr-6 py-3 max-w-[140px]">
+      {/* Notes */}
+      <td className="pl-3 pr-4 sm:pr-6 py-3 max-w-[140px]">
         {player.notes ? (
           <span className="block truncate text-xs text-muted" title={player.notes}>
             {player.notes}
@@ -209,6 +222,78 @@ function PlayerTableRow({
         )}
       </td>
     </tr>
+  );
+}
+
+// Dot-separated meta line — filters out absent fields (no gender set) so the
+// divider between items always lands between two real values, never orphaned.
+function MetaLine({ items }: { items: React.ReactNode[] }) {
+  const present = items.filter((item) => item !== null && item !== undefined && item !== false);
+  return (
+    <div className="flex items-center flex-wrap gap-x-1.5 gap-y-1 text-xs text-muted">
+      {present.map((item, i) => (
+        <span key={i} className="inline-flex items-center gap-1.5">
+          {i > 0 && <span className="text-muted/40" aria-hidden>·</span>}
+          {item}
+        </span>
+      ))}
+    </div>
+  );
+}
+
+// Below `lg:`, replaces the table row — every field the table hides below
+// that breakpoint (Payment, Gender, State, Games, Check-in, Notes) is shown
+// here instead, vertically, rather than clipped behind a horizontal scroll.
+function PlayerCard({
+  row,
+  gamesPlayed,
+  onClick,
+  onPaymentChange,
+}: {
+  row: SessionPlayerRow;
+  gamesPlayed: number;
+  onClick: () => void;
+  onPaymentChange: (status: PaymentStatus) => void;
+}) {
+  const { player } = row;
+  return (
+    <div
+      onClick={onClick}
+      onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") onClick(); }}
+      tabIndex={0}
+      role="button"
+      aria-label={`${player.name}${row.source === "bench" ? ", benched" : ""}`}
+      className={cn(
+        "flex flex-col gap-2 px-4 sm:px-6 py-3 border-b border-border/50 cursor-pointer",
+        "transition-colors duration-100 hover:bg-surface-elevated/40 focus-visible:outline-none focus-visible:bg-surface-elevated/40"
+      )}
+    >
+      {/* Name + skill */}
+      <div className="flex items-center gap-2 min-w-0">
+        <span className="text-sm font-medium text-ink truncate flex-1 min-w-0">{player.name}</span>
+        <SkillBadge level={player.skillLevel} compact />
+      </div>
+
+      {/* Payment — the one field here that's an interactive control, not a
+          read-out, so it gets its own row rather than folding into the meta
+          line; PaymentToggle already stops its own click propagation. */}
+      <PaymentToggle value={player.paymentStatus} onChange={onPaymentChange} />
+
+      <MetaLine
+        items={[
+          player.gender && <GenderIcon gender={player.gender} />,
+          <StateCell key="state" source={row.source} />,
+          <span key="games" className="font-mono tabular-nums">{gamesPlayed} games</span>,
+          <span key="checkin" className="font-mono tabular-nums">{formatCheckinTime(row.sessionJoinedAt)}</span>,
+        ]}
+      />
+
+      {player.notes && (
+        <span className="block truncate text-xs text-muted" title={player.notes}>
+          {player.notes}
+        </span>
+      )}
+    </div>
   );
 }
 
@@ -396,9 +481,11 @@ export function PlayersView() {
             )}
           </div>
 
-          {/* Filter bar — single non-wrapping scrollable row */}
-          <div className="relative">
-          <div className="px-4 sm:px-6 py-2.5 border-b border-border flex items-center gap-2 overflow-x-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+          {/* Filter bar — wraps by group (search / sort / skill / gender)
+              instead of scrolling horizontally. Each group is a single flex
+              item with no internal wrap, so flex-wrap always breaks between
+              whole groups, never mid-group. */}
+          <div className="px-4 sm:px-6 py-2.5 border-b border-border flex flex-wrap items-center gap-x-3 gap-y-2">
             {/* Search */}
             <div className="relative flex-shrink-0 w-[160px] sm:w-[188px]">
               <Search
@@ -426,7 +513,35 @@ export function PlayersView() {
               )}
             </div>
 
-            <div className="h-4 w-px bg-border/60 flex-shrink-0" aria-hidden />
+            {/* Sort — below `lg:` only. The table's clickable column headers
+                (SortHeader) sort at lg+; below that the card list has no
+                headers, so sorting needs its own compact control instead of
+                silently disappearing. */}
+            <div className="lg:hidden flex items-center gap-1 flex-shrink-0">
+              <select
+                value={sortKey}
+                onChange={(e) => setSortKey(e.target.value as SortKey)}
+                aria-label="Sort players by"
+                className="bg-surface border border-border rounded-md pl-2 pr-6 text-xs text-ink focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary/40 transition-colors duration-150 h-8"
+              >
+                {SORT_KEYS.map((key) => (
+                  <option key={key} value={key}>{SORT_KEY_LABELS[key]}</option>
+                ))}
+              </select>
+              <button
+                onClick={() => setSortDir((d) => (d === "asc" ? "desc" : "asc"))}
+                aria-label={sortDir === "asc" ? "Sort ascending, click for descending" : "Sort descending, click for ascending"}
+                className="flex-shrink-0 h-8 w-8 flex items-center justify-center rounded-md border border-border text-muted hover:text-ink hover:bg-surface-elevated transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
+              >
+                {sortDir === "asc" ? (
+                  <ChevronUp size={13} strokeWidth={2.5} aria-hidden />
+                ) : (
+                  <ChevronDown size={13} strokeWidth={2.5} aria-hidden />
+                )}
+              </button>
+            </div>
+
+            <div className="hidden lg:block h-4 w-px bg-border/60 flex-shrink-0" aria-hidden />
 
             {/* Skill filter chips */}
             <div
@@ -457,7 +572,7 @@ export function PlayersView() {
               })}
             </div>
 
-            <div className="h-4 w-px bg-border/60 flex-shrink-0" aria-hidden />
+            <div className="hidden lg:block h-4 w-px bg-border/60 flex-shrink-0" aria-hidden />
 
             {/* Gender filter chips */}
             <div
@@ -492,20 +607,18 @@ export function PlayersView() {
             {hasFilters && (
               <button
                 onClick={clearFilters}
-                className="text-xs text-primary hover:text-primary-hover transition-colors flex-shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 rounded px-1 h-7 ml-auto"
+                className="text-xs text-primary hover:text-primary-hover transition-colors flex-shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 rounded px-1 h-7 lg:ml-auto"
               >
                 Clear
               </button>
             )}
           </div>
-          {/* Right-edge scroll fade — communicates horizontal scrollability */}
-          <div className="absolute right-0 top-0 bottom-0 w-10 bg-gradient-to-l from-bg to-transparent pointer-events-none" aria-hidden />
-          </div>
         </div>
 
-        {/* ── Table ─────────────────────────────────────────── */}
+        {/* ── Table (lg+) / Cards (below lg) ───────────────────── */}
         {filteredAndSorted.length > 0 ? (
-          <table className="w-full border-collapse" role="grid" aria-label="Players roster">
+          <>
+          <table className="hidden lg:table w-full border-collapse" role="grid" aria-label="Players roster">
               {/* Sticky thead — sits directly below the 109px sticky header */}
               <thead className={cn("sticky top-[109px] z-[var(--z-sticky)] transition-colors duration-200", headerShadow ? "bg-surface-elevated" : "bg-bg")}>
                 <tr className="border-b border-border">
@@ -531,7 +644,7 @@ export function PlayersView() {
                     currentKey={sortKey}
                     currentDir={sortDir}
                     onSort={handleSort}
-                    className="hidden sm:table-cell px-3 w-[190px]"
+                    className="px-3 w-[190px]"
                     title="Paid, unpaid, or waived for this session"
                   />
                   <SortHeader
@@ -540,7 +653,7 @@ export function PlayersView() {
                     currentKey={sortKey}
                     currentDir={sortDir}
                     onSort={handleSort}
-                    className="hidden sm:table-cell px-3 w-[56px]"
+                    className="px-3 w-[56px]"
                   />
                   <SortHeader
                     label="State"
@@ -548,7 +661,7 @@ export function PlayersView() {
                     currentKey={sortKey}
                     currentDir={sortDir}
                     onSort={handleSort}
-                    className="hidden sm:table-cell px-3 w-[84px]"
+                    className="px-3 w-[84px]"
                     title="Queued or benched right now"
                   />
                   <SortHeader
@@ -558,7 +671,7 @@ export function PlayersView() {
                     currentDir={sortDir}
                     onSort={handleSort}
                     align="right"
-                    className="hidden md:table-cell px-3 w-[60px]"
+                    className="px-3 w-[60px]"
                     title="Games played this session"
                   />
                   <SortHeader
@@ -568,10 +681,10 @@ export function PlayersView() {
                     currentDir={sortDir}
                     onSort={handleSort}
                     align="right"
-                    className="hidden lg:table-cell px-3 w-[88px]"
+                    className="px-3 w-[88px]"
                     title="Time player checked into this session"
                   />
-                  <th className="hidden lg:table-cell text-left text-xs font-medium text-muted pl-3 pr-4 sm:pr-6 py-2.5 whitespace-nowrap">
+                  <th className="text-left text-xs font-medium text-muted pl-3 pr-4 sm:pr-6 py-2.5 whitespace-nowrap">
                     Notes
                   </th>
                 </tr>
@@ -588,6 +701,21 @@ export function PlayersView() {
                 ))}
               </tbody>
           </table>
+
+          {/* Cards — below lg, replaces the table (and its hidden columns)
+              with every field visible, stacked vertically. */}
+          <div className="lg:hidden" role="list" aria-label="Players roster">
+            {filteredAndSorted.map((row) => (
+              <PlayerCard
+                key={row.entryId}
+                row={row}
+                gamesPlayed={gamesPlayedMap.get(row.player.id) ?? 0}
+                onClick={() => handleEdit(row)}
+                onPaymentChange={(status) => handlePaymentChange(row, status)}
+              />
+            ))}
+          </div>
+          </>
         ) : (
           <div className="flex flex-col items-center justify-center py-24 px-4 text-center">
             {hasFilters ? (

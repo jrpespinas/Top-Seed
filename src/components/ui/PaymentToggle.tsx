@@ -50,7 +50,7 @@ export function PaymentToggle({
               if (!active) onChange(status);
             }}
             className={cn(
-              "flex items-center justify-center h-6 px-2 rounded-sm text-[10px] font-semibold whitespace-nowrap",
+              "flex items-center justify-center h-9 px-2 rounded-sm text-[10px] font-semibold whitespace-nowrap",
               "transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50",
               active ? activeClasses[status] : "text-muted hover:text-ink hover:bg-surface-elevated"
             )}

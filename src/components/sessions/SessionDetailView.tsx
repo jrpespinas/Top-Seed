@@ -19,6 +19,7 @@ import type { SessionPlayerSnapshot } from "@/types";
 
 interface SessionSummary {
   id: string;
+  name: string;
   date: string;
   status: "OPEN" | "CLOSED";
   closedAt: string | null;
@@ -43,6 +44,7 @@ export function SessionDetailView({ sessionId }: { sessionId: string }) {
       ];
       return {
         id: currentSession.id,
+        name: currentSession.name,
         date: currentSession.date,
         status: "OPEN",
         closedAt: null,
@@ -55,6 +57,7 @@ export function SessionDetailView({ sessionId }: { sessionId: string }) {
     if (!record) return null;
     return {
       id: record.id,
+      name: record.name,
       date: record.date,
       status: "CLOSED",
       closedAt: record.closedAt,
@@ -101,7 +104,10 @@ export function SessionDetailView({ sessionId }: { sessionId: string }) {
       <div className="px-4 sm:px-6 py-4 border-b border-border flex flex-col gap-2">
         <div className="flex items-center gap-2.5 flex-wrap">
           <CalendarDays size={14} strokeWidth={2} className="text-muted flex-shrink-0" aria-hidden />
-          <h1 className="text-base font-semibold text-ink flex-1">{formatSessionDate(summary.date)}</h1>
+          <div className="flex-1 min-w-0">
+            <h1 className="text-base font-semibold text-ink truncate">{summary.name}</h1>
+            <p className="text-xs text-muted mt-0.5">{formatSessionDate(summary.date)}</p>
+          </div>
           <StatusBadge status={summary.status === "OPEN" ? "open" : "closed"} />
           <button
             onClick={async () => {

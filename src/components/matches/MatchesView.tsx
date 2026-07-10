@@ -372,9 +372,13 @@ export function MatchesView() {
             )}
           </div>
 
-          {/* Result filter pills */}
+          {/* Result filter pills — horizontally scrollable, matching
+              LeaderboardView's identical treatment: five pills' rendered
+              width depends on actual font metrics, not just this estimate,
+              so a scroll fallback is cheap insurance against clipping on
+              narrow phones rather than a hard breakpoint-tested guarantee. */}
           <div
-            className="flex items-center gap-1"
+            className="flex items-center gap-1 overflow-x-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]"
             role="group"
             aria-label="Filter by result"
           >
@@ -386,7 +390,7 @@ export function MatchesView() {
                   onClick={() => setResultFilter(key)}
                   aria-pressed={active}
                   className={cn(
-                    "h-9 px-2.5 flex items-center rounded-md text-xs font-medium flex-shrink-0",
+                    "h-9 px-2.5 flex items-center rounded-md text-xs font-medium flex-shrink-0 whitespace-nowrap",
                     "transition-all duration-150",
                     "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50",
                     active
@@ -593,7 +597,7 @@ function MatchRow({
       role="listitem"
       onClick={selectable ? onToggleSelect : undefined}
       className={cn(
-        "flex items-center gap-3 px-4 sm:px-6 py-3 border-b border-border",
+        "flex flex-col lg:flex-row lg:items-center gap-2 lg:gap-3 px-4 sm:px-6 py-3 border-b border-border",
         "hover:bg-surface-elevated/40 transition-colors",
         match.status === "VOIDED" && "opacity-50",
         isConfirming && "ring-1 ring-inset ring-error/30 bg-error/5",
@@ -601,97 +605,107 @@ function MatchRow({
         selectMode && isSelected && "ring-1 ring-inset ring-primary/30 bg-primary/5"
       )}
     >
-      {/* Selection checkbox — only COMPLETED matches can be batch-voided */}
-      {selectMode && (
-        <div className="flex-shrink-0 w-5 flex items-center justify-center">
-          {selectable && (
-            <input
-              type="checkbox"
-              checked={isSelected}
-              onChange={onToggleSelect}
-              onClick={(e) => e.stopPropagation()}
-              className="h-4 w-4 cursor-pointer accent-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
-              aria-label={`Select match: ${matchupText}`}
-            />
-          )}
-        </div>
-      )}
+      {/* Row 1 below lg: (checkbox +) meta/matchup, given the full row width so
+          player pills no longer share space with the badge/action area. At
+          lg:, `contents` drops this wrapper's own box so its children rejoin
+          the outer row as direct flex items — the exact pre-existing desktop
+          layout, same DOM/refs, no duplicated markup. */}
+      <div className="flex items-center gap-3 lg:contents">
+        {/* Selection checkbox — only COMPLETED matches can be batch-voided */}
+        {selectMode && (
+          <div className="flex-shrink-0 w-5 flex items-center justify-center">
+            {selectable && (
+              <input
+                type="checkbox"
+                checked={isSelected}
+                onChange={onToggleSelect}
+                onClick={(e) => e.stopPropagation()}
+                className="h-4 w-4 cursor-pointer accent-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+                aria-label={`Select match: ${matchupText}`}
+              />
+            )}
+          </div>
+        )}
 
-      {/* Meta + matchup */}
-      <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-1.5 mb-1">
-          <span className="text-xs font-mono text-muted tabular-nums flex-shrink-0">
-            {time}
-          </span>
-          <span className="text-muted/40 text-xs leading-none" aria-hidden>·</span>
-          <span className="text-xs text-muted truncate">{courtType}</span>
-        </div>
-        <div className="flex items-center gap-1.5 min-w-0" aria-label={matchupText}>
-          <span aria-hidden="true" className="contents">
-            <TeamChip players={match.sideA} />
-            <span className="text-[10px] font-semibold uppercase tracking-wide text-muted/60 flex-shrink-0">
-              vs
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-1.5 mb-1">
+            <span className="text-xs font-mono text-muted tabular-nums flex-shrink-0">
+              {time}
             </span>
-            <TeamChip players={match.sideB} />
-          </span>
+            <span className="text-muted/40 text-xs leading-none" aria-hidden>·</span>
+            <span className="text-xs text-muted truncate">{courtType}</span>
+          </div>
+          <div className="flex items-center gap-1.5 min-w-0" aria-label={matchupText}>
+            <span aria-hidden="true" className="contents">
+              <TeamChip players={match.sideA} />
+              <span className="text-[10px] font-semibold uppercase tracking-wide text-muted/60 flex-shrink-0">
+                vs
+              </span>
+              <TeamChip players={match.sideB} />
+            </span>
+          </div>
         </div>
       </div>
 
-      {/* Result badge */}
-      <span
-        className={cn(
-          "text-xs font-medium px-2 py-0.5 rounded flex-shrink-0 max-w-[96px] truncate",
-          BADGE_STYLES[badgeVariant]
-        )}
-        title={badgeLabel}
-      >
-        {badgeLabel}
-      </span>
+      {/* Row 2 below lg: result badge (left) + action button(s) (right). Same
+          `contents` trick rejoins the outer row at lg:. */}
+      <div className="flex items-center justify-between lg:contents">
+        {/* Result badge */}
+        <span
+          className={cn(
+            "text-xs font-medium px-2 py-0.5 rounded flex-shrink-0 max-w-[96px] truncate",
+            BADGE_STYLES[badgeVariant]
+          )}
+          title={badgeLabel}
+        >
+          {badgeLabel}
+        </span>
 
-      {/* Void / Restore area — hidden in select mode, replaced by the checkbox */}
-      {!selectMode && (
-        <div className="flex-shrink-0 flex items-center justify-end gap-1 min-w-[72px]">
-          {match.status === "COMPLETED" && !isConfirming && (
-            <button
-              ref={voidBtnRef}
-              onClick={onVoidStart}
-              className="text-xs text-muted hover:text-error transition-colors px-2 py-1 rounded min-h-[44px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-border"
-              aria-label={`Void match: ${matchupText}`}
-            >
-              Void
-            </button>
-          )}
-          {match.status === "VOIDED" && (
-            <button
-              ref={restoreBtnRef}
-              onClick={onRestore}
-              className="text-xs text-primary hover:text-primary-hover transition-colors px-2 py-1 rounded min-h-[44px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
-              aria-label={`Restore match: ${matchupText}`}
-            >
-              Restore
-            </button>
-          )}
-          {isConfirming && (
-            <>
+        {/* Void / Restore area — hidden in select mode, replaced by the checkbox */}
+        {!selectMode && (
+          <div className="flex-shrink-0 flex items-center justify-end gap-1 min-w-[72px]">
+            {match.status === "COMPLETED" && !isConfirming && (
               <button
-                ref={cancelBtnRef}
-                onClick={onVoidCancel}
-                aria-label="Cancel void"
-                className="text-xs text-muted hover:text-ink transition-colors px-3 py-1 rounded min-h-[44px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-border"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={onVoidConfirm}
-                aria-label="Confirm void"
-                className="text-xs text-error font-medium hover:text-error/70 transition-colors px-3 py-1 rounded min-h-[44px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-error/40"
+                ref={voidBtnRef}
+                onClick={onVoidStart}
+                className="text-xs text-muted hover:text-error transition-colors px-2 py-1 rounded min-h-[44px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-border"
+                aria-label={`Void match: ${matchupText}`}
               >
                 Void
               </button>
-            </>
-          )}
-        </div>
-      )}
+            )}
+            {match.status === "VOIDED" && (
+              <button
+                ref={restoreBtnRef}
+                onClick={onRestore}
+                className="text-xs text-primary hover:text-primary-hover transition-colors px-2 py-1 rounded min-h-[44px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+                aria-label={`Restore match: ${matchupText}`}
+              >
+                Restore
+              </button>
+            )}
+            {isConfirming && (
+              <>
+                <button
+                  ref={cancelBtnRef}
+                  onClick={onVoidCancel}
+                  aria-label="Cancel void"
+                  className="text-xs text-muted hover:text-ink transition-colors px-3 py-1 rounded min-h-[44px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-border"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={onVoidConfirm}
+                  aria-label="Confirm void"
+                  className="text-xs text-error font-medium hover:text-error/70 transition-colors px-3 py-1 rounded min-h-[44px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-error/40"
+                >
+                  Void
+                </button>
+              </>
+            )}
+          </div>
+        )}
+      </div>
     </div>
   );
 }

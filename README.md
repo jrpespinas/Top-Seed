@@ -43,6 +43,33 @@ If you want the app to live at a domain you own (e.g., `badminton.yourclub.com`)
 
 This step is entirely optional — the free `vercel.app` address works exactly the same way.
 
+## Installing it on a phone or tablet
+
+Top Seed can be installed like a real app — an icon on the home screen, opens full-screen with no browser address bar, and keeps working even if the gym's wifi drops mid-session. This is a one-time, per-device setup: do it once on the tablet or phone you'll actually be running sessions from.
+
+### On iPhone or iPad
+
+This only works in **Safari** — Chrome and other browsers on iOS aren't allowed to install apps to the home screen, even though they can open the site fine.
+
+1. Open your app's link in **Safari**.
+2. Tap the **Share** icon (the square with an arrow pointing up), in the bottom toolbar.
+3. Scroll down and tap **Add to Home Screen**.
+4. Confirm the name (defaults to "Top Seed") and tap **Add** in the top right.
+
+An icon now sits on your home screen like any other app.
+
+### On Android
+
+1. Open your app's link in **Chrome**.
+2. You'll often see an **Install** banner appear automatically at the bottom of the screen — tap it. If it doesn't appear, tap the **⋮** menu (top right) and look for **Install app** or **Add to Home screen**.
+3. Confirm by tapping **Install**.
+
+### After installing
+
+- Opening it from the home screen icon feels like a normal app — no browser bar, no tabs.
+- It keeps working without an internet connection after the first time it's opened, so a dead spot in the gym won't interrupt an in-progress session.
+- Remember the earlier point about data being per-device: installing it on a phone and a tablet gives you two separate, independent copies of the app, not one synced instance.
+
 ## Keeping your instance up to date
 
 If the original project receives updates and you want them reflected in your copy:

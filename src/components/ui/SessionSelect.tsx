@@ -118,8 +118,8 @@ export function SessionSelect({
         )}
       >
         <CalendarDays size={13} strokeWidth={2} className="text-muted flex-shrink-0" aria-hidden />
-        <span className="truncate max-w-[88px] sm:max-w-none">
-          {selected ? formatSessionDate(selected.label) : "Select session"}
+        <span className="truncate max-w-[88px] sm:max-w-[180px]">
+          {selected ? selected.label : "Select session"}
         </span>
         {selected?.isOpen && (
           <>
@@ -168,7 +168,10 @@ export function SessionSelect({
                   s.id === highlighted && "bg-surface-elevated"
                 )}
               >
-                <span className="flex-1 truncate">{formatSessionDate(s.label)}</span>
+                <span className="flex-1 min-w-0">
+                  <span className="block truncate">{s.label}</span>
+                  <span className="block text-xs text-muted truncate">{formatSessionDate(s.date)}</span>
+                </span>
                 {s.isOpen && <StatusBadge status="open" className="flex-shrink-0" />}
                 {value === s.id && (
                   <Check size={14} strokeWidth={2.5} className="text-primary flex-shrink-0" aria-hidden />

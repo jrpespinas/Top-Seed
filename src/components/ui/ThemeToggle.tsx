@@ -44,10 +44,7 @@ export function ThemeToggle({ className }: { className?: string }) {
   if (!mounted) {
     return (
       <div
-        className={cn(
-          "flex flex-col items-center gap-0.5 w-full py-2 rounded-md",
-          className
-        )}
+        className={cn("flex flex-col items-center gap-0.5 py-2 rounded-md", className)}
         aria-hidden
       />
     );
@@ -59,7 +56,7 @@ export function ThemeToggle({ className }: { className?: string }) {
       aria-label={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
       title={theme === "dark" ? "Light mode" : "Dark mode"}
       className={cn(
-        "flex flex-col items-center gap-0.5 w-full py-2 rounded-md",
+        "flex flex-col items-center gap-0.5 py-2 rounded-md",
         "bg-surface-elevated text-muted hover:text-ink",
         "transition-colors duration-150",
         "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary",

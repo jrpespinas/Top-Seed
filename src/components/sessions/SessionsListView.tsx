@@ -71,6 +71,7 @@ function DeleteArchivedSessionButton({ sessionId }: { sessionId: string }) {
 
 interface SessionListRow {
   id: string;
+  name: string;
   date: string;
   status: "OPEN" | "CLOSED";
   playerCount: number;
@@ -133,6 +134,7 @@ export function SessionsListView() {
       const { paid, unpaid, waived } = tallyPayments(players);
       openRow.push({
         id: currentSession.id,
+        name: currentSession.name,
         date: currentSession.date,
         status: "OPEN",
         playerCount: players.length,
@@ -148,6 +150,7 @@ export function SessionsListView() {
       const { paid, unpaid, waived } = tallyPayments(record.players);
       return {
         id: record.id,
+        name: record.name,
         date: record.date,
         status: "CLOSED",
         playerCount: record.players.length,
@@ -191,7 +194,7 @@ export function SessionsListView() {
         <table className="w-full border-collapse" role="grid" aria-label="Session history">
           <thead className={cn("sticky top-14 z-[var(--z-sticky)] transition-colors duration-200", headerShadow ? "bg-surface-elevated" : "bg-bg")}>
             <tr className="border-b border-border">
-              <th scope="col" className="text-left text-xs font-medium text-muted pl-4 sm:pl-6 pr-3 py-2.5 whitespace-nowrap">Date</th>
+              <th scope="col" className="text-left text-xs font-medium text-muted pl-4 sm:pl-6 pr-3 py-2.5 whitespace-nowrap">Session</th>
               <th scope="col" className="text-left text-xs font-medium text-muted px-3 py-2.5 whitespace-nowrap w-[84px]">Status</th>
               <th scope="col" className="hidden sm:table-cell text-right text-xs font-medium text-muted px-3 py-2.5 whitespace-nowrap w-[64px]">Players</th>
               <th scope="col" className="hidden md:table-cell text-right text-xs font-medium text-muted px-3 py-2.5 whitespace-nowrap w-[64px]">Matches</th>
@@ -215,11 +218,12 @@ export function SessionsListView() {
                 }}
                 tabIndex={0}
                 role="row"
-                aria-label={`${formatSessionDate(row.date)}, ${row.status === "OPEN" ? "open" : "closed"}`}
+                aria-label={`${row.name}, ${formatSessionDate(row.date)}, ${row.status === "OPEN" ? "open" : "closed"}`}
                 className="group border-b border-border/50 cursor-pointer transition-colors duration-100 hover:bg-surface-elevated/40 focus-visible:outline-none focus-visible:bg-surface-elevated/40"
               >
                 <td className="pl-4 sm:pl-6 pr-3 py-3">
-                  <span className="text-sm font-medium text-ink">{formatSessionDate(row.date)}</span>
+                  <span className="block text-sm font-medium text-ink truncate max-w-[200px] sm:max-w-none">{row.name}</span>
+                  <span className="block text-xs text-muted mt-0.5">{formatSessionDate(row.date)}</span>
                 </td>
                 <td className="px-3 py-3">
                   <StatusBadge status={row.status === "OPEN" ? "open" : "closed"} />

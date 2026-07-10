@@ -18,6 +18,14 @@ export function formatSessionDate(iso: string): string {
   });
 }
 
+/** Pre-fill/fallback session name — time-of-day, not a counter, so it stays meaningful even when an organizer never touches the field. */
+export function getDefaultSessionName(date: Date = new Date()): string {
+  const hour = date.getHours();
+  if (hour < 12) return "Morning Session";
+  if (hour < 17) return "Afternoon Session";
+  return "Evening Session";
+}
+
 export const SKILL_LABELS: Record<string, string> = {
   S: "Professional",
   A: "Advanced",

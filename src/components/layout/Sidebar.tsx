@@ -18,7 +18,7 @@ const navItems = [
   { href: "/sessions",    icon: CalendarDays, label: "Sessions"    },
   { href: "/players",     icon: Users,        label: "Players"     },
   { href: "/matches",     icon: Activity,     label: "Matches"     },
-  { href: "/leaderboard", icon: Trophy,       label: "Leaderboard" },
+  { href: "/leaderboard", icon: Trophy,       label: "Rankings"    },
 ];
 
 function NavItem({
@@ -38,14 +38,15 @@ function NavItem({
       aria-label={label}
       aria-current={active ? "page" : undefined}
       className={cn(
-        "flex flex-col items-center gap-0.5 w-full py-2 rounded-md transition-colors duration-150",
+        "flex flex-col items-center justify-center gap-0.5 w-full min-h-[44px] py-2 rounded-md transition-colors duration-150",
+        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50",
         active
           ? "bg-primary text-bg"
           : "text-muted hover:text-ink hover:bg-surface-elevated"
       )}
     >
       <Icon size={16} strokeWidth={active ? 2.5 : 1.75} aria-hidden />
-      <span className="text-[9px] font-medium leading-none">{label}</span>
+      <span className="text-[9px] font-medium leading-none truncate max-w-full px-0.5">{label}</span>
     </Link>
   );
 }
@@ -80,7 +81,7 @@ export function Sidebar() {
 
       {/* Theme toggle + settings pinned to bottom */}
       <div className="px-2 pb-3 border-t border-border pt-3 flex flex-col gap-1">
-        <ThemeToggle />
+        <ThemeToggle className="w-full min-h-[44px] justify-center" />
         <NavItem
           href="/settings"
           icon={Settings}

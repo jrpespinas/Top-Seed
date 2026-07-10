@@ -102,6 +102,7 @@ export interface MatchRecord {
 // never stored here (they'd immediately go stale).
 export interface CurrentSession {
   id: string;
+  name: string;
   date: string; // ISO, when started
 }
 
@@ -119,6 +120,7 @@ export interface SessionPlayerSnapshot {
 
 export interface SessionRecord {
   id: string;
+  name: string;
   date: string; // ISO, when started
   closedAt: string; // ISO, when closed
   players: SessionPlayerSnapshot[];

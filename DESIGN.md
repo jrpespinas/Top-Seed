@@ -239,16 +239,17 @@ Active-state colors are semantic, not decorative: Paid uses `success/15` backgro
 
 ### Navigation
 
-Two complementary nav surfaces — Sidebar (desktop) and BottomBar (mobile) — sharing an identical item vocabulary.
+Two complementary nav surfaces — Sidebar and BottomBar — sharing an identical primary-item vocabulary. `md:` (768px) is the single switch point between them, which per this project's own breakpoint definitions (`CLAUDE.md` — Tablet: 768px+) makes Sidebar the tablet **and** desktop nav, not desktop-only; BottomBar serves phones exclusively.
 
-**Sidebar** (`hidden md:flex`): Fixed-left, 80px wide (`w-20`), `bg-surface border-r border-border`, `z-sticky`. Logo lockup at top (64px tall header, "TS" in Court Copper, Space Grotesk Bold 18px). Nav items stacked vertically with icon (16px) above label (9px, font-medium). Settings and ThemeToggle pinned to the bottom.
+**Sidebar** (`hidden md:flex`, 768px+): Fixed-left, 80px wide (`w-20`), `bg-surface border-r border-border`, `z-sticky`. Logo lockup at top (64px tall header, "TS" in Court Copper, Space Grotesk Bold 18px). Nav items stacked vertically with icon (16px) above label (9px, font-medium), each `min-h-[44px]`. Settings and ThemeToggle are pinned to the bottom below a divider, matching the same 44px floor and icon/label sizing as the primary items above them.
 
-**BottomBar** (`md:hidden`): Fixed-bottom, 60px tall, same `bg-surface border-t border-border`. Five items across the full width. Icons at 20px (slightly larger than sidebar for thumb recognition).
+**BottomBar** (`md:hidden`, below 768px): Fixed-bottom, 60px tall, same `bg-surface border-t border-border`. Five primary destinations share the row as equal `flex-1` slots (Dashboard, Sessions, Players, Matches, Rankings — same order and same nav labels as Sidebar), icons at 20px (slightly larger than sidebar for thumb recognition), labels at 10px. The Leaderboard feature's nav label reads "Rankings" (not "Leaderboard") in both surfaces — at 375px's ~52px-per-item budget, "Leaderboard" (11 characters) doesn't fit without truncating; "Rankings" (8 characters) does, and it's already the app's own internal vocabulary for this feature (see the empty states and `aria-label`s in `LeaderboardView.tsx`). The page itself still opens on a "Leaderboard" heading — only the nav label changed. A vertical divider separates the primary five from a narrower fixed-width utility segment — Settings then ThemeToggle, each pinned to a 48px column — deliberately sized down to Sidebar's own convention rather than the Bottom Bar's primary-row sizing: icons at 16px, labels at 9px, both items matching each other exactly so the utility pair reads as one consistent secondary tier. Seven interactive targets in total, all `min-h-[44px]` regardless of segment.
 
 **Item states** (shared vocabulary):
 - Default: `text-muted`, icon `strokeWidth={1.75}`
 - Active: `bg-primary text-bg` (sidebar) / `text-primary` (bottom bar, no fill), icon `strokeWidth={2.5}`
 - Hover: `hover:text-ink hover:bg-surface-elevated` (sidebar only — bottom bar has no hover)
+- Focus: `focus-visible:ring-2 focus-visible:ring-primary/50` on every nav item in both surfaces — `ring-inset` on Bottom Bar's edge-flush items (the primary five and Settings) so the ring stays inside the element instead of risking clipping against the viewport edge.
 
 The active sidebar item gets a copper fill block (`bg-primary text-bg`), making it the only non-text copper element in the nav. Bottom bar active is copper text only (no fill) — appropriate for a touch surface where fill can feel heavy.
 
