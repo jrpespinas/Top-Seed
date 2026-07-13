@@ -3,23 +3,28 @@ import { cn, SKILL_LABELS, SKILL_LABELS_SHORT } from "@/lib/utils";
 
 // A named-tier material ladder (see the --color-skill-* tokens in
 // globals.css): Newbie → Bronze → Silver → Gold → Emerald → Platinum →
-// Diamond. Two reinforcing channels carry rank, not one — hue temperature
-// (warm/muted low tiers → cool/vivid high tiers) AND fill weight (barely-
-// there tint at the bottom → solid fill at the top).
+// Diamond. Rank reads through color identity alone — hue temperature and
+// chroma climb from muted/warm at the bottom to vivid/cool at the top —
+// since every tier now shares the same fill treatment.
 //
-// The Filled Tier Rule: S and A are solid fills with inverted (bg-color)
-// text — unmistakably "filled," like a real medal, not a tinted chip. B
-// through F stay unfilled (tinted background + colored text + border),
-// fading toward nothing at F. Diluting "filled" across more than two tiers
-// would make neither one read as elite.
+// The Filled Tier Rule: every level is a solid fill, not just the top ones —
+// a real medal, not a tinted chip, at every rank. Fading a low tier down to
+// a near-invisible tint read as "forgot to color this one" rather than
+// "deliberately restrained," so all seven are equally filled and let hue/
+// chroma alone carry the ladder. Text is plain `text-black` — not the
+// theme-relative `text-bg`, and not a custom CSS-variable token either
+// (a prior version used one; a newly-added Tailwind theme key needs a dev
+// server restart to take effect, and without it the class silently produced
+// no rule at all) — since the fill itself is fixed across both themes (see
+// the globals.css comment), pure black needs no indirection to stay correct.
 const variants: Record<SkillLevel, string> = {
-  S: "bg-skill-s text-bg border border-skill-s/50",
-  A: "bg-skill-a/90 text-bg border border-skill-a/60",
-  B: "bg-skill-b/30 text-skill-b border border-skill-b/40",
-  C: "bg-skill-c/16 text-skill-c border border-skill-c/28",
-  D: "bg-skill-d/10 text-skill-d border border-skill-d/20",
-  E: "bg-skill-e/6 text-skill-e border border-skill-e/14",
-  F: "bg-skill-f/3 text-skill-f border border-skill-f/8",
+  S: "bg-skill-s text-black border border-skill-s/50",
+  A: "bg-skill-a text-black border border-skill-a/50",
+  B: "bg-skill-b text-black border border-skill-b/50",
+  C: "bg-skill-c text-black border border-skill-c/50",
+  D: "bg-skill-d text-black border border-skill-d/50",
+  E: "bg-skill-e text-black border border-skill-e/50",
+  F: "bg-skill-f text-black border border-skill-f/50",
 };
 
 export function SkillBadge({

@@ -25,20 +25,27 @@
      "Professional" (S) needs to look like the rarest material on the ladder,
      so it's the coolest, brightest, most saturated step, not the warmest.
      Hues are spaced ≥35° apart at every adjacent step — S and A sit 50°
-     apart (blue vs teal) specifically because they're the two filled tiers
-     and render right next to each other constantly; anything closer reads
-     as "the same color" once compressed into a small badge (verified against
-     a live queue screenshot where a first pass at 10° apart was genuinely
-     indistinguishable). D's chroma is deliberately non-trivial (0.045, not
-     ~0.015) so "Silver" reads as a cool metal tint, not a disabled-looking
-     flat gray. The arc also routes around the warning (75°) and error (25°)
-     hues — PlayersView shows a SkillBadge next to a PaymentToggle in the
-     same row, and a mid-tier skill badge should never visually echo
-     "unpaid"/"error" a few columns over. See DESIGN.md's Skill Badge
-     section for the full tier table and the Filled Tier rule. */
-  --color-skill-f-raw:            0.600 0.010 38;   /* Newbie — unranked ash */
+     apart (blue vs teal) since they render right next to each other
+     constantly; anything closer reads as "the same color" once compressed
+     into a small badge (verified against a live queue screenshot where a
+     first pass at 10° apart was genuinely indistinguishable). F and D carry
+     deliberately non-trivial chroma (0.035 and 0.09, not ~0.01/~0.015) so
+     "Newbie" and "Silver" read as intentional muted material tints, not a
+     plain gray/white border. They're still the two most restrained steps on
+     the ladder, just not achromatic.
+
+     Deliberately NOT redefined under [data-theme="light"] below, unlike
+     every other color group in this file — a skill badge is a fixed medal,
+     not theme-adaptive body text; it must render as the exact same color
+     regardless of which theme the organizer has open. All seven tiers use
+     a solid fill (see SkillBadge.tsx's Filled Tier rule) with plain
+     `text-black` (Tailwind's built-in, not a custom token here) as the
+     label color, since fixed pure black needs no per-theme variant and no
+     CSS-variable indirection to stay correct against these fill lightnesses
+     (all ≥0.6). See DESIGN.md's Skill Badge section for the full tier table. */
+  --color-skill-f-raw:            0.600 0.035 38;   /* Newbie — unranked ash, warm-tinted not gray */
   --color-skill-e-raw:            0.640 0.135 40;   /* Beginner — Bronze */
-  --color-skill-d-raw:            0.780 0.045 230;  /* Upper Beginner — Silver */
+  --color-skill-d-raw:            0.780 0.090 230;  /* Upper Beginner — Silver, cool-tinted not gray */
   --color-skill-c-raw:            0.800 0.160 92;   /* Intermediate — Gold */
   --color-skill-b-raw:            0.720 0.170 150;  /* Upper Intermediate — Emerald */
   --color-skill-a-raw:            0.760 0.135 185;  /* Advanced — Platinum */
@@ -160,22 +167,10 @@ body {
   --color-warning-raw:          0.42 0.14 75;      /* darkened amber */
   --color-error-raw:            0.38 0.21 25;      /* darkened error */
 
-  /* Skill-level ramp — same named-tier construction as dark theme (see
-     :root), darkened for correct contrast against a white surface. S/A stay
-     dark+saturated rather than light — they render as solid fills with
-     inverted (white) text in both themes, the same pattern --color-primary
-     already uses for button-primary. Same ≥35°-apart hue spacing as dark
-     theme (S/A specifically 50° apart, blue vs teal) — a first pass had them
-     only 10° apart and they rendered as the same dark teal chip in a live
-     screenshot. D's chroma is bumped (0.05, not ~0.02) so "Silver" reads as
-     a cool metal tint instead of a disabled-looking flat gray. */
-  --color-skill-f-raw:          0.420 0.010 38;   /* Newbie — unranked ash */
-  --color-skill-e-raw:          0.430 0.140 40;   /* Beginner — Bronze */
-  --color-skill-d-raw:          0.420 0.050 230;  /* Upper Beginner — Silver */
-  --color-skill-c-raw:          0.480 0.165 92;   /* Intermediate — Gold */
-  --color-skill-b-raw:          0.390 0.170 150;  /* Upper Intermediate — Emerald */
-  --color-skill-a-raw:          0.400 0.150 185;  /* Advanced — Platinum */
-  --color-skill-s-raw:          0.370 0.170 235;  /* Professional — Diamond */
+  /* Skill-level ramp: deliberately absent here. See the long comment in
+     :root — skill badge colors are fixed across both themes on purpose, so
+     this block intentionally does not redefine them; the :root values apply
+     unchanged under this selector too. */
 
   /* Semantic aliases */
   --color-bg:               oklch(var(--color-bg-raw));
@@ -190,13 +185,6 @@ body {
   --color-success:          oklch(var(--color-success-raw));
   --color-warning:          oklch(var(--color-warning-raw));
   --color-error:            oklch(var(--color-error-raw));
-  --color-skill-s:          oklch(var(--color-skill-s-raw));
-  --color-skill-a:          oklch(var(--color-skill-a-raw));
-  --color-skill-b:          oklch(var(--color-skill-b-raw));
-  --color-skill-c:          oklch(var(--color-skill-c-raw));
-  --color-skill-d:          oklch(var(--color-skill-d-raw));
-  --color-skill-e:          oklch(var(--color-skill-e-raw));
-  --color-skill-f:          oklch(var(--color-skill-f-raw));
 }
 
 /* ─── Theme switching transition (JS-triggered, ~250ms window) ────────────── */

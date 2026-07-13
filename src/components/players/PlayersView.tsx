@@ -469,7 +469,7 @@ export function PlayersView() {
           )}
         >
           {/* Title bar */}
-          <div className="flex items-center gap-2.5 px-4 sm:px-6 h-14">
+          <div className="flex items-center gap-2.5 px-4 sm:px-6 h-14 border-b border-border">
             <h1 className="text-base font-semibold text-ink">Players</h1>
             <span className="font-mono text-xs text-muted tabular-nums">
               ({filteredAndSorted.length})

@@ -37,7 +37,7 @@ export function CourtsSection({
       {/* Header */}
       <div className="flex items-center justify-between px-3 pt-3 pb-2.5 flex-shrink-0 border-b border-border">
         <h2 className="flex items-center gap-2 text-sm font-semibold text-ink">
-          <Grid3X3 size={15} strokeWidth={2} className="text-muted" aria-hidden />
+          <Grid3X3 size={14} strokeWidth={2} className="text-muted" aria-hidden />
           Courts
           <span className="font-mono text-xs text-muted font-normal tabular-nums">
             ({courts.length})
@@ -46,10 +46,10 @@ export function CourtsSection({
 
         <button
           onClick={onAdd}
-          className="flex items-center gap-1 text-xs text-muted hover:text-ink hover:bg-surface-elevated transition-colors px-2 py-1.5 rounded-sm border border-border/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-border min-h-[36px]"
+          className="flex items-center gap-1 text-xs text-muted hover:text-ink hover:bg-surface-elevated transition-colors px-2 py-1.5 rounded-sm border border-border/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-border"
           aria-label="Add a court"
         >
-          <Plus size={12} strokeWidth={2.5} aria-hidden />
+          <Plus size={11} strokeWidth={2.5} aria-hidden />
           Add
         </button>
       </div>

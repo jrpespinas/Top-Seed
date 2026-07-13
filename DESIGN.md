@@ -206,17 +206,19 @@ Extracted to `useConfirmFocus(isConfirming, swapped?)` in `src/hooks/useConfirmF
 
 The most frequently rendered component — appears on every player row, chip, and picker. A compact badge (`h-5`, `rounded-sm` 4px, content-width) in JetBrains Mono Bold at 10px. Seven levels (S → F) map to a named-tier material ladder — Newbie → Bronze → Silver → Gold → Emerald → Platinum → Diamond — not an arbitrary rainbow. The ladder deliberately does **not** put warm copper at the top: copper reads as "bronze" in every familiar ranking vocabulary, a low tier, not the summit. "Professional" (S) is the coolest, brightest, most saturated step instead — Diamond, not Bronze.
 
+**Skill badge colors are identical in both themes** — the one deliberate exception to this system's usual dark/light color-pair convention. A skill badge is a fixed medal, not theme-adaptive body text; the `--color-skill-*` tokens are defined once in `:root` and intentionally not redefined under `[data-theme="light"]`. Label text is plain `text-black` (Tailwind's built-in, not a custom CSS-variable token) — fixed pure black needs no theme variant and no indirection to stay correct.
+
 | Level | Tier | Background | Text | Border |
 |-------|------|-----------|------|--------|
-| S | Diamond | `bg-skill-s` (solid) | `text-bg` | `border-skill-s/50` |
-| A | Platinum | `bg-skill-a/90` (solid) | `text-bg` | `border-skill-a/60` |
-| B | Emerald | `bg-skill-b/30` | `text-skill-b` | `border-skill-b/40` |
-| C | Gold | `bg-skill-c/16` | `text-skill-c` | `border-skill-c/28` |
-| D | Silver | `bg-skill-d/10` | `text-skill-d` | `border-skill-d/20` |
-| E | Bronze | `bg-skill-e/6` | `text-skill-e` | `border-skill-e/14` |
-| F | Newbie | `bg-skill-f/3` | `text-skill-f` | `border-skill-f/8` |
+| S | Diamond | `bg-skill-s` (solid) | `text-black` | `border-skill-s/50` |
+| A | Platinum | `bg-skill-a` (solid) | `text-black` | `border-skill-a/50` |
+| B | Emerald | `bg-skill-b` (solid) | `text-black` | `border-skill-b/50` |
+| C | Gold | `bg-skill-c` (solid) | `text-black` | `border-skill-c/50` |
+| D | Silver | `bg-skill-d` (solid) | `text-black` | `border-skill-d/50` |
+| E | Bronze | `bg-skill-e` (solid) | `text-black` | `border-skill-e/50` |
+| F | Newbie | `bg-skill-f` (solid) | `text-black` | `border-skill-f/50` |
 
-**The Filled Tier Rule.** S and A are solid fills with inverted (`text-bg`) text — unmistakably "filled," like a real medal, not a tinted chip. B through F stay unfilled (tinted background + colored text + border), fading toward nearly nothing at F. Rank reads through two reinforcing channels — hue temperature (warm/muted low tiers → cool/vivid high tiers) and fill weight (barely-there tint → solid fill) — not color alone. Diluting "filled" across more than two tiers would make neither one read as elite. Never use a color outside this table for skill levels — the gradation is the signal.
+**The Filled Tier Rule.** Every level is a solid fill, not just the top ones — a real medal at every rank, not a tinted chip that fades toward invisible at the bottom. An earlier version faded low tiers down to a 3-16% background tint; that read as "forgot to color this one," not "deliberately restrained." Rank now reads through hue temperature and chroma alone (warm/muted low tiers → cool/vivid high tiers), carried by a uniform fill treatment across all seven. Text is always plain `text-black`, never the theme-relative `text-bg` — since the fill color itself doesn't change between themes, the label color can't either, and a fixed value needs no custom token. Never use a color outside this table for skill levels — the gradation is the signal.
 
 ### Gender Icon
 

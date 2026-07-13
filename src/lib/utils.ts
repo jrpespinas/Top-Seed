@@ -11,7 +11,7 @@ export function cn(...classes: (string | false | null | undefined)[]): string {
 // changes.
 export const THEME_COLOR: Record<"dark" | "light", string> = {
   dark: "#020202",
-  light: "#ffffff",
+  light: "#020202",
 };
 
 export function formatElapsedMs(ms: number): string {
