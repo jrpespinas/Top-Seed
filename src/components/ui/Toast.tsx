@@ -60,18 +60,23 @@ export function ToastViewport({
       role={toast.onUndo ? "alert" : "status"}
       aria-live={toast.onUndo ? "assertive" : "polite"}
       className={cn(
-        "fixed bottom-[76px] md:bottom-6 left-1/2 -translate-x-1/2 flex items-center gap-2 bg-surface-elevated border border-border text-ink text-xs font-medium px-4 py-2.5 rounded-full shadow-lg z-[var(--z-toast)] animate-toast whitespace-nowrap",
+        "fixed bottom-[76px] md:bottom-6 left-1/2 -translate-x-1/2 flex items-center gap-2 bg-surface-elevated border border-border text-ink text-xs font-medium px-4 py-2.5 rounded-full shadow-lg z-[var(--z-toast)] animate-toast max-w-[calc(100vw-2rem)]",
         toast.onUndo ? "pointer-events-auto" : "pointer-events-none"
       )}
     >
       <Check size={12} strokeWidth={2.5} className="text-success flex-shrink-0" aria-hidden />
-      {toast.message}
+      {/* flex-1 + min-w-0 lets this truncate instead of forcing the pill past
+          the viewport — full player names (see PlanningCard, CourtCard,
+          DashboardClient) run longer than this was originally sized for. */}
+      <span className="truncate min-w-0 flex-1" title={toast.message}>
+        {toast.message}
+      </span>
       {toast.onUndo && (
         <>
           <span className="w-px h-3 bg-border mx-0.5 flex-shrink-0" aria-hidden />
           <button
             onClick={onDismissAndUndo}
-            className="text-primary hover:text-primary-hover font-semibold transition-colors rounded-sm px-1 -mx-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
+            className="text-primary hover:text-primary-hover font-semibold transition-colors rounded-sm px-1 -mx-1 flex-shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
             aria-label={toast.undoLabel ?? "Undo"}
           >
             Undo

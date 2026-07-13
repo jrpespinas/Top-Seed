@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Space_Grotesk, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
 import { AppShell } from "@/components/layout/AppShell";
+import { THEME_COLOR } from "@/lib/utils";
 
 const spaceGrotesk = Space_Grotesk({
   subsets: ["latin"],
@@ -41,10 +42,19 @@ export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
   viewportFit: "cover",
-  themeColor: "#020202",
+  // Server-rendered default for the pre-hydration instant — matches the
+  // dark theme's own default. The inline script below immediately corrects
+  // this to the user's actual resolved theme (localStorage or OS
+  // preference) before paint, and ThemeToggle keeps it in sync afterward —
+  // this static value alone can't track a user-toggled theme.
+  themeColor: THEME_COLOR.dark,
 };
 
-const themeScript = `(function(){try{var s=localStorage.getItem('ts-theme');document.documentElement.dataset.theme=s||(matchMedia('(prefers-color-scheme:light)').matches?'light':'dark')}catch(e){}})()`;
+// Runs before paint: resolves the theme (localStorage, else OS preference),
+// sets data-theme, and syncs <meta name="theme-color"> to match — without
+// this, the browser/PWA chrome color would stay stuck on the server-rendered
+// default even when the resolved theme is light.
+const themeScript = `(function(){try{var s=localStorage.getItem('ts-theme');var t=s||(matchMedia('(prefers-color-scheme:light)').matches?'light':'dark');document.documentElement.dataset.theme=t;var c=t==='light'?'${THEME_COLOR.light}':'${THEME_COLOR.dark}';var m=document.querySelector('meta[name="theme-color"]');if(m){m.setAttribute('content',c);}else{m=document.createElement('meta');m.name='theme-color';m.content=c;document.head.appendChild(m);}}catch(e){}})()`;
 
 export default function RootLayout({
   children,

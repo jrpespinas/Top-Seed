@@ -2,6 +2,18 @@ export function cn(...classes: (string | false | null | undefined)[]): string {
   return classes.filter(Boolean).join(" ");
 }
 
+// Hex mirrors of --color-bg-raw for each theme (globals.css) — the browser's
+// <meta name="theme-color"> can't read CSS custom properties, so the app's
+// canvas color needs a literal duplicate here. Single source of truth for
+// both the inline pre-paint script (layout.tsx) and the manual toggle
+// (ThemeToggle.tsx), which both need to update the tag when the theme is
+// user-selected rather than OS-driven — keep in sync if --color-bg-raw ever
+// changes.
+export const THEME_COLOR: Record<"dark" | "light", string> = {
+  dark: "#020202",
+  light: "#ffffff",
+};
+
 export function formatElapsedMs(ms: number): string {
   const totalSec = Math.floor(ms / 1000);
   const m = Math.floor(totalSec / 60);

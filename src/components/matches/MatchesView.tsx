@@ -10,7 +10,12 @@ import { useToast, ToastViewport } from "@/components/ui/Toast";
 import type { MatchRecord, Player } from "@/types";
 
 type ResultFilter = "all" | "wins" | "losses" | "draws" | "voided";
-type BadgeVariant = "win" | "loss" | "draw" | "side_a" | "side_b" | "voided";
+// "side_a"/"side_b" (a decisive result with no player search active) used to
+// have their own badge variant, but that badge just repeated the winning
+// side's names — now redundant with the winning TeamChip's own color. Only
+// draw/voided (no color difference to show) and win/loss (framed relative to
+// a searched player) still need a text badge.
+type BadgeVariant = "win" | "loss" | "draw" | "voided";
 type MatchListItem =
   | { type: "match"; data: MatchRecord }
   | { type: "group-header"; label: string };
@@ -27,8 +32,6 @@ const BADGE_STYLES: Record<BadgeVariant, string> = {
   win:    "bg-primary/15 text-primary",
   loss:   "bg-error/15 text-error",
   draw:   "bg-surface-elevated text-muted",
-  side_a: "bg-primary/15 text-primary",
-  side_b: "bg-accent/15 text-accent",
   voided: "bg-surface-elevated text-muted",
 };
 
@@ -50,14 +53,7 @@ function formatHourGroup(iso: string): string {
 // Plain-text join — for non-visual contexts (aria-label, title tooltips) where
 // "&" reads fine since there's no visual separation to get wrong.
 function formatSideText(players: Player[]): string {
-  return players.map((p) => p.name.split(" ")[0]).join(" & ");
-}
-
-// Compact visible join for the small result badge — a middot instead of "&",
-// lighter than a word-glue but still just text; the badge is a secondary,
-// already-small indicator that doesn't warrant its own chip layout.
-function formatSideCompact(players: Player[]): string {
-  return players.map((p) => p.name.split(" ")[0]).join(" · ");
+  return players.map((p) => p.name).join(" & ");
 }
 
 function getMatchedPlayer(match: MatchRecord, query: string): Player | null {
@@ -70,10 +66,12 @@ function getMatchedPlayer(match: MatchRecord, query: string): Player | null {
   );
 }
 
+// null = a decisive result with no player search active — the winning
+// TeamChip's own color already communicates it, so no badge is needed.
 function getBadgeVariant(
   match: MatchRecord,
   matchedPlayer: Player | null
-): BadgeVariant {
+): BadgeVariant | null {
   if (match.status === "VOIDED") return "voided";
   if (!match.result) return "voided";
   if (match.result === "DRAW") return "draw";
@@ -85,16 +83,21 @@ function getBadgeVariant(
     if (inB) return match.result === "SIDE_B" ? "win" : "loss";
   }
 
-  return match.result === "SIDE_A" ? "side_a" : "side_b";
+  return null;
 }
 
-function getBadgeLabel(match: MatchRecord, variant: BadgeVariant): string {
-  if (variant === "side_a") return formatSideCompact(match.sideA);
-  if (variant === "side_b") return formatSideCompact(match.sideB);
+function getBadgeLabel(variant: BadgeVariant): string {
   if (variant === "win") return "Win";
   if (variant === "loss") return "Loss";
   if (variant === "draw") return "Draw";
   return "Voided";
+}
+
+// Which side's TeamChip gets colorized as the winner — null for a draw,
+// voided match, or one still without a result (nothing to highlight).
+function getWinningSide(match: MatchRecord): "A" | "B" | null {
+  if (match.status === "VOIDED" || !match.result || match.result === "DRAW") return null;
+  return match.result === "SIDE_A" ? "A" : "B";
 }
 
 function passesResultFilter(
@@ -450,7 +453,8 @@ export function MatchesView() {
               const match = item.data;
               const matchedPlayer = getMatchedPlayer(match, search);
               const badgeVariant = getBadgeVariant(match, matchedPlayer);
-              const badgeLabel = getBadgeLabel(match, badgeVariant);
+              const badgeLabel = badgeVariant ? getBadgeLabel(badgeVariant) : null;
+              const winningSide = getWinningSide(match);
               const isConfirming = confirmingId === match.id;
 
               return (
@@ -459,6 +463,7 @@ export function MatchesView() {
                   match={match}
                   badgeVariant={badgeVariant}
                   badgeLabel={badgeLabel}
+                  winningSide={winningSide}
                   isConfirming={isConfirming}
                   onVoidStart={() => setConfirmingId(match.id)}
                   onVoidCancel={() => setConfirmingId(null)}
@@ -537,13 +542,28 @@ export function MatchesView() {
   );
 }
 
-function TeamChip({ players }: { players: Player[] }) {
+function TeamChip({ players, isWinner }: { players: Player[]; isWinner: boolean }) {
   return (
-    <span className="inline-flex items-center gap-1.5 min-w-0 flex-shrink px-2 py-1 rounded-md bg-surface-elevated/70">
+    <span
+      className={cn(
+        "inline-flex items-center gap-1.5 min-w-0 flex-shrink px-2 py-1 rounded-md border transition-colors",
+        isWinner
+          ? "bg-surface-elevated border-primary/40 text-primary"
+          : "bg-surface-elevated/70 border-transparent text-ink"
+      )}
+    >
       {players.map((p, i) => (
         <span key={p.id} className="flex items-center gap-1.5 min-w-0">
-          {i > 0 && <span className="w-px h-3 bg-border/70 flex-shrink-0" aria-hidden />}
-          <span className="text-sm text-ink truncate">{p.name.split(" ")[0]}</span>
+          {/* A middot reads clearly as "separate player" even with full names
+              now shown — the previous 1px rule was too faint to notice next
+              to a two-word name like "Aims Guinto", where it wasn't obvious
+              whether that was one player or two. */}
+          {i > 0 && (
+            <span className="text-ink text-sm leading-none flex-shrink-0" aria-hidden>
+              ·
+            </span>
+          )}
+          <span className="text-sm truncate">{p.name}</span>
         </span>
       ))}
     </span>
@@ -554,6 +574,7 @@ function MatchRow({
   match,
   badgeVariant,
   badgeLabel,
+  winningSide,
   isConfirming,
   onVoidStart,
   onVoidCancel,
@@ -564,8 +585,9 @@ function MatchRow({
   onToggleSelect,
 }: {
   match: MatchRecord;
-  badgeVariant: BadgeVariant;
-  badgeLabel: string;
+  badgeVariant: BadgeVariant | null;
+  badgeLabel: string | null;
+  winningSide: "A" | "B" | null;
   isConfirming: boolean;
   onVoidStart: () => void;
   onVoidCancel: () => void;
@@ -642,35 +664,48 @@ function MatchRow({
             <span className="text-muted/40 text-xs leading-none" aria-hidden>·</span>
             <span className="text-xs text-muted truncate">{courtType}</span>
           </div>
-          <div className="flex items-center gap-1.5 min-w-0" aria-label={matchupText}>
+          <div className="flex items-center gap-2 min-w-0" aria-label={matchupText}>
             <span aria-hidden="true" className="contents">
-              <TeamChip players={match.sideA} />
+              <TeamChip players={match.sideA} isWinner={winningSide === "A"} />
               <span className="text-[10px] font-semibold uppercase tracking-wide text-muted/60 flex-shrink-0">
                 vs
               </span>
-              <TeamChip players={match.sideB} />
+              <TeamChip players={match.sideB} isWinner={winningSide === "B"} />
             </span>
           </div>
         </div>
       </div>
 
       {/* Row 2 below lg: result badge (left) + action button(s) (right). Same
-          `contents` trick rejoins the outer row at lg:. */}
-      <div className="flex items-center justify-between lg:contents">
-        {/* Result badge */}
-        <span
-          className={cn(
-            "text-xs font-medium px-2 py-0.5 rounded flex-shrink-0 max-w-[96px] truncate",
-            BADGE_STYLES[badgeVariant]
-          )}
-          title={badgeLabel}
-        >
-          {badgeLabel}
-        </span>
+          `contents` trick rejoins the outer row at lg:. `ml-auto` on the
+          action area (not `justify-between` on this wrapper) keeps it pinned
+          right whether or not the badge renders — a decisive result with no
+          player search active now shows no badge at all (the winning
+          TeamChip's own color already says who won), and `justify-between`
+          with a single child would otherwise snap to the start instead.
+          `min-h-[24px]` (ignored once `lg:contents` drops this box) stops the
+          row from collapsing in select mode, where the action area is also
+          hidden — without it, a badge-less decisive match would render
+          visibly shorter than a draw/voided row sitting next to it. */}
+      <div className="flex items-center gap-2 min-h-[24px] lg:contents">
+        {/* Result badge — only for states color alone can't express (draw,
+            voided) or that are framed relative to a searched player (win/loss).
+            A decisive result with no search active shows nothing here. */}
+        {badgeVariant && badgeLabel && (
+          <span
+            className={cn(
+              "text-xs font-medium px-2 py-0.5 rounded flex-shrink-0 max-w-[96px] truncate",
+              BADGE_STYLES[badgeVariant]
+            )}
+            title={badgeLabel}
+          >
+            {badgeLabel}
+          </span>
+        )}
 
         {/* Void / Restore area — hidden in select mode, replaced by the checkbox */}
         {!selectMode && (
-          <div className="flex-shrink-0 flex items-center justify-end gap-1 min-w-[72px]">
+          <div className="flex-shrink-0 flex items-center justify-end gap-1 min-w-[72px] ml-auto">
             {match.status === "COMPLETED" && !isConfirming && (
               <button
                 ref={voidBtnRef}

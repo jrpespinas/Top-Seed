@@ -3,7 +3,7 @@ import type { Gender } from "@/types";
 import { cn } from "@/lib/utils";
 
 const ICONS = { M: Mars, F: Venus } as const;
-const COLORS = { M: "text-primary", F: "text-accent" } as const;
+const COLORS = { M: "text-accent", F: "text-primary" } as const;
 const LABELS = { M: "Male", F: "Female" } as const;
 
 // Below this, the Mars/Venus glyph's arrow and cross strokes stop reading as

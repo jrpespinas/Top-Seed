@@ -15,7 +15,6 @@ import { ThemeToggle } from "@/components/ui/ThemeToggle";
 
 const navItems = [
   { href: "/",            icon: LayoutGrid,   label: "Dashboard"   },
-  { href: "/sessions",    icon: CalendarDays, label: "Sessions"    },
   { href: "/players",     icon: Users,        label: "Players"     },
   { href: "/matches",     icon: Activity,     label: "Matches"     },
   { href: "/leaderboard", icon: Trophy,       label: "Rankings"    },
@@ -89,9 +88,17 @@ export function Sidebar() {
         })}
       </nav>
 
-      {/* Theme toggle + settings pinned to bottom */}
+      {/* Theme toggle + settings pinned to bottom — Sessions lives here too now
+          (moved out of the primary four), grouped with the other secondary
+          destination rather than the day-to-day nav items above. */}
       <div className="px-2 pb-3 border-t border-border pt-3 flex flex-col gap-1">
         <ThemeToggle className="w-full min-h-[44px] justify-center" />
+        <NavItem
+          href="/sessions"
+          icon={CalendarDays}
+          label="Sessions"
+          active={pathname.startsWith("/sessions")}
+        />
         <NavItem
           href="/settings"
           icon={Settings}

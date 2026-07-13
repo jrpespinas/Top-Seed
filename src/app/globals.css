@@ -17,20 +17,32 @@
   --color-warning-raw:            0.75 0.14 75;
   --color-error-raw:              0.62 0.21 25;
 
-  /* Skill-level ramp (F→S) — one continuous hue arc, not seven arbitrary
-     colors. Endpoints are exact matches for --color-accent (F) and
-     --color-primary (S); L/C/H all interpolate smoothly between them. The
-     arc deliberately routes around the warning (75°) and error (25°) hues —
-     PlayersView shows a SkillBadge next to a PaymentToggle in the same row,
-     and a mid-tier skill badge should never visually echo "unpaid"/"error"
-     a few columns over. See docs/specs or DESIGN.md for the design rationale. */
-  --color-skill-f-raw:            0.620 0.140 220;
-  --color-skill-e-raw:            0.635 0.145 192;
-  --color-skill-d-raw:            0.650 0.150 164;
-  --color-skill-c-raw:            0.665 0.155 138;
-  --color-skill-b-raw:            0.680 0.160 108;
-  --color-skill-a-raw:            0.695 0.165 55;
-  --color-skill-s-raw:            0.710 0.170 38;
+  /* Skill-level ramp (F→S) — a named-tier material metaphor (Unranked →
+     Bronze → Silver → Gold → Emerald → Platinum → Diamond), not an arbitrary
+     hue sweep. This intentionally does NOT endpoint-match --color-primary at
+     the top: warm copper reads as "bronze" in every familiar ranking
+     vocabulary (games, sports, chess ratings) — a LOW tier, not the top one.
+     "Professional" (S) needs to look like the rarest material on the ladder,
+     so it's the coolest, brightest, most saturated step, not the warmest.
+     Hues are spaced ≥35° apart at every adjacent step — S and A sit 50°
+     apart (blue vs teal) specifically because they're the two filled tiers
+     and render right next to each other constantly; anything closer reads
+     as "the same color" once compressed into a small badge (verified against
+     a live queue screenshot where a first pass at 10° apart was genuinely
+     indistinguishable). D's chroma is deliberately non-trivial (0.045, not
+     ~0.015) so "Silver" reads as a cool metal tint, not a disabled-looking
+     flat gray. The arc also routes around the warning (75°) and error (25°)
+     hues — PlayersView shows a SkillBadge next to a PaymentToggle in the
+     same row, and a mid-tier skill badge should never visually echo
+     "unpaid"/"error" a few columns over. See DESIGN.md's Skill Badge
+     section for the full tier table and the Filled Tier rule. */
+  --color-skill-f-raw:            0.600 0.010 38;   /* Newbie — unranked ash */
+  --color-skill-e-raw:            0.640 0.135 40;   /* Beginner — Bronze */
+  --color-skill-d-raw:            0.780 0.045 230;  /* Upper Beginner — Silver */
+  --color-skill-c-raw:            0.800 0.160 92;   /* Intermediate — Gold */
+  --color-skill-b-raw:            0.720 0.170 150;  /* Upper Intermediate — Emerald */
+  --color-skill-a-raw:            0.760 0.135 185;  /* Advanced — Platinum */
+  --color-skill-s-raw:            0.840 0.150 235;  /* Professional — Diamond */
 
   /* Semantic aliases (for direct CSS use) */
   --color-bg:               oklch(var(--color-bg-raw));
@@ -148,16 +160,22 @@ body {
   --color-warning-raw:          0.42 0.14 75;      /* darkened amber */
   --color-error-raw:            0.38 0.21 25;      /* darkened error */
 
-  /* Skill-level ramp — same construction as dark theme (see :root), just
-     interpolated between this theme's own darker accent/primary endpoints
-     for correct contrast against a white surface. */
-  --color-skill-f-raw:          0.350 0.140 220;
-  --color-skill-e-raw:          0.365 0.147 192;
-  --color-skill-d-raw:          0.380 0.153 164;
-  --color-skill-c-raw:          0.395 0.160 138;
-  --color-skill-b-raw:          0.410 0.167 108;
-  --color-skill-a-raw:          0.425 0.173 55;
-  --color-skill-s-raw:          0.440 0.180 38;
+  /* Skill-level ramp — same named-tier construction as dark theme (see
+     :root), darkened for correct contrast against a white surface. S/A stay
+     dark+saturated rather than light — they render as solid fills with
+     inverted (white) text in both themes, the same pattern --color-primary
+     already uses for button-primary. Same ≥35°-apart hue spacing as dark
+     theme (S/A specifically 50° apart, blue vs teal) — a first pass had them
+     only 10° apart and they rendered as the same dark teal chip in a live
+     screenshot. D's chroma is bumped (0.05, not ~0.02) so "Silver" reads as
+     a cool metal tint instead of a disabled-looking flat gray. */
+  --color-skill-f-raw:          0.420 0.010 38;   /* Newbie — unranked ash */
+  --color-skill-e-raw:          0.430 0.140 40;   /* Beginner — Bronze */
+  --color-skill-d-raw:          0.420 0.050 230;  /* Upper Beginner — Silver */
+  --color-skill-c-raw:          0.480 0.165 92;   /* Intermediate — Gold */
+  --color-skill-b-raw:          0.390 0.170 150;  /* Upper Intermediate — Emerald */
+  --color-skill-a-raw:          0.400 0.150 185;  /* Advanced — Platinum */
+  --color-skill-s-raw:          0.370 0.170 235;  /* Professional — Diamond */
 
   /* Semantic aliases */
   --color-bg:               oklch(var(--color-bg-raw));

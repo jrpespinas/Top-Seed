@@ -124,10 +124,10 @@ The surface has grown since this system was first documented — Sessions (list 
 A committed dark palette anchored by one copper-coral accent. All neutrals are pure black variants; all warmth is delivered by the brand color alone.
 
 ### Primary
-- **Court Copper** (`oklch(0.71 0.17 38)`): The brand anchor. Used exclusively on primary action buttons (Start Match, Assign to Court, Confirm), active navigation states, and the open-session badge. Never decorative. Its hover variant (`oklch(0.76 0.16 38)`) lightens slightly rather than darkening, preserving warmth under bright gym lighting.
+- **Court Copper** (`oklch(0.71 0.17 38)`): The brand anchor. Used only for a fixed set of semantic purposes, never decoratively: primary action buttons (Start Match, Assign to Court, Confirm), active navigation states, the open-session badge, the winning side's `TeamChip` in match history, and the Female gender icon. Its hover variant (`oklch(0.76 0.16 38)`) lightens slightly rather than darkening, preserving warmth under bright gym lighting.
 
 ### Secondary
-- **Steel Slate** (`oklch(0.62 0.14 220)`): A cool slate-blue for secondary highlights and non-destructive secondary actions. Contrasts the copper without competing with it. Used for In Use / In Progress court status badges.
+- **Steel Slate** (`oklch(0.62 0.14 220)`): A cool slate-blue for secondary highlights and non-destructive secondary actions. Contrasts the copper without competing with it. Used for In Use / In Progress court status badges and the Male gender icon.
 
 ### Tertiary
 - **Court Green** (`oklch(0.65 0.17 145)`): Semantic only. Available court status, Paid payment status. Never decorative.
@@ -204,17 +204,25 @@ Extracted to `useConfirmFocus(isConfirming, swapped?)` in `src/hooks/useConfirmF
 
 ### Skill Badge
 
-The most frequently rendered component — appears on every player row, chip, and picker. A compact square (`20×20px`, `rounded-sm` 4px) in JetBrains Mono Bold at 11px. Seven levels (S → F), each with a distinct color tier:
+The most frequently rendered component — appears on every player row, chip, and picker. A compact badge (`h-5`, `rounded-sm` 4px, content-width) in JetBrains Mono Bold at 10px. Seven levels (S → F) map to a named-tier material ladder — Newbie → Bronze → Silver → Gold → Emerald → Platinum → Diamond — not an arbitrary rainbow. The ladder deliberately does **not** put warm copper at the top: copper reads as "bronze" in every familiar ranking vocabulary, a low tier, not the summit. "Professional" (S) is the coolest, brightest, most saturated step instead — Diamond, not Bronze.
 
-| Level | Background | Text |
-|-------|-----------|------|
-| S | `bg-primary/20 border border-primary/30` | `text-primary` |
-| A | `bg-primary/12` | `text-primary/80` |
-| B | `bg-accent/12` | `text-accent` |
-| C | `bg-ink/8` | `text-ink/60` |
-| D–F | `bg-ink/6` | `text-muted` |
+| Level | Tier | Background | Text | Border |
+|-------|------|-----------|------|--------|
+| S | Diamond | `bg-skill-s` (solid) | `text-bg` | `border-skill-s/50` |
+| A | Platinum | `bg-skill-a/90` (solid) | `text-bg` | `border-skill-a/60` |
+| B | Emerald | `bg-skill-b/30` | `text-skill-b` | `border-skill-b/40` |
+| C | Gold | `bg-skill-c/16` | `text-skill-c` | `border-skill-c/28` |
+| D | Silver | `bg-skill-d/10` | `text-skill-d` | `border-skill-d/20` |
+| E | Bronze | `bg-skill-e/6` | `text-skill-e` | `border-skill-e/14` |
+| F | Newbie | `bg-skill-f/3` | `text-skill-f` | `border-skill-f/8` |
 
-The S tier gets a visible border to distinguish the top rank at a glance; all others use background-only tints. Never use a color outside this table for skill levels — the gradation is the signal.
+**The Filled Tier Rule.** S and A are solid fills with inverted (`text-bg`) text — unmistakably "filled," like a real medal, not a tinted chip. B through F stay unfilled (tinted background + colored text + border), fading toward nearly nothing at F. Rank reads through two reinforcing channels — hue temperature (warm/muted low tiers → cool/vivid high tiers) and fill weight (barely-there tint → solid fill) — not color alone. Diluting "filled" across more than two tiers would make neither one read as elite. Never use a color outside this table for skill levels — the gradation is the signal.
+
+### Gender Icon
+
+A small Lucide glyph (Mars / Venus) that rides alongside SkillBadge wherever a player is listed — Player Row, PlanningCard's Player Chip, CourtCard's In Use body, AddPlayersModal's review grid, MatchesView's TeamChip. Minimum legible size 14px; below that the glyph's arrow/cross strokes stop reading as distinct shapes and degrade to an undifferentiated dot.
+
+**The Fixed Gender Mapping.** Male (Mars) is always `text-accent` (Steel Slate); Female (Venus) is always `text-primary` (Court Copper). This is a deliberate, singular exception to Court Copper's "primary actions only" convention — decided explicitly, not a drift to be "corrected" back. Never swap the mapping per-screen or introduce a third color for either.
 
 ### Status Badge
 
@@ -241,9 +249,9 @@ Active-state colors are semantic, not decorative: Paid uses `success/15` backgro
 
 Two complementary nav surfaces — Sidebar and BottomBar — sharing an identical primary-item vocabulary. `md:` (768px) is the single switch point between them, which per this project's own breakpoint definitions (`CLAUDE.md` — Tablet: 768px+) makes Sidebar the tablet **and** desktop nav, not desktop-only; BottomBar serves phones exclusively.
 
-**Sidebar** (`hidden md:flex`, 768px+): Fixed-left, 80px wide (`w-20`), `bg-surface border-r border-border`, `z-sticky`. Logo lockup at top (64px tall header, "TS" in Court Copper, Space Grotesk Bold 18px). Nav items stacked vertically with icon (16px) above label (9px, font-medium), each `min-h-[44px]`. Settings and ThemeToggle are pinned to the bottom below a divider, matching the same 44px floor and icon/label sizing as the primary items above them.
+**Sidebar** (`hidden md:flex`, 768px+): Fixed-left, 80px wide (`w-20`), `bg-surface border-r border-border`, `z-sticky`. Logo lockup at top (64px tall header, "TS" in Court Copper, Space Grotesk Bold 18px). Nav items stacked vertically with icon (16px) above label (9px, font-medium), each `min-h-[44px]`. ThemeToggle, Sessions, and Settings are pinned to the bottom below a divider, matching the same 44px floor and icon/label sizing as the primary items above them — Sessions sits here as a secondary destination rather than in the day-to-day primary group.
 
-**BottomBar** (`md:hidden`, below 768px): Fixed-bottom, 60px tall, same `bg-surface border-t border-border`. Five primary destinations share the row as equal `flex-1` slots (Dashboard, Sessions, Players, Matches, Rankings — same order and same nav labels as Sidebar), icons at 20px (slightly larger than sidebar for thumb recognition), labels at 10px. The Leaderboard feature's nav label reads "Rankings" (not "Leaderboard") in both surfaces — at 375px's ~52px-per-item budget, "Leaderboard" (11 characters) doesn't fit without truncating; "Rankings" (8 characters) does, and it's already the app's own internal vocabulary for this feature (see the empty states and `aria-label`s in `LeaderboardView.tsx`). The page itself still opens on a "Leaderboard" heading — only the nav label changed. A vertical divider separates the primary five from a narrower fixed-width utility segment — Settings then ThemeToggle, each pinned to a 48px column — deliberately sized down to Sidebar's own convention rather than the Bottom Bar's primary-row sizing: icons at 16px, labels at 9px, both items matching each other exactly so the utility pair reads as one consistent secondary tier. Seven interactive targets in total, all `min-h-[44px]` regardless of segment.
+**BottomBar** (`md:hidden`, below 768px): Fixed-bottom, 60px tall, same `bg-surface border-t border-border`. Four primary destinations share the row as equal `flex-1` slots (Dashboard, Players, Matches, Rankings — same order and same nav labels as Sidebar), icons at 20px (slightly larger than sidebar for thumb recognition), labels at 10px. The Leaderboard feature's nav label reads "Rankings" (not "Leaderboard") in both surfaces — "Leaderboard" (11 characters) risks truncating at phone widths; "Rankings" (8 characters) doesn't, and it's already the app's own internal vocabulary for this feature (see the empty states and `aria-label`s in `LeaderboardView.tsx`). The page itself still opens on a "Leaderboard" heading — only the nav label changed. A vertical divider separates the primary four from a narrower fixed-width utility segment — Settings, then Sessions, then ThemeToggle, each pinned to a 48px column — deliberately sized down to Sidebar's own convention rather than the Bottom Bar's primary-row sizing: icons at 16px, labels at 9px, all three matching each other exactly so the trio reads as one consistent secondary tier. Eight interactive targets in total, all `min-h-[44px]` regardless of segment.
 
 **Item states** (shared vocabulary):
 - Default: `text-muted`, icon `strokeWidth={1.75}`
@@ -253,13 +261,15 @@ Two complementary nav surfaces — Sidebar and BottomBar — sharing an identica
 
 The active sidebar item gets a copper fill block (`bg-primary text-bg`), making it the only non-text copper element in the nav. Bottom bar active is copper text only (no fill) — appropriate for a touch surface where fill can feel heavy.
 
+`ThemeToggle` shares the nav item vocabulary exactly — transparent at rest, `hover:bg-surface-elevated` on hover — rather than carrying its own permanent `bg-surface-elevated` fill. A control that sits directly beside NavItems in both surfaces reads as one family only when its resting state matches theirs.
+
 ### CourtCard
 
 The highest-stakes card in the application. Two root states: **Available** and **In Use**. Both use `bg-surface border border-border rounded-lg` with no shadow at rest.
 
 **Available state**: Header shows court number + StatusBadge. Body contains a full-width "New Match" primary button (`min-h-[44px]`). Drop-target state during planning card drag: `ring-2 ring-primary/50 bg-primary/12 border-primary/30`. Blocked state (another card dragging, court in use): `opacity-40 cursor-not-allowed`.
 
-**In Use state**: Header shows court number + "In Use" badge. Body shows Side A players, "vs" divider text, Side B players (each as first name + SkillBadge). Footer has elapsed timer (JetBrains Mono, `text-muted`) + End and Void buttons. The elapsed timer is the only continuously updating element in the interface — it uses a client-side interval, no server polling.
+**In Use state**: Header shows court number + "In Use" badge. Body shows Side A players, "vs" divider text, Side B players (each as full name + SkillBadge + Gender Icon). Footer has elapsed timer (JetBrains Mono, `text-muted`) + End and Void buttons. The elapsed timer is the only continuously updating element in the interface — it uses a client-side interval, no server polling.
 
 **Confirm states**: Both End and Void open inline within the card footer (no modal). End shows a three-button picker (Side A / Draw / Side B) in a `grid-cols-3` layout. Void shows a compact Confirm Void / Cancel row. Delete shows Confirm Delete / Cancel. All use `min-h-[44px]` on every confirm button.
 
@@ -273,7 +283,7 @@ The matchup staging card. Fixed width of `w-[76vw] md:w-[252px]` in horizontal s
 
 **Body**: Stacked Side A / vs / Side B layout. Side A chips render first, then a "vs" divider row (`flex items-center gap-1.5 py-1` with `border-t border-border/40` lines flanking centered "vs" text in 10px muted), then Side B chips. This vertical stack matches how coaches write matchups on whiteboards — partners together, opponents below. Empty slot placeholders are dashed `border-border/50` boxes (`h-7 rounded-sm`); they highlight to `border-primary/50 bg-primary/10` when a player is being dragged over the correct slot.
 
-**Player Chip**: Button (`rounded-sm px-1.5 py-1.5`) with first name + SkillBadge. Selected state: `bg-primary/12 ring-1 ring-primary/40`. Remove `×` reveals on hover at `-top-1 -right-1` (7px icon, `rounded-full`, `opacity-0 group-hover:opacity-100`). On touch: `@media(hover:none)` keeps remove button visible at all times.
+**Player Chip**: Button (`rounded-sm px-1.5 py-1.5`) with full name + SkillBadge + Gender Icon. Selected state: `bg-primary/12 ring-1 ring-primary/40`. Remove `×` reveals on hover at `-top-1 -right-1` (7px icon, `rounded-full`, `opacity-0 group-hover:opacity-100`). On touch: `@media(hover:none)` keeps remove button visible at all times.
 
 **Chip swap interaction**: Tap a chip to select it (state stored in `selectedChip`). A hint ("Tap another player to swap") + Cancel button appear below the chips. Tap a second chip to execute the swap via `onSwap`. Tap the same chip or Cancel to deselect. The swap is immediate with no animation — speed over choreography.
 
@@ -285,7 +295,7 @@ The matchup staging card. Fixed width of `w-[76vw] md:w-[252px]` in horizontal s
 
 The atomic list item in the PlayerPoolColumn — used for both queue entries and bench entries. Height minimum 44px (`min-h-[44px]`), full-width, `border-b border-border/40`.
 
-**Queue row**: Left area: `GripVertical` (10px, `text-muted/60`) + position number (JetBrains Mono, 10px, right-aligned in a fixed `w-5` slot). Center: first name (14px, `text-ink`) + SkillBadge + optional "Matched" badge (`bg-primary/10 text-primary`, pill). Right: game count (JetBrains Mono, 10px `text-muted`) + controls.
+**Queue row**: Left area: `GripVertical` (10px, `text-muted/60`) + position number (JetBrains Mono, 10px, right-aligned in a fixed `w-5` slot). Center: full name (14px, `text-ink`) + SkillBadge + Gender Icon + optional "Matched" badge (`bg-primary/10 text-primary`, pill). Right: game count (JetBrains Mono, 10px `text-muted`) + controls.
 
 **Bench row**: Same as queue but no grip or position number (bench is unordered). "Bench" entries have no position slot.
 
@@ -294,6 +304,26 @@ The atomic list item in the PlayerPoolColumn — used for both queue entries and
 **Remove confirm**: `×` click enters confirm mode via `AnimatePresence mode="wait"` cross-fade to Check + `×` pair. Check executes removal; `×` cancels. Duration 120ms. This prevents accidental removal without adding a modal.
 
 **"Playing" state**: Players currently in an active match are hidden from the queue list entirely — court/match state is client-side only and not yet a shared store other pages (Players, Sessions) can read, so an in-match player simply isn't visible anywhere off the Dashboard until they return to the queue. Not a deliberate filter; a known gap (see `docs/specs/08-sessions.md`). A "Playing" informational badge exists for legacy contexts (`text-muted bg-surface-elevated`, not the accent color — it's a status-of-fact, not an action).
+
+### Add Players Modal
+
+A two-step dialog (`AddPlayersModal.tsx`): **Paste** → **Review**. Paste is one large textarea, one name per line (no comma delimiter — a comma inside a real pasted name, e.g. "Smith, John", must not be misread as two players). Review renders a grid of editable cards, one per parsed name.
+
+**Bulk controls**: A "Set for all" row above the grid pairs a skill-level dropdown with a `GenderToggle`, laid out side by side to mirror the exact skill+gender pairing each row below has — the bulk row reads as "the same controls, acting on everyone at once." Each change applies immediately to every row (a one-shot trigger, not a bound value the grid stays synced to) and surfaces an undo toast (`Set 12 players to Male`, `Set 12 players to Intermediate`). Hand-edited rows can drift from the bulk value afterward without the control fighting that.
+
+**Single vs. multi-player review**: With exactly one player, the bulk toolbar is hidden entirely (nothing to apply "all" to) and the lone card gets a dedicated, roomier treatment — visible field labels ("Player name", "Skill level", "Gender"), generous padding, and the full-labeled `GenderToggle` variant — instead of shrinking the many-player grid layout onto one card. With two or more, the compact grid layout applies and each row's skill-level trigger drops its spelled-out label (badge + chevron only) to avoid the label truncating to an ellipsis at grid-cell width; the open dropdown panel still shows full labels.
+
+**Validation**: Gender is required per player (missing-gender state is gated behind a submit attempt, not shown live — every row starts genderless, so showing it immediately would ring every card red before the organizer has touched anything). Duplicate names are checked live and case-sensitively, both against existing session players and within the current batch.
+
+### Match Row
+
+The list item on `/matches` (`MatchesView.tsx`). Two-row layout below `lg:` (meta line, then matchup + badge/actions), single row at `lg:` via a `display: contents` collapse so both breakpoints share one DOM tree.
+
+**TeamChip**: Renders one side's players as a pill (`rounded-md`, `bg-surface-elevated/70` at rest). Multiple players within the same chip (doubles) are separated by a middot (`·`, `text-ink`) rather than a border-rule divider — full names now render in this chip (not first names), and a 1px rule was too faint to notice next to a two-word name like "Aims Guinto," where it wasn't obvious whether that was one player or two. The two chips for a match sit side by side with plain muted "vs" text between them (`text-muted/60`, no background/border — an enclosing chip was tried and rejected as too heavy for a divider word).
+
+**Winner colorization**: The winning side's `TeamChip` gets `border-primary/40` + `text-primary`; the losing side stays neutral. Draws and voided matches leave both sides neutral (no winner to mark).
+
+**Result badge**: Only rendered for states color alone can't express — `Draw`, `Voided` — or that are framed relative to an active player search (`Win`/`Loss` from that player's perspective). A decisive result with no search active shows no badge at all; the winning `TeamChip`'s own color already says who won, so repeating the winning side's names in a separate badge (the previous behavior) was redundant.
 
 ### Session Row
 
@@ -304,6 +334,8 @@ The navigable table row on `/sessions` — a different interaction model from Pl
 A rounded-full pill (`rounded-full`, `bg-surface-elevated border border-border`, `px-4 py-2.5`, `shadow-lg`) fixed to the bottom center of the viewport, above the mobile bottom bar. Every reversible action across the app (queue removal, court assignment, card changes, player removal) confirms through this one shape — never a separate toast design per feature.
 
 Leads with a `success`-colored Check icon (12px), then the message in `text-ink text-xs font-medium`, then — only when the action has an undo — a `border-border` divider (`w-px h-3`) and an "Undo" text-action in `text-primary font-semibold`. Two timing/ARIA modes: with `onUndo`, 5000ms and `role="alert" aria-live="assertive"`; without it, 2500ms and `role="status" aria-live="polite"`. The longer timeout for undoable actions is deliberate — it's the difference between "FYI" and "you might want to act on this."
+
+The pill caps at `max-w-[calc(100vw-2rem)]` and the message itself truncates (`truncate`, with a `title` tooltip carrying the full text) rather than growing past the viewport — a safety net now that several call sites join full player names into a single message (e.g. a doubles "won" toast), which run considerably longer than this shape was originally sized for.
 
 Extracted to `useToast()` + `<ToastViewport />` in `src/components/ui/Toast.tsx`, migrated onto every one of its three previously-independent implementations (Dashboard, Matches, Players). `showToast(message, onUndo?, undoLabel?)` — the third argument is a per-call `aria-label` for the Undo button (e.g. "Undo court assignment"), since the visible text is always just "Undo" but what's actually being undone varies by call site.
 
@@ -340,3 +372,5 @@ Extracted to `useToast()` + `<ToastViewport />` in `src/components/ui/Toast.tsx`
 - **Don't** use `focus-visible:underline` as a substitute for a ring, even on dense inline text inside a toast or pill. It's a deprecated pattern in this system, not a legitimate secondary convention — every instance of it has been migrated to a padded ring.
 - **Don't** "fix" a dark-mode shadow by tinting its color instead of dropping it. If a shadow is invisible against `oklch(0.09 0 0)`, the answer is `bg-surface-elevated`, never a lighter-colored shadow.
 - **Don't** make a table row look hoverable everywhere but only respond to a link buried in one cell. If the row highlights on hover, the whole row is the click target.
+- **Don't** render a badge or chip that just repeats information a color already conveys elsewhere in the same row. MatchesView's `Win`/`Loss` badge for a decisive, non-searched result was removed for exactly this reason — the winning `TeamChip`'s own color already says who won.
+- **Don't** separate two names (or any two like-items) with a divider so faint it disappears — a bare `w-px` rule at `border/70` reads as nothing next to a two-word name. Use a middot or another visible glyph instead.

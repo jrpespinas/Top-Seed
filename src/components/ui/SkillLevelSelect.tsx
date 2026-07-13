@@ -13,10 +13,16 @@ export function SkillLevelSelect({
   value,
   onChange,
   className,
+  hideLabel = false,
 }: {
   value: SkillLevel;
   onChange: (level: SkillLevel) => void;
   className?: string;
+  /** Trigger shows only the badge + chevron, no spelled-out label — for
+   * narrow contexts where the label would truncate to an ellipsis. The
+   * badge's own title/aria-label still carries the full name, and the open
+   * dropdown panel is unaffected (it always shows full labels). */
+  hideLabel?: boolean;
 }) {
   const [isOpen, setIsOpen] = useState(false);
   const [highlighted, setHighlighted] = useState<SkillLevel>(value);
@@ -108,7 +114,7 @@ export function SkillLevelSelect({
         aria-haspopup="listbox"
         aria-expanded={isOpen}
         aria-controls={listboxId}
-        aria-label="Skill level"
+        aria-label={`Skill level: ${SKILL_LABELS[value]}`}
         className={cn(
           "flex items-center gap-1.5 bg-bg border border-border rounded-md pl-2.5 pr-2 py-2 text-sm text-ink min-w-0",
           "focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary/50",
@@ -117,7 +123,7 @@ export function SkillLevelSelect({
         )}
       >
         <SkillBadge level={value} compact />
-        <span className="truncate">{SKILL_LABELS[value]}</span>
+        {!hideLabel && <span className="truncate">{SKILL_LABELS[value]}</span>}
         <ChevronDown
           size={13}
           strokeWidth={2}

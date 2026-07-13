@@ -40,8 +40,12 @@ function buildMatchesSheet(matches: MatchRecord[]) {
 // "no cross-session aggregation" (see docs/specs/08-sessions.md), not the
 // app's live all-time /leaderboard.
 function buildLeaderboardSheet(sessionMatches: MatchRecord[]) {
-  const header = ["Rank", "Player", "Matches Played", "Wins", "Draws", "Losses", "Win Rate"];
-  const standings = computeLeaderboard(sessionMatches, { matchType: "ALL", sort: "winRate" });
+  const header = ["Rank", "Player", "Matches Played", "Wins", "Draws", "Losses", "Win Rate", "Rating"];
+  // Sorted by Rating (a Wilson score lower bound, not naive Win Rate) — same
+  // rationale as the live /leaderboard: a 1-1 record shouldn't outrank a
+  // genuine multi-match record just because both compute to 100%. Keeping
+  // this sheet's order consistent with what the app itself shows.
+  const standings = computeLeaderboard(sessionMatches, { matchType: "ALL", sort: "rating" });
   const rows = standings.map((row) => ({
     Rank: row.isTied ? `T-${row.rank}` : row.rank,
     Player: row.name,
@@ -50,6 +54,7 @@ function buildLeaderboardSheet(sessionMatches: MatchRecord[]) {
     Draws: row.draws,
     Losses: row.losses,
     "Win Rate": `${Math.round(row.winRate * 100)}%`,
+    Rating: `${Math.round(row.rating * 100)}%`,
   }));
   return XLSX.utils.json_to_sheet(rows, { header });
 }

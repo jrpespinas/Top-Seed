@@ -60,7 +60,7 @@ function PlayerChip({
   onClick: () => void;
   onRemove?: () => void;
 }) {
-  const firstName = player.name.split(" ")[0];
+  const displayName = player.name;
   return (
     <div className="relative group/chip">
       <button
@@ -73,7 +73,7 @@ function PlayerChip({
         )}
       >
         <span className="text-xs text-ink truncate leading-none min-w-[44px]">
-          {firstName}
+          {displayName}
         </span>
         <SkillBadge level={player.skillLevel} compact />
         {player.gender && <GenderIcon gender={player.gender} size={14} />}
@@ -84,7 +84,7 @@ function PlayerChip({
             e.stopPropagation();
             onRemove();
           }}
-          aria-label={`Remove ${firstName}`}
+          aria-label={`Remove ${displayName}`}
           className="absolute -top-1 -right-1 w-3.5 h-3.5 [@media(pointer:coarse)]:w-4 [@media(pointer:coarse)]:h-4 bg-surface-elevated border border-border rounded-full flex items-center justify-center text-muted hover:text-error hover:border-error/40 active:text-error active:border-error/40 transition-colors opacity-0 group-hover/chip:opacity-100 [@media(hover:none)]:opacity-100 focus-visible:opacity-100 focus-visible:outline-none"
         >
           <X size={7} strokeWidth={2.5} aria-hidden />
@@ -141,7 +141,7 @@ export function PlanningCard({
   const isFull = getNextEmptySlot(suggestion, matchType) === null;
   const nextEmpty = isDragOverForPlayer ? getNextEmptySlot(suggestion, matchType) : null;
   const canPlaceHere = !!selectedPlayer && !isFull;
-  const selectedFirstName = selectedPlayer?.name.split(" ")[0];
+  const selectedName = selectedPlayer?.name;
 
   function handleChipClick(side: "A" | "B", index: number) {
     if (!selectedChip) {
@@ -232,7 +232,7 @@ export function PlanningCard({
           <div className="flex flex-col gap-0.5">
             {suggestion.sideA.filter((p): p is Player => p !== null).map((p) => (
               <div key={`preview-a-${p.id}`} className="flex items-center gap-1.5">
-                <span className="text-xs text-ink truncate flex-1 min-w-0">{p.name.split(" ")[0]}</span>
+                <span className="text-xs text-ink truncate flex-1 min-w-0">{p.name}</span>
                 <SkillBadge level={p.skillLevel} compact />
               </div>
             ))}
@@ -241,7 +241,7 @@ export function PlanningCard({
           <div className="flex flex-col gap-0.5">
             {suggestion.sideB.filter((p): p is Player => p !== null).map((p) => (
               <div key={`preview-b-${p.id}`} className="flex items-center gap-1.5">
-                <span className="text-xs text-ink truncate flex-1 min-w-0">{p.name.split(" ")[0]}</span>
+                <span className="text-xs text-ink truncate flex-1 min-w-0">{p.name}</span>
                 <SkillBadge level={p.skillLevel} compact />
               </div>
             ))}
@@ -304,7 +304,7 @@ export function PlanningCard({
         >
           <p className={cn("text-xs text-center", canPlaceHere ? "text-primary" : "text-muted")}>
             {canPlaceHere
-              ? `Tap to place ${selectedFirstName}`
+              ? `Tap to place ${selectedName}`
               : onPlayerDrop
               ? "Drop a player to fill this card"
               : "Not enough players in queue"}
@@ -334,7 +334,7 @@ export function PlanningCard({
                     key={`a-empty-${i}`}
                     onClick={canPlaceHere ? onPlaceSelectedPlayer : undefined}
                     role={canPlaceHere ? "button" : undefined}
-                    aria-label={canPlaceHere ? `Place ${selectedFirstName} here` : undefined}
+                    aria-label={canPlaceHere ? `Place ${selectedName} here` : undefined}
                     className={cn(
                       "h-9 rounded-sm border border-dashed transition-colors",
                       highlightA
@@ -367,7 +367,7 @@ export function PlanningCard({
                     key={`b-empty-${i}`}
                     onClick={canPlaceHere ? onPlaceSelectedPlayer : undefined}
                     role={canPlaceHere ? "button" : undefined}
-                    aria-label={canPlaceHere ? `Place ${selectedFirstName} here` : undefined}
+                    aria-label={canPlaceHere ? `Place ${selectedName} here` : undefined}
                     className={cn(
                       "h-9 rounded-sm border border-dashed transition-colors",
                       highlightB

@@ -70,7 +70,7 @@ function PlayerRow({
 }) {
   const [isDragging, setIsDragging] = useState(false);
   const [confirmRemove, setConfirmRemove] = useState(false);
-  const firstName = player.name.split(" ")[0];
+  const displayName = player.name;
 
   const dimmed = isInMatch;
 
@@ -119,7 +119,7 @@ function PlayerRow({
       {/* Name + badges */}
       <div className="flex items-center gap-1.5 flex-1 min-w-0">
         <span className={cn("text-sm truncate leading-none min-w-[44px]", dimmed ? "text-muted" : "text-ink")}>
-          {firstName}
+          {displayName}
         </span>
         <SkillBadge level={player.skillLevel} compact />
         {player.gender && <GenderIcon gender={player.gender} size={14} />}
@@ -172,7 +172,7 @@ function PlayerRow({
                 <button
                   onClick={(e) => { e.stopPropagation(); onRemove?.(); setConfirmRemove(false); }}
                   className="p-3 text-error hover:bg-error/10 active:bg-error/15 rounded-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-error/40"
-                  aria-label={`Confirm remove ${firstName}`}
+                  aria-label={`Confirm remove ${displayName}`}
                 >
                   <Check size={11} strokeWidth={2.5} aria-hidden />
                 </button>
@@ -197,7 +197,7 @@ function PlayerRow({
                   <button
                     onClick={(e) => { e.stopPropagation(); onMoveToBench(); }}
                     className="p-3 text-muted hover:text-ink hover:bg-surface-elevated rounded-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-border"
-                    aria-label={`Move ${firstName} to bench`}
+                    aria-label={`Move ${displayName} to bench`}
                   >
                     <PauseCircle size={11} strokeWidth={2} aria-hidden />
                   </button>
@@ -206,7 +206,7 @@ function PlayerRow({
                   <button
                     onClick={(e) => { e.stopPropagation(); onReturnToQueue(); }}
                     className="p-3 text-muted hover:text-ink hover:bg-surface-elevated rounded-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-border"
-                    aria-label={`Return ${firstName} to queue`}
+                    aria-label={`Return ${displayName} to queue`}
                   >
                     <PlayCircle size={11} strokeWidth={2} aria-hidden />
                   </button>
@@ -215,7 +215,7 @@ function PlayerRow({
                   <button
                     onClick={(e) => { e.stopPropagation(); setConfirmRemove(true); }}
                     className="p-3 text-muted hover:text-error hover:bg-error/10 active:text-error active:bg-error/10 rounded-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-error/40"
-                    aria-label={`Remove ${firstName}`}
+                    aria-label={`Remove ${displayName}`}
                   >
                     <X size={11} strokeWidth={2} aria-hidden />
                   </button>

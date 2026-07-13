@@ -13,6 +13,7 @@ import {
 } from "@/lib/leaderboard";
 
 const SORT_OPTIONS: { key: LeaderboardSort; label: string }[] = [
+  { key: "rating", label: "Rating" },
   { key: "wins", label: "Wins" },
   { key: "winRate", label: "Win Rate" },
   { key: "matchesPlayed", label: "Matches Played" },
@@ -70,10 +71,15 @@ function rankClasses(rank: number): string {
 export function LeaderboardView() {
   const matches = useMatchLog();
   const { sessions, selectedSessionId, setSelectedSessionId } = useSessionOptions();
-  // Win Rate, not Wins, is the default sort — Wins is hidden below `lg:` (see
-  // the table header below), so defaulting to it would make the visible order
-  // look arbitrary against Win Rate, the one ranking number phones can see.
-  const [sort, setSort] = useState<LeaderboardSort>("winRate");
+  // Rating, not raw Win Rate, is the default sort — a 1-1 record is a naive
+  // 100% win rate, which used to out-rank a genuine 20-2 record on small
+  // sample size alone. Rating (a Wilson score lower bound; see leaderboard.ts)
+  // asks how confident we actually are in that percentage given how many
+  // matches back it up, so an unproven small sample can't out-rank a real
+  // track record. It's also the one ranking number phones can see (Wins is
+  // hidden below `lg:` — see the table header below), so defaulting to
+  // anything else would make the visible order look arbitrary against it.
+  const [sort, setSort] = useState<LeaderboardSort>("rating");
   const [matchType, setMatchType] = useState<MatchTypeFilter>("ALL");
   const [search, setSearch] = useState("");
 
@@ -215,8 +221,14 @@ export function LeaderboardView() {
               <th className="hidden lg:table-cell text-right text-xs font-medium text-muted px-3 py-2.5 w-[60px]">
                 Losses
               </th>
-              <th className="text-right text-xs font-medium text-muted pl-3 pr-4 sm:pr-6 py-2.5 w-[80px]">
+              <th className="hidden lg:table-cell text-right text-xs font-medium text-muted px-3 py-2.5 w-[80px]">
                 Win Rate
+              </th>
+              <th
+                className="text-right text-xs font-medium text-muted pl-3 pr-4 sm:pr-6 py-2.5 w-[80px]"
+                title="Confidence-adjusted win rate — accounts for how many matches back it up, so one lucky win can't out-rank a real track record"
+              >
+                Rating
               </th>
             </tr>
           </thead>
@@ -247,9 +259,14 @@ export function LeaderboardView() {
                   <td className="hidden lg:table-cell px-3 py-3 text-right">
                     <span className="font-mono text-sm tabular-nums text-muted">{row.losses}</span>
                   </td>
+                  <td className="hidden lg:table-cell px-3 py-3 text-right">
+                    <span className="font-mono text-sm tabular-nums text-muted">
+                      {Math.round(row.winRate * 100)}%
+                    </span>
+                  </td>
                   <td className="pl-3 pr-4 sm:pr-6 py-3 text-right">
                     <span className="font-mono text-sm font-semibold tabular-nums text-ink">
-                      {Math.round(row.winRate * 100)}%
+                      {Math.round(row.rating * 100)}%
                     </span>
                   </td>
                 </tr>

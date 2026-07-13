@@ -13,14 +13,14 @@ import {
 import { cn } from "@/lib/utils";
 import { ThemeToggle } from "@/components/ui/ThemeToggle";
 
-// Same five destinations, same order, as Sidebar's primary nav — "shared
-// item vocabulary" per DESIGN.md. Settings/ThemeToggle are the utility pair
-// Sidebar pins below a divider; mirrored here as a narrower end segment
-// rather than flex-1 slots, so they read as secondary without being hidden
-// (this is the only nav surface below md:, so nothing here can be unreachable).
+// Same four destinations, same order, as Sidebar's primary nav — "shared
+// item vocabulary" per DESIGN.md. Sessions/Settings/ThemeToggle are the
+// secondary trio Sidebar pins below a divider; mirrored here as a narrower
+// end segment rather than flex-1 slots, so they read as secondary without
+// being hidden (this is the only nav surface below md:, so nothing here can
+// be unreachable).
 const items = [
   { href: "/",            icon: LayoutGrid,   label: "Dashboard"   },
-  { href: "/sessions",    icon: CalendarDays, label: "Sessions"    },
   { href: "/players",     icon: Users,        label: "Players"     },
   { href: "/matches",     icon: Activity,     label: "Matches"     },
   { href: "/leaderboard", icon: Trophy,       label: "Rankings"    },
@@ -76,6 +76,20 @@ export function BottomBar() {
         >
           <Settings size={16} strokeWidth={pathname === "/settings" ? 2.5 : 1.75} aria-hidden />
           <span className="text-[9px] font-medium leading-none truncate max-w-full px-0.5">Settings</span>
+        </Link>
+
+        <Link
+          href="/sessions"
+          aria-label="Sessions"
+          aria-current={pathname.startsWith("/sessions") ? "page" : undefined}
+          className={cn(
+            "w-12 flex-shrink-0 flex flex-col items-center justify-center gap-0.5 transition-colors duration-150 min-h-[44px]",
+            "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary/50",
+            pathname.startsWith("/sessions") ? "text-primary" : "text-muted"
+          )}
+        >
+          <CalendarDays size={16} strokeWidth={pathname.startsWith("/sessions") ? 2.5 : 1.75} aria-hidden />
+          <span className="text-[9px] font-medium leading-none truncate max-w-full px-0.5">Sessions</span>
         </Link>
 
         <ThemeToggle className="w-12 flex-shrink-0 justify-center min-h-[44px]" />

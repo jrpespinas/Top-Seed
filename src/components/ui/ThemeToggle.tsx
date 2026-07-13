@@ -2,11 +2,18 @@
 
 import { useState, useEffect } from "react";
 import { Sun, Moon } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { cn, THEME_COLOR } from "@/lib/utils";
 
 type Theme = "dark" | "light";
 
 const STORAGE_KEY = "ts-theme";
+
+// The inline pre-paint script in layout.tsx sets this on first load; this
+// keeps it correct after that, whenever the theme changes post-hydration
+// (manual toggle or a live OS preference change with no stored override).
+function syncMetaThemeColor(theme: Theme) {
+  document.querySelector('meta[name="theme-color"]')?.setAttribute("content", THEME_COLOR[theme]);
+}
 
 export function ThemeToggle({ className }: { className?: string }) {
   const [theme, setThemeState] = useState<Theme>("dark");
@@ -24,6 +31,7 @@ export function ThemeToggle({ className }: { className?: string }) {
       if (!localStorage.getItem(STORAGE_KEY)) {
         const t: Theme = e.matches ? "light" : "dark";
         document.documentElement.dataset.theme = t;
+        syncMetaThemeColor(t);
         setThemeState(t);
       }
     };
@@ -37,6 +45,7 @@ export function ThemeToggle({ className }: { className?: string }) {
     html.classList.add("theme-switching");
     html.dataset.theme = next;
     localStorage.setItem(STORAGE_KEY, next);
+    syncMetaThemeColor(next);
     setThemeState(next);
     setTimeout(() => html.classList.remove("theme-switching"), 250);
   };
@@ -57,7 +66,7 @@ export function ThemeToggle({ className }: { className?: string }) {
       title={theme === "dark" ? "Light mode" : "Dark mode"}
       className={cn(
         "flex flex-col items-center gap-0.5 py-2 rounded-md",
-        "bg-surface-elevated text-muted hover:text-ink",
+        "text-muted hover:text-ink hover:bg-surface-elevated",
         "transition-colors duration-150",
         "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary",
         className

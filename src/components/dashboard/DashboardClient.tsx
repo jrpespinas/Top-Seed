@@ -19,8 +19,8 @@ import {
 import { suggestMatchup } from "@/lib/smart-matchup";
 import { useToast, ToastViewport } from "@/components/ui/Toast";
 
-function firstNames(players: Player[]): string {
-  return players.map((p) => p.name.split(" ")[0]).join("/");
+function sideNames(players: Player[]): string {
+  return players.map((p) => p.name).join("/");
 }
 
 function buildActiveMatch(
@@ -156,7 +156,7 @@ export function DashboardClient({ sessionId }: Props) {
     showToast(
       newEntries.length > 1
         ? `Added ${newEntries.length} players to queue`
-        : `Added ${newEntries[0].player.name.split(" ")[0]} to queue`
+        : `Added ${newEntries[0].player.name} to queue`
     );
   }, [showToast, setQueue]);
 
@@ -285,7 +285,7 @@ export function DashboardClient({ sessionId }: Props) {
           [...card.suggestion.sideA, ...card.suggestion.sideB].some((p) => p?.id === player.id)
       );
       if (isDuplicate) {
-        showToast(`${player.name.split(" ")[0]} is already in a card`);
+        showToast(`${player.name} is already in a card`);
         return;
       }
 
@@ -670,7 +670,7 @@ export function DashboardClient({ sessionId }: Props) {
       addMatchRecord(record);
 
       const winnerLabel =
-        result === "DRAW" ? "Draw" : `${firstNames(result === "SIDE_A" ? activeMatch.sideA : activeMatch.sideB)} won`;
+        result === "DRAW" ? "Draw" : `${sideNames(result === "SIDE_A" ? activeMatch.sideA : activeMatch.sideB)} won`;
       returnMatchPlayersToQueue(courtId, `Match ended — ${winnerLabel}`, () =>
         removeMatchRecord(record.id)
       );

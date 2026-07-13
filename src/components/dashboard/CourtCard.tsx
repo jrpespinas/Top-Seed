@@ -11,19 +11,15 @@ import { cn } from "@/lib/utils";
 
 type ConfirmMode = "end" | "void" | "delete" | null;
 
-function firstName(fullName: string) {
-  return fullName.split(" ")[0];
-}
-
 function sideLabel(players: Player[]) {
-  return players.map((p) => firstName(p.name)).join("/");
+  return players.map((p) => p.name).join("/");
 }
 
 function PlayerRow({ player }: { player: Player }) {
   return (
     <span className="flex items-center gap-1.5 min-w-0">
       <span className="text-xs text-ink truncate leading-none min-w-[44px]">
-        {firstName(player.name)}
+        {player.name}
       </span>
       <SkillBadge level={player.skillLevel} compact />
       {player.gender && <GenderIcon gender={player.gender} size={14} />}
