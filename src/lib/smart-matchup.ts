@@ -15,7 +15,7 @@ export interface SmartMatchupSettings {
 
 export const DEFAULT_SMART_MATCHUP_SETTINGS: SmartMatchupSettings = {
   balanceWeight: 0.6,
-  windowSize: 8,
+  windowSize: 10,
   skipCapThreshold: 2,
 };
 

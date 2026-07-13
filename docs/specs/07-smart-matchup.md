@@ -21,14 +21,14 @@ A player is eligible to appear in the window if they are:
 Arrival order is determined by `sessionJoinedAt` on `QueueEntry` — the timestamp when the player first entered the session, which never resets on re-queue. This ensures players who checked in earlier retain their seniority even after returning from a match.
 
 ### The Rolling Window
-Each planning card evaluates a **window of 8 eligible players**, drawn in arrival order. The window is not a fixed slice — it's a rolling buffer that stays at size 8 across the whole planning-card sequence for a round:
+Each planning card evaluates a **window of 10 eligible players**, drawn in arrival order. The window is not a fixed slice — it's a rolling buffer that stays at size 10 across the whole planning-card sequence for a round:
 
-1. **Card 1** opens with the earliest 8 eligible players in the queue.
+1. **Card 1** opens with the earliest 10 eligible players in the queue.
 2. It selects the best-scoring group (4 for doubles, 2 for singles) out of that window. The players **not** selected remain in the window.
-3. **Card 2's** window is topped back up to 8 by pulling in exactly as many *new* players from further down the queue as were just selected out — e.g. 4 leftover + 4 fresh arrivals for doubles.
+3. **Card 2's** window is topped back up to 10 by pulling in exactly as many *new* players from further down the queue as were just selected out — e.g. 4 leftover + 4 fresh arrivals for doubles.
 4. This repeats for every additional card/court opened in the same round: leftovers always carry forward, new arrivals only backfill the difference.
 
-This keeps every card's decision scoped to the same constant field of 8, rather than a pool that grows with each additional court. A player who scores poorly against one window's competition isn't compared against an ever-larger field in the next round — they reappear in a same-sized window, which keeps their odds of eventually being picked from silently shrinking round over round.
+This keeps every card's decision scoped to the same constant field of 10, rather than a pool that grows with each additional court. A player who scores poorly against one window's competition isn't compared against an ever-larger field in the next round — they reappear in a same-sized window, which keeps their odds of eventually being picked from silently shrinking round over round.
 
 **Minimum thresholds:**
 - Doubles needs at least 4 eligible players in the window; singles needs at least 2.
@@ -111,7 +111,7 @@ Because scoring can legitimately pass over a player in the window in favor of a 
 - Skip counts are session-scoped — they don't carry over between sessions.
 - If a player's skip count reaches the cap (default: **2**), the next time they appear in a window they are **force-included** in the selected group regardless of score; the remaining slots and side-split are still chosen to score as well as possible around that forced inclusion.
 
-This is a backstop, not the common case — with an 8-wide window, most players are picked well before hitting the cap. It exists for the rare outlier (an unusual skill level, or the only player of a given gender) who could otherwise be repeatedly out-scored round after round.
+This is a backstop, not the common case — with a 10-wide window, most players are picked well before hitting the cap. It exists for the rare outlier (an unusual skill level, or the only player of a given gender) who could otherwise be repeatedly out-scored round after round.
 
 ---
 
@@ -121,15 +121,15 @@ When every possible arrangement available in the current window (after the gende
 - Falls back to the least-recently-paired arrangement among them
 - UI shows a subtle note: "All unique pairs used — suggesting least recently repeated"
 
-With an 8-wide window this is now a much rarer fallback than under a fixed 4-player pool, since the number of valid arrangements is far larger — but it can still happen in a small or long-running session.
+With a 10-wide window this is now a much rarer fallback than under a fixed 4-player pool, since the number of valid arrangements is far larger — but it can still happen in a small or long-running session.
 
 ---
 
 ## Multi-Court Handling
 
 When multiple planning cards are open at once (multiple courts to fill in the same round):
-- Card 1 draws the first window of 8 and selects its group.
-- Card 2's window tops back up to 8 using leftovers from Card 1's window plus fresh arrivals (see "The Rolling Window" above), and so on for each additional card.
+- Card 1 draws the first window of 10 and selects its group.
+- Card 2's window tops back up to 10 using leftovers from Card 1's window plus fresh arrivals (see "The Rolling Window" above), and so on for each additional card.
 - Selected players are excluded from all subsequent cards' windows in the same round — nobody is suggested for two courts at once.
 
 ---
@@ -140,7 +140,7 @@ When multiple planning cards are open at once (multiple courts to fill in the sa
 Each planning card on the Dashboard is independently powered by the Smart Suggest algorithm:
 - Cards are auto-generated on session load (default 3); the `↺ Resuggest` button re-runs the algorithm for a single card
 - No scores or percentages are shown — just the suggested players on each side
-- Cards draw from the rolling 8-wide window described above, in card order
+- Cards draw from the rolling 10-wide window described above, in card order
 - If fewer eligible candidates exist than the match type requires, the card shows an **Empty** state with a "Not enough players" note — no button rendered
 
 ### Within a Planning Card
@@ -178,7 +178,7 @@ type MatchupSuggestion = {
 
 | Constant | Default | Description |
 |---|---|---|
-| `matchupWindowSize` | 8 | Size of the rolling candidate window per card |
+| `matchupWindowSize` | 10 | Size of the rolling candidate window per card |
 | `skipCapThreshold` | 2 | Consecutive skips before a player is force-included |
 
 ---
@@ -220,5 +220,5 @@ async function getSessionSkipCount(playerId: string, sessionId: string): Promise
 - **`balanceWeight` set to 1.0**: novelty ignored entirely; pure skill/win-rate balance
 - **`balanceWeight` set to 0.0**: novelty only; ignores skill balance
 - **Window can't support any same-gender or mixed-doubles group**: gender preference silently drops to unrestricted for that card; no UI note needed
-- **Fewer than 8 eligible players remain in the queue**: window is simply capped at whatever's available; falls through to the standard "not enough players" disable if it drops below the match-type minimum
+- **Fewer than 10 eligible players remain in the queue**: window is simply capped at whatever's available; falls through to the standard "not enough players" disable if it drops below the match-type minimum
 - **A player hits the skip cap while also being the only option for a same-gender/mixed-doubles slot**: force-inclusion still respects the active gender tier — they're forced into a valid arrangement within that tier, not into a tier the window doesn't support
