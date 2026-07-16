@@ -116,6 +116,11 @@ export interface SessionPlayerSnapshot {
   skillLevel: SkillLevel;
   gender?: Gender;
   paymentStatus: PaymentStatus;
+  // Optional — snapshots taken before this field existed won't have one;
+  // consumers must handle its absence, not assume it. When present, the
+  // player's original check-in time for this session (from QueueEntry/
+  // BenchEntry.sessionJoinedAt), preserved so it's still visible after close.
+  sessionJoinedAt?: string;
 }
 
 export interface SessionRecord {

@@ -1,7 +1,7 @@
 # Spec: Player Management
 
 ## Scope
-The `/players` page is not a persistent roster — it's a live view of whoever is currently in the open session's queue or bench (`useQueueSnapshot`/`useBenchSnapshot` from `src/lib/session-store.ts`), the same localStorage-backed store the live Dashboard reads and writes. There is no standalone player directory that outlives a session: closing a session and starting a new one starts this page empty again. **There is currently no backend** — `session-store.ts` persists to `localStorage` only.
+The `/players` page is not a persistent roster — it's a per-session view, scoped by the same `SessionSelect` combobox and `useSessionOptions()` hook `/matches` and `/leaderboard` use, staying in sync with whichever session is selected on any of the three pages. Viewing the **open** session shows a live view of whoever is currently in its queue or bench (`useQueueSnapshot`/`useBenchSnapshot` from `src/lib/session-store.ts`), the same localStorage-backed store the live Dashboard reads and writes, fully editable exactly as before. Viewing a **closed** session instead shows that session's frozen `SessionPlayerSnapshot[]` (captured once at close time via `useSessionArchive()`) — read-only, since a snapshot has no live queue/bench entry behind it to mutate: no edit drawer, no payment toggle (a plain `StatusBadge` read-out instead), no Queued/Benched state (not preserved — `closeSession` merges queue+bench without remembering which). Check-in time *does* survive, though — `SessionPlayerSnapshot.sessionJoinedAt` is captured at close time, so you can still see what time someone arrived after their session has ended (snapshots taken before this field existed just show "—"). There is no standalone player directory outside any session. **There is currently no backend** — `session-store.ts` persists to `localStorage` only.
 
 Both `/players` and the Dashboard's `AddPlayersModal` write into the same queue, so a player added or edited from either surface is immediately visible on the other — there are no longer two disconnected player pools.
 
@@ -48,24 +48,24 @@ There is no `PlayerStatus` / active-inactive concept. Presence in the queue or b
 ## Pages & Components
 
 ### `/players` — Session Roster (`PlayersView.tsx`)
-Search + filter + sort + create + edit + remove, all against the live session queue/bench.
+Search + filter + sort + edit + remove, scoped to whichever session is selected via the title-bar `SessionSelect` (synced with `/matches` and `/leaderboard`). No create entry point on this page — see `AddPlayersModal` on the Dashboard.
 
 **Table columns** (responsive column hiding by breakpoint):
 
-| Column | Always visible? | Sortable |
-|---|---|---|
-| Name | Yes | Yes |
-| Skill (badge) | Yes | Yes |
-| Payment (3-way toggle: Paid/Unpaid/Waived) | Hidden < `sm` | Yes |
-| Gender (icon or —) | Hidden < `sm` | Yes |
-| State (dot + "Queued"/"Benched") | Hidden < `sm` | Yes |
-| Games (from `useGamesPlayedMap`) | Hidden < `md` | Yes |
-| Check-in (formatted `sessionJoinedAt`) | Hidden < `lg` | Yes |
-| Notes (truncated or —) | Hidden < `lg` | No |
+| Column | Always visible? | Sortable | Closed session |
+|---|---|---|---|
+| Name | Yes | Yes | as recorded |
+| Skill (badge) | Yes | Yes | as recorded |
+| Payment | Hidden < `sm` | Yes | read-only `StatusBadge`, not the toggle |
+| Gender (icon or —) | Hidden < `sm` | Yes | as recorded |
+| State (dot + "Queued"/"Benched") | Hidden < `sm` | Yes | — (not preserved in the snapshot) |
+| Games (session-scoped match count) | Hidden < `md` | Yes | as recorded |
+| Check-in (formatted `sessionJoinedAt`) | Hidden < `lg` | Yes | as recorded, or — if the snapshot predates this field |
+| Notes (truncated or —) | Hidden < `lg` | No | as recorded |
 
-Default sort: Name ascending. Clicking a sortable header toggles direction. Sorting by Payment ranks Unpaid first, then Waived, then Paid — surfaces who still owes.
+Default sort: Name ascending. Clicking a sortable header toggles direction. Sorting by Payment ranks Unpaid first, then Waived, then Paid — surfaces who still owes. Games is scoped to the selected session (not all-time).
 
-**Payment column** (`PaymentToggle.tsx`): a tap-to-set 3-segment inline control, no drawer needed — clicking a segment calls `updateQueuePlayer`/`updateBenchPlayer` directly with the new `paymentStatus`, exactly like any other field edit. New players (from either `/players` or the Dashboard's `AddPlayersModal`) default to `UNPAID`. The header shows a running `{n} paid` count next to the row total, computed over the currently filtered rows. **Deliberately out of scope for now** (real PRD stories, not yet built): session fee amounts, per-payment overrides, payment notes, an Unpaid-only filter, and any cross-session payment history — the last of which is now in direct tension with players not persisting across sessions at all (see the `PlayerStatus` note above).
+**Payment column**: for the **open session**, `PaymentToggle.tsx` — a tap-to-set 3-segment inline control, no drawer needed — clicking a segment calls `updateQueuePlayer`/`updateBenchPlayer` directly with the new `paymentStatus`, exactly like any other field edit. New players default to `UNPAID`. For a **closed session**, a plain `StatusBadge` read-out instead — a closed session's players are a frozen `SessionPlayerSnapshot[]`, not a live queue/bench entry, so there's nothing to mutate. The header shows a running `{n} paid` count next to the row total, computed over the currently filtered rows, for whichever session is selected. **Deliberately out of scope for now** (real PRD stories, not yet built): session fee amounts, per-payment overrides, payment notes, an Unpaid-only filter, and editing a closed session's frozen payment record after the fact.
 
 **Filters**:
 - Free-text search (name substring, case-insensitive)
@@ -73,14 +73,12 @@ Default sort: Name ascending. Clicking a sortable header toggles direction. Sort
 - Gender filter: multi-select chips (M/F)
 - "Clear" link resets search + skill + gender filters
 
-**Row interaction**: the entire row is clickable (mouse or keyboard) and opens `PlayerDrawer` in edit mode.
+**Row interaction**: for the **open session**, the entire row is clickable (mouse or keyboard) and opens `PlayerDrawer` in edit mode, exactly as before. For a **closed session**, rows are plain read-outs — no click handler, no drawer, matching `SessionDetailView`'s existing read-only player table for the same reason (frozen snapshot, nothing to edit).
 
-**"Add Player" button** (header, plus a duplicate CTA in the empty state): opens `PlayerDrawer` in create mode. Saving enters the player directly into the session queue via `addPlayerToQueue` — identical mechanics to the Dashboard's own add flow, just single-player.
+### `PlayerDrawer.tsx` — single-player edit/remove
+Right-side drawer, edit mode only (`editingPlayer: Player | null`) — opens from a `/players` row when the open session is selected.
 
-### `PlayerDrawer.tsx` — single-player create/edit/remove
-Right-side drawer, one component for both modes (`editingPlayer: Player | null` — `null` = create).
-
-Fields: Name (required, min 2 characters), Skill Level (`SkillLevelSelect`, shared component — see below), Gender (`GenderToggle`, `variant="full"`, optional, click-to-deselect), Notes (textarea, organizer-only). Edit mode only: a **"Remove from session"** action, replacing the old "Mark as Inactive" toggle. Removing pulls the entry out of whichever store (queue or bench) it's in; `PlayersView` shows a 5-second undo toast (`restoreQueueEntry`/`restoreBenchEntry`), matching the toast/undo convention used on the Dashboard and Matches page.
+Fields: Name (required, min 2 characters), Skill Level (`SkillLevelSelect`, shared component — see below), Gender (`GenderToggle`, `variant="full"`, optional, click-to-deselect), Notes (textarea, organizer-only). A **"Remove from session"** action pulls the entry out of whichever store (queue or bench) it's in; `PlayersView` shows a 5-second undo toast (`restoreQueueEntry`/`restoreBenchEntry`), matching the toast/undo convention used on the Dashboard and Matches page.
 
 Standard dialog behaviors: discard-confirmation when closing with unsaved changes, Escape/focus-trap, a simulated 300ms save delay before committing (no real async work — see Known Gaps).
 
@@ -119,11 +117,11 @@ On submit, each valid row becomes a new `QueueEntry` with a client-generated pla
 Places where the UI implies behavior that has no real implementation behind it — a backend build should either implement the real thing or the UI copy should be revisited:
 
 1. **No persistence beyond localStorage.** Every "save" writes to `localStorage`; nothing survives a cleared browser or a different device.
-2. **No cross-session player history.** Because players are entirely session-scoped, there is currently no way to see a person's stats, notes, or skill level from a *previous* session, and no quick "re-add a regular" flow — every session starts from zero. If the real product wants a persistent club roster, that's a reversal of this decision, not an extension of it.
+2. **No cross-session player history *across* sessions, though a single past session is now viewable.** `/players` can show a closed session's frozen roster (name, skill, gender, payment, notes) via `SessionSelect`, but there's still no way to look up a specific person's history across every session they've played, and no quick "re-add a regular" flow into a new session — every new session starts from zero. If the real product wants a persistent club roster, that's a reversal of this decision, not an extension of it.
 3. **Skill-level history is UI-only copy with no data behind it.** No history record is ever created on a skill-level change.
 4. **No duplicate-name detection**, despite name being the only required, user-typed identifier.
 5. **In-match players are invisible on `/players`.** See the "Known limitation" note above — court state isn't in a shared store yet.
-6. **Validation is inconsistent between the two creation entry points** (2-character minimum on `/players`, none on the Dashboard bulk-add).
+6. **Validation is inconsistent between `PlayerDrawer` and the Dashboard bulk-add** (2-character minimum in the drawer, none in `AddPlayersModal`) — `/players` itself has no creation entry point, only edit, so this surfaces only via the drawer opened from a row.
 
 ---
 

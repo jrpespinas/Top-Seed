@@ -60,12 +60,16 @@ function buildLeaderboardSheet(sessionMatches: MatchRecord[]) {
 }
 
 function buildPlayersSheet(players: SessionPlayerSnapshot[]) {
-  const header = ["Name", "Skill", "Gender", "Payment Status"];
+  const header = ["Name", "Skill", "Gender", "Payment Status", "Check-in"];
   const rows = players.map((p) => ({
     Name: p.name,
     Skill: SKILL_LABELS[p.skillLevel] ?? p.skillLevel,
     Gender: p.gender ? GENDER_LABELS[p.gender] : "—",
     "Payment Status": PAYMENT_LABELS[p.paymentStatus],
+    // Absent on snapshots taken before this field was captured — not an error.
+    "Check-in": p.sessionJoinedAt
+      ? new Date(p.sessionJoinedAt).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })
+      : "—",
   }));
   return XLSX.utils.json_to_sheet(rows, { header });
 }

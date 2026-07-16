@@ -699,7 +699,10 @@ export function closeSession(matches: MatchRecord[]): CloseSessionResult | null 
   const playersById = new Map<string, SessionPlayerSnapshot>();
   for (const entry of [...queue, ...bench]) {
     const { id, name, skillLevel, gender, paymentStatus } = entry.player;
-    playersById.set(id, { id, name, skillLevel, gender, paymentStatus });
+    // sessionJoinedAt lives on the queue/bench entry, not the embedded
+    // player — captured here so it survives the snapshot and is still
+    // visible on /players after the session closes.
+    playersById.set(id, { id, name, skillLevel, gender, paymentStatus, sessionJoinedAt: entry.sessionJoinedAt });
   }
 
   const matchCount = matches.filter(

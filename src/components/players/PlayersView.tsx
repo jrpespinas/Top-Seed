@@ -5,11 +5,16 @@ import { Search, X, ChevronUp, ChevronDown } from "lucide-react";
 import { SkillBadge } from "@/components/ui/SkillBadge";
 import { GenderIcon } from "@/components/ui/GenderIcon";
 import { PaymentToggle } from "@/components/ui/PaymentToggle";
+import { StatusBadge } from "@/components/ui/StatusBadge";
+import { SessionSelect } from "@/components/ui/SessionSelect";
 import { PlayerDrawer } from "./PlayerDrawer";
 import { useToast, ToastViewport } from "@/components/ui/Toast";
 import { cn, SKILL_LABELS, SKILL_LABELS_SHORT } from "@/lib/utils";
-import { useGamesPlayedMap } from "@/lib/match-log-store";
+import { useMatchLog } from "@/lib/match-log-store";
 import {
+  useSessionOptions,
+  useCurrentSession,
+  useSessionArchive,
   useQueueSnapshot,
   useBenchSnapshot,
   updateQueuePlayer,
@@ -45,17 +50,26 @@ const STATE_ORDER: Record<Source, number> = { queue: 0, bench: 1 };
 // Ascending surfaces who still owes money first — the organizer's most useful default.
 const PAYMENT_ORDER: Record<PaymentStatus, number> = { UNPAID: 0, WAIVED: 1, PAID: 2 };
 
-// A single row on this page — the Players page has no roster of its own; it's
-// a live merge of whoever is currently in the session's queue or bench. Presence
-// here IS the "status": there's no separate active/inactive concept anymore.
-interface SessionPlayerRow {
-  entryId: string;
-  source: Source;
-  player: Player;
-  sessionJoinedAt: string;
-}
+// A single row on this page — scoped to whichever session is selected in the
+// title bar. The open session is a live merge of its queue/bench (editable —
+// presence IS the "status", there's no separate active/inactive concept); a
+// closed session is the frozen SessionPlayerSnapshot[] captured at close time
+// (read-only — same branch SessionDetailView already uses, since a snapshot
+// has no live queue/bench entry behind it to mutate, no remembered queue-vs-
+// bench source, and no check-in timestamp). The discriminated union keeps
+// entryId/source type-safe: only reachable when editable. sessionJoinedAt is
+// no longer editable-only, though — it's now captured into the frozen
+// SessionPlayerSnapshot at close time (see session-store.ts's closeSession),
+// so a closed row can carry a real value too. It's still nullable there
+// because snapshots taken before that field existed won't have one.
+type SessionPlayerRow =
+  | { key: string; player: Player; editable: true; entryId: string; source: Source; sessionJoinedAt: string }
+  | { key: string; player: Player; editable: false; entryId: null; source: null; sessionJoinedAt: string | null };
 
-function formatCheckinTime(iso: string): string {
+// null covers closed-session snapshots taken before sessionJoinedAt was
+// captured — graceful degradation, not an error state.
+function formatCheckinTime(iso: string | null): string {
+  if (!iso) return "—";
   return new Date(iso).toLocaleTimeString("en-US", {
     hour: "numeric",
     minute: "2-digit",
@@ -153,17 +167,17 @@ function PlayerTableRow({
   onClick: () => void;
   onPaymentChange: (status: PaymentStatus) => void;
 }) {
-  const { player } = row;
+  const { player, editable } = row;
   return (
     <tr
-      onClick={onClick}
-      onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") onClick(); }}
-      tabIndex={0}
+      onClick={editable ? onClick : undefined}
+      onKeyDown={editable ? (e) => { if (e.key === "Enter" || e.key === " ") onClick(); } : undefined}
+      tabIndex={editable ? 0 : undefined}
       role="row"
       aria-label={`${player.name}${row.source === "bench" ? ", benched" : ""}`}
       className={cn(
-        "border-b border-border/50 cursor-pointer transition-colors duration-100",
-        "hover:bg-surface-elevated/40 focus-visible:outline-none focus-visible:bg-surface-elevated/40"
+        "border-b border-border/50 transition-colors duration-100",
+        editable && "cursor-pointer hover:bg-surface-elevated/40 focus-visible:outline-none focus-visible:bg-surface-elevated/40"
       )}
     >
       {/* Name */}
@@ -178,9 +192,14 @@ function PlayerTableRow({
         <SkillBadge level={player.skillLevel} compact />
       </td>
 
-      {/* Payment */}
+      {/* Payment — interactive for the live session, a plain read-out for a
+          closed one (no live entry behind a snapshot to mutate). */}
       <td className="px-3 py-3 w-[190px]">
-        <PaymentToggle value={player.paymentStatus} onChange={onPaymentChange} />
+        {editable ? (
+          <PaymentToggle value={player.paymentStatus} onChange={onPaymentChange} />
+        ) : (
+          <StatusBadge status={player.paymentStatus.toLowerCase() as "paid" | "unpaid" | "waived"} />
+        )}
       </td>
 
       {/* Gender */}
@@ -192,19 +211,21 @@ function PlayerTableRow({
         )}
       </td>
 
-      {/* State */}
+      {/* State — not preserved once a session closes (the snapshot merges
+          queue+bench without remembering which). */}
       <td className="px-3 py-3 w-[84px]">
-        <StateCell source={row.source} />
+        {editable ? <StateCell source={row.source} /> : <span className="text-xs text-border">—</span>}
       </td>
 
-      {/* Games */}
+      {/* Games — scoped to this session */}
       <td className="px-3 py-3 w-[60px] text-right">
         <span className="font-mono text-sm tabular-nums text-muted">
           {gamesPlayed}
         </span>
       </td>
 
-      {/* Check-in time */}
+      {/* Check-in time — "—" only for closed-session snapshots taken before
+          this field was captured (see SessionPlayerSnapshot.sessionJoinedAt) */}
       <td className="px-3 py-3 w-[88px] text-right">
         <span className="font-mono text-sm tabular-nums text-muted">
           {formatCheckinTime(row.sessionJoinedAt)}
@@ -255,17 +276,17 @@ function PlayerCard({
   onClick: () => void;
   onPaymentChange: (status: PaymentStatus) => void;
 }) {
-  const { player } = row;
+  const { player, editable } = row;
   return (
     <div
-      onClick={onClick}
-      onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") onClick(); }}
-      tabIndex={0}
-      role="button"
+      onClick={editable ? onClick : undefined}
+      onKeyDown={editable ? (e) => { if (e.key === "Enter" || e.key === " ") onClick(); } : undefined}
+      tabIndex={editable ? 0 : undefined}
+      role={editable ? "button" : undefined}
       aria-label={`${player.name}${row.source === "bench" ? ", benched" : ""}`}
       className={cn(
-        "flex flex-col gap-2 px-4 sm:px-6 py-3 border-b border-border/50 cursor-pointer",
-        "transition-colors duration-100 hover:bg-surface-elevated/40 focus-visible:outline-none focus-visible:bg-surface-elevated/40"
+        "flex flex-col gap-2 px-4 sm:px-6 py-3 border-b border-border/50 transition-colors duration-100",
+        editable && "cursor-pointer hover:bg-surface-elevated/40 focus-visible:outline-none focus-visible:bg-surface-elevated/40"
       )}
     >
       {/* Name + skill */}
@@ -274,17 +295,20 @@ function PlayerCard({
         <SkillBadge level={player.skillLevel} compact />
       </div>
 
-      {/* Payment — the one field here that's an interactive control, not a
-          read-out, so it gets its own row rather than folding into the meta
-          line; PaymentToggle already stops its own click propagation. */}
-      <PaymentToggle value={player.paymentStatus} onChange={onPaymentChange} />
+      {/* Payment — interactive for the live session, a plain read-out for a
+          closed one; PaymentToggle already stops its own click propagation. */}
+      {editable ? (
+        <PaymentToggle value={player.paymentStatus} onChange={onPaymentChange} />
+      ) : (
+        <StatusBadge status={player.paymentStatus.toLowerCase() as "paid" | "unpaid" | "waived"} className="self-start" />
+      )}
 
       <MetaLine
         items={[
           player.gender && <GenderIcon gender={player.gender} />,
-          <StateCell key="state" source={row.source} />,
+          editable ? <StateCell key="state" source={row.source} /> : null,
           <span key="games" className="font-mono tabular-nums">{gamesPlayed} games</span>,
-          <span key="checkin" className="font-mono tabular-nums">{formatCheckinTime(row.sessionJoinedAt)}</span>,
+          row.sessionJoinedAt && <span key="checkin" className="font-mono tabular-nums">{formatCheckinTime(row.sessionJoinedAt)}</span>,
         ]}
       />
 
@@ -298,14 +322,49 @@ function PlayerCard({
 }
 
 export function PlayersView() {
+  const { sessions, selectedSessionId, setSelectedSessionId } = useSessionOptions();
+  const currentSession = useCurrentSession();
+  const archive = useSessionArchive();
   const queue = useQueueSnapshot();
   const bench = useBenchSnapshot();
-  const gamesPlayedMap = useGamesPlayedMap();
+  const matches = useMatchLog();
 
-  const rows = useMemo<SessionPlayerRow[]>(() => [
-    ...queue.map((e) => ({ entryId: e.id, source: "queue" as const, player: e.player, sessionJoinedAt: e.sessionJoinedAt })),
-    ...bench.map((e) => ({ entryId: e.id, source: "bench" as const, player: e.player, sessionJoinedAt: e.sessionJoinedAt })),
-  ], [queue, bench]);
+  // The open session is live and editable (a merge of its current queue +
+  // bench, same as before); any other selected session is closed — its
+  // players come from the frozen SessionPlayerSnapshot[] captured at close
+  // time instead, which carries no live entryId/source/check-in to edit.
+  // Same open-vs-closed branch SessionDetailView already uses.
+  const isOpenSessionSelected = !!currentSession && currentSession.id === selectedSessionId;
+
+  const rows = useMemo<SessionPlayerRow[]>(() => {
+    if (isOpenSessionSelected) {
+      return [
+        ...queue.map((e) => ({ key: e.id, entryId: e.id, source: "queue" as const, player: e.player, sessionJoinedAt: e.sessionJoinedAt, editable: true as const })),
+        ...bench.map((e) => ({ key: e.id, entryId: e.id, source: "bench" as const, player: e.player, sessionJoinedAt: e.sessionJoinedAt, editable: true as const })),
+      ];
+    }
+    const record = archive.find((r) => r.id === selectedSessionId);
+    if (!record) return [];
+    return record.players.map((p) => ({ key: p.id, player: p, editable: false as const, entryId: null, source: null, sessionJoinedAt: p.sessionJoinedAt ?? null }));
+  }, [isOpenSessionSelected, queue, bench, archive, selectedSessionId]);
+
+  // Scoped to the selected session, not all-time — consistent with the rest
+  // of this page now being session-scoped. Same COMPLETED-only rule as
+  // match-log-store's useGamesPlayedMap, just filtered to one session first.
+  const sessionMatches = useMemo(
+    () => matches.filter((m) => m.sessionId === selectedSessionId),
+    [matches, selectedSessionId]
+  );
+  const gamesPlayedMap = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const match of sessionMatches) {
+      if (match.status !== "COMPLETED") continue;
+      for (const p of [...match.sideA, ...match.sideB]) {
+        map.set(p.id, (map.get(p.id) ?? 0) + 1);
+      }
+    }
+    return map;
+  }, [sessionMatches]);
 
   const [search, setSearch] = useState("");
   const [skillFilter, setSkillFilter] = useState<Set<SkillLevel>>(new Set());
@@ -339,10 +398,10 @@ export function PlayersView() {
         case "name":        cmp = a.player.name.localeCompare(b.player.name); break;
         case "skillLevel":  cmp = SKILL_ORDER[a.player.skillLevel] - SKILL_ORDER[b.player.skillLevel]; break;
         case "gender":      cmp = (a.player.gender ?? "").localeCompare(b.player.gender ?? ""); break;
-        case "state":       cmp = STATE_ORDER[a.source] - STATE_ORDER[b.source]; break;
+        case "state":       cmp = (a.source ? STATE_ORDER[a.source] : -1) - (b.source ? STATE_ORDER[b.source] : -1); break;
         case "paymentStatus":   cmp = PAYMENT_ORDER[a.player.paymentStatus] - PAYMENT_ORDER[b.player.paymentStatus]; break;
         case "gamesPlayed":     cmp = (gamesPlayedMap.get(a.player.id) ?? 0) - (gamesPlayedMap.get(b.player.id) ?? 0); break;
-        case "sessionJoinedAt": cmp = a.sessionJoinedAt.localeCompare(b.sessionJoinedAt); break;
+        case "sessionJoinedAt": cmp = (a.sessionJoinedAt ?? "").localeCompare(b.sessionJoinedAt ?? ""); break;
       }
       return sortDir === "asc" ? cmp : -cmp;
     });
@@ -393,6 +452,10 @@ export function PlayersView() {
   }
 
   function handleEdit(row: SessionPlayerRow) {
+    // Closed-session rows have no click handler wired in PlayerTableRow/
+    // PlayerCard, so this shouldn't fire for one in practice — guard stays
+    // for type-narrowing (entryId/source below need the editable branch).
+    if (!row.editable) return;
     setEditingRow(row);
     setDrawerOpen(true);
   }
@@ -405,9 +468,18 @@ export function PlayersView() {
   function handleSave(data: PlayerSaveData) {
     // Players page no longer has an add-player entry point (see AddPlayersModal
     // on the Dashboard) — the drawer only ever opens via handleEdit now, so
-    // editingRow is always set by the time a save happens. Guard stays for
-    // type-narrowing, not because this can realistically be null here.
-    if (!editingRow) return;
+    // editingRow is always set (and editable — handleEdit guards on entry) by
+    // the time a save happens. Guard stays for type-narrowing.
+    if (!editingRow || !editingRow.editable) return;
+    // The queue/bench stores sync cross-tab (storage events) — if another
+    // tab closed this session while the drawer was open here, the live entry
+    // is already gone. updateQueuePlayer/updateBenchPlayer would silently
+    // no-op on a missing id, closing the drawer as if the save succeeded
+    // when nothing actually happened. Catch it explicitly instead.
+    if (!isOpenSessionSelected) {
+      showToast("This session was closed elsewhere — nothing saved");
+      return;
+    }
     const patch = {
       name: data.name,
       skillLevel: data.skillLevel,
@@ -422,6 +494,15 @@ export function PlayersView() {
   }
 
   function handlePaymentChange(row: SessionPlayerRow, status: PaymentStatus) {
+    // Same reasoning as handleEdit — PaymentToggle only renders (and can only
+    // fire onChange) for editable rows; StatusBadge replaces it otherwise.
+    if (!row.editable) return;
+    // Same cross-tab race as handleSave — the row was editable when this
+    // render started, but the session may have closed elsewhere since.
+    if (!isOpenSessionSelected) {
+      showToast("This session was closed elsewhere — nothing saved");
+      return;
+    }
     if (row.source === "queue") {
       updateQueuePlayer(row.entryId, { paymentStatus: status });
     } else {
@@ -430,7 +511,12 @@ export function PlayersView() {
   }
 
   function handleRemove() {
-    if (!editingRow) return;
+    if (!editingRow || !editingRow.editable) return;
+    // Same cross-tab race as handleSave.
+    if (!isOpenSessionSelected) {
+      showToast("This session was closed elsewhere — nothing to remove");
+      return;
+    }
     const { entryId, source, player } = editingRow;
     if (source === "queue") {
       const removed = removeQueueEntry(entryId);
@@ -453,6 +539,20 @@ export function PlayersView() {
     }
   }
 
+  if (sessions.length === 0) {
+    return (
+      <div className="flex flex-col min-h-full">
+        <div className="flex items-center px-4 sm:px-6 min-h-[56px] pt-[env(safe-area-inset-top)] border-b border-border">
+          <h1 className="text-lg font-semibold text-ink">Players</h1>
+        </div>
+        <div className="flex flex-col items-center justify-center py-24 px-4 text-center">
+          <p className="text-sm text-muted">No sessions yet</p>
+          <p className="text-xs text-muted mt-1">Start your first session from the Dashboard.</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <>
       <div className="flex flex-col min-h-full">
@@ -468,7 +568,9 @@ export function PlayersView() {
             headerShadow ? "bg-surface-elevated shadow-[0_1px_0_var(--color-border)]" : "bg-bg"
           )}
         >
-          {/* Title bar */}
+          {/* Title bar — SessionSelect sits here, not the filter bar below,
+              matching Matches/Leaderboard: it changes which dataset this page
+              shows, not how the same dataset is displayed. */}
           <div className="flex items-center gap-2.5 px-4 sm:px-6 h-14 border-b border-border">
             <h1 className="text-base font-semibold text-ink">Players</h1>
             <span className="font-mono text-xs text-muted tabular-nums">
@@ -479,6 +581,9 @@ export function PlayersView() {
                 <span className="font-mono tabular-nums text-success">{paidCount}</span> paid
               </span>
             )}
+            <div className="ml-auto">
+              <SessionSelect sessions={sessions} value={selectedSessionId} onChange={setSelectedSessionId} />
+            </div>
           </div>
 
           {/* Filter bar — wraps by group (search / sort / skill / gender)
@@ -694,7 +799,7 @@ export function PlayersView() {
               <tbody>
                 {filteredAndSorted.map((row) => (
                   <PlayerTableRow
-                    key={row.entryId}
+                    key={row.key}
                     row={row}
                     gamesPlayed={gamesPlayedMap.get(row.player.id) ?? 0}
                     onClick={() => handleEdit(row)}
@@ -709,7 +814,7 @@ export function PlayersView() {
           <div className="lg:hidden" role="list" aria-label="Players roster">
             {filteredAndSorted.map((row) => (
               <PlayerCard
-                key={row.entryId}
+                key={row.key}
                 row={row}
                 gamesPlayed={gamesPlayedMap.get(row.player.id) ?? 0}
                 onClick={() => handleEdit(row)}
@@ -730,11 +835,13 @@ export function PlayersView() {
                   Clear filters
                 </button>
               </>
-            ) : (
+            ) : isOpenSessionSelected ? (
               <>
                 <p className="text-sm text-muted">No players in this session yet</p>
                 <p className="text-xs text-muted mt-1">Add players from the Dashboard to get started</p>
               </>
+            ) : (
+              <p className="text-sm text-muted">No players recorded for this session</p>
             )}
           </div>
         )}

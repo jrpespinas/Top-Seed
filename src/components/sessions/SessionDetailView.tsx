@@ -17,6 +17,13 @@ import {
 import { useMatchLog } from "@/lib/match-log-store";
 import type { SessionPlayerSnapshot } from "@/types";
 
+// null covers rows with no sessionJoinedAt — snapshots taken before this
+// field was captured. Graceful degradation, not an error state.
+function formatCheckinTime(iso: string | undefined): string {
+  if (!iso) return "—";
+  return new Date(iso).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", hour12: true });
+}
+
 interface SessionSummary {
   id: string;
   name: string;
@@ -38,9 +45,12 @@ export function SessionDetailView({ sessionId }: { sessionId: string }) {
 
   const summary = useMemo<SessionSummary | null>(() => {
     if (currentSession?.id === sessionId) {
+      // sessionJoinedAt lives on the queue/bench entry, not the embedded
+      // player — carried through here so the open session's table can show
+      // check-in time too, not just closed ones (see SessionPlayerSnapshot).
       const players: SessionPlayerSnapshot[] = [
-        ...queue.map((e) => e.player),
-        ...bench.map((e) => e.player),
+        ...queue.map((e) => ({ ...e.player, sessionJoinedAt: e.sessionJoinedAt })),
+        ...bench.map((e) => ({ ...e.player, sessionJoinedAt: e.sessionJoinedAt })),
       ];
       return {
         id: currentSession.id,
@@ -151,7 +161,8 @@ export function SessionDetailView({ sessionId }: { sessionId: string }) {
               <th scope="col" className="text-left text-xs font-medium text-muted pl-4 sm:pl-6 pr-3 py-2.5 whitespace-nowrap">Name</th>
               <th scope="col" className="text-left text-xs font-medium text-muted px-3 py-2.5 whitespace-nowrap w-[100px]">Skill</th>
               <th scope="col" className="hidden sm:table-cell text-left text-xs font-medium text-muted px-3 py-2.5 whitespace-nowrap w-[56px]">Gender</th>
-              <th scope="col" className="text-left text-xs font-medium text-muted pl-3 pr-4 sm:pr-6 py-2.5 whitespace-nowrap w-[92px]">Payment</th>
+              <th scope="col" className="text-left text-xs font-medium text-muted px-3 py-2.5 whitespace-nowrap w-[92px]">Payment</th>
+              <th scope="col" className="hidden sm:table-cell text-right text-xs font-medium text-muted pl-3 pr-4 sm:pr-6 py-2.5 whitespace-nowrap w-[88px]">Check-in</th>
             </tr>
           </thead>
           <tbody>
@@ -170,8 +181,13 @@ export function SessionDetailView({ sessionId }: { sessionId: string }) {
                     <span className="text-xs text-border">—</span>
                   )}
                 </td>
-                <td className="pl-3 pr-4 sm:pr-6 py-3">
+                <td className="px-3 py-3">
                   <StatusBadge status={player.paymentStatus.toLowerCase() as "paid" | "unpaid" | "waived"} />
+                </td>
+                <td className="hidden sm:table-cell text-right pl-3 pr-4 sm:pr-6 py-3">
+                  <span className="font-mono text-sm tabular-nums text-muted">
+                    {formatCheckinTime(player.sessionJoinedAt)}
+                  </span>
                 </td>
               </tr>
             ))}
