@@ -7,7 +7,7 @@ import { GenderIcon } from "@/components/ui/GenderIcon";
 import { PaymentToggle } from "@/components/ui/PaymentToggle";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { SessionSelect } from "@/components/ui/SessionSelect";
-import { PlayerDrawer } from "./PlayerDrawer";
+import { PlayerModal } from "./PlayerModal";
 import { useToast, ToastViewport } from "@/components/ui/Toast";
 import { cn, SKILL_LABELS, SKILL_LABELS_SHORT } from "@/lib/utils";
 import { useMatchLog } from "@/lib/match-log-store";
@@ -371,7 +371,7 @@ export function PlayersView() {
   const [genderFilter, setGenderFilter] = useState<Set<Gender>>(new Set());
   const [sortKey, setSortKey] = useState<SortKey>("name");
   const [sortDir, setSortDir] = useState<SortDir>("asc");
-  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [modalOpen, setModalOpen] = useState(false);
   const [editingRow, setEditingRow] = useState<SessionPlayerRow | null>(null);
   const [headerShadow, setHeaderShadow] = useState(false);
   const { toast, showToast, dismissAndUndo } = useToast();
@@ -457,24 +457,24 @@ export function PlayersView() {
     // for type-narrowing (entryId/source below need the editable branch).
     if (!row.editable) return;
     setEditingRow(row);
-    setDrawerOpen(true);
+    setModalOpen(true);
   }
 
   function handleClose() {
-    setDrawerOpen(false);
+    setModalOpen(false);
     setTimeout(() => setEditingRow(null), 220);
   }
 
   function handleSave(data: PlayerSaveData) {
     // Players page no longer has an add-player entry point (see AddPlayersModal
-    // on the Dashboard) — the drawer only ever opens via handleEdit now, so
+    // on the Dashboard) — the modal only ever opens via handleEdit now, so
     // editingRow is always set (and editable — handleEdit guards on entry) by
     // the time a save happens. Guard stays for type-narrowing.
     if (!editingRow || !editingRow.editable) return;
     // The queue/bench stores sync cross-tab (storage events) — if another
-    // tab closed this session while the drawer was open here, the live entry
+    // tab closed this session while the modal was open here, the live entry
     // is already gone. updateQueuePlayer/updateBenchPlayer would silently
-    // no-op on a missing id, closing the drawer as if the save succeeded
+    // no-op on a missing id, closing the modal as if the save succeeded
     // when nothing actually happened. Catch it explicitly instead.
     if (!isOpenSessionSelected) {
       showToast("This session was closed elsewhere — nothing saved");
@@ -847,8 +847,8 @@ export function PlayersView() {
         )}
       </div>
 
-      <PlayerDrawer
-        isOpen={drawerOpen}
+      <PlayerModal
+        isOpen={modalOpen}
         editingPlayer={editingRow?.player ?? null}
         onClose={handleClose}
         onSave={handleSave}

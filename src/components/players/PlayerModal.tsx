@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
+import { createPortal } from "react-dom";
 import { X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { SkillLevelSelect } from "@/components/ui/SkillLevelSelect";
@@ -22,7 +23,7 @@ const defaultForm: PlayerFormData = {
   notes: "",
 };
 
-interface PlayerDrawerProps {
+interface PlayerModalProps {
   isOpen: boolean;
   editingPlayer: Player | null;
   onClose: () => void;
@@ -30,13 +31,13 @@ interface PlayerDrawerProps {
   onRemove: () => void;
 }
 
-export function PlayerDrawer({
+export function PlayerModal({
   isOpen,
   editingPlayer,
   onClose,
   onSave,
   onRemove,
-}: PlayerDrawerProps) {
+}: PlayerModalProps) {
   const [formData, setFormData] = useState<PlayerFormData>(defaultForm);
   const [isDirty, setIsDirty] = useState(false);
   const [discardConfirm, setDiscardConfirm] = useState(false);
@@ -44,10 +45,20 @@ export function PlayerDrawer({
   const [isSaving, setIsSaving] = useState(false);
   const isSavingRef = useRef(false);
   const nameInputRef = useRef<HTMLInputElement>(null);
-  const drawerRef = useRef<HTMLElement>(null);
+  const dialogRef = useRef<HTMLDivElement>(null);
   // "Keep editing" is the safe default focused on entering confirm mode;
   // the footer's own Cancel button is what regains focus on exit.
   const { triggerRef: cancelBtnRef, cancelRef: keepEditingBtnRef } = useConfirmFocus(discardConfirm);
+  // Portal target (document.body) only exists client-side; avoids an SSR/
+  // hydration mismatch. Portaling matters here specifically because this
+  // component now also mounts inside the Dashboard's PlayerPoolColumn, whose
+  // sticky/grid ancestry can contain a plain `fixed` element to one column's
+  // box instead of the true viewport — the exact bug portaling sidesteps
+  // entirely, matching the pattern AddPlayersModal already uses.
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   // Sync form data when drawer opens
   useEffect(() => {
@@ -85,7 +96,7 @@ export function PlayerDrawer({
         return;
       }
       if (e.key !== "Tab") return;
-      const el = drawerRef.current;
+      const el = dialogRef.current;
       if (!el) return;
       const focusable = Array.from(
         el.querySelectorAll<HTMLElement>(
@@ -153,7 +164,9 @@ export function PlayerDrawer({
   const skillChanged =
     editingPlayer && formData.skillLevel !== editingPlayer.skillLevel;
 
-  return (
+  if (!mounted) return null;
+
+  return createPortal(
     <>
       {/* Backdrop */}
       <div
@@ -166,23 +179,26 @@ export function PlayerDrawer({
         aria-hidden
       />
 
-      {/* Drawer panel */}
-      <aside
-        ref={drawerRef}
-        role="dialog"
-        aria-modal="true"
-        aria-label={editingPlayer ? "Edit player" : "Add player"}
-        aria-hidden={!isOpen}
+      {/* Dialog */}
+      <div
         className={cn(
-          "fixed top-0 right-0 bottom-0 z-[var(--z-modal)]",
-          "w-full sm:w-[440px]",
-          "bg-surface border-l border-border",
-          "flex flex-col",
-          "transition-transform duration-200 ease-out motion-reduce:transition-none",
-          isOpen ? "translate-x-0" : "translate-x-full pointer-events-none"
+          "fixed inset-0 z-[var(--z-modal)] flex items-center justify-center p-4",
+          isOpen ? "pointer-events-auto" : "pointer-events-none"
         )}
       >
-        {/* Drawer header */}
+        <div
+          ref={dialogRef}
+          role="dialog"
+          aria-modal="true"
+          aria-label={editingPlayer ? "Edit player" : "Add player"}
+          aria-hidden={!isOpen}
+          className={cn(
+            "w-full max-w-md max-h-[85vh] bg-surface border border-border rounded-lg flex flex-col",
+            "transition-all duration-200 ease-out motion-reduce:transition-none",
+            isOpen ? "opacity-100 scale-100" : "opacity-0 scale-95 pointer-events-none"
+          )}
+        >
+        {/* Header */}
         <div className="flex items-center justify-between px-5 h-14 border-b border-border flex-shrink-0">
           <h2 className="text-base font-semibold text-ink">
             {editingPlayer ? "Edit Player" : "Add Player"}
@@ -190,7 +206,7 @@ export function PlayerDrawer({
           <button
             onClick={handleClose}
             className="text-muted hover:text-ink hover:bg-surface-elevated transition-colors p-1.5 rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-border min-h-[36px] min-w-[36px] flex items-center justify-center"
-            aria-label="Close drawer"
+            aria-label="Close"
           >
             <X size={16} strokeWidth={2} aria-hidden />
           </button>
@@ -390,7 +406,9 @@ export function PlayerDrawer({
             </div>
           </div>
         )}
-      </aside>
-    </>
+        </div>
+      </div>
+    </>,
+    document.body
   );
 }

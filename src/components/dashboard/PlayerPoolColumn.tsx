@@ -2,18 +2,28 @@
 
 import { useState } from "react";
 import { motion, AnimatePresence, MotionConfig } from "motion/react";
-import type { QueueEntry, BenchEntry, Player } from "@/types";
+import type { QueueEntry, BenchEntry, Player, SkillLevel, Gender } from "@/types";
 import { SkillBadge } from "@/components/ui/SkillBadge";
 import { GenderIcon } from "@/components/ui/GenderIcon";
 import { ElapsedTimer } from "@/components/ui/ElapsedTimer";
 import { AddPlayersModal, type NewPlayerInput } from "./AddPlayersModal";
+import { PlayerModal } from "@/components/players/PlayerModal";
 import { cn } from "@/lib/utils";
+import {
+  updateQueuePlayer,
+  updateBenchPlayer,
+  removeQueueEntry,
+  removeBenchEntry,
+  restoreQueueEntry,
+  restoreBenchEntry,
+} from "@/lib/session-store";
 import {
   Users,
   Plus,
   GripVertical,
   PauseCircle,
   PlayCircle,
+  Pencil,
   X,
   Check,
 } from "lucide-react";
@@ -33,6 +43,10 @@ interface Props {
   existingPlayerNames: Set<string>;
   selectedPlayerId?: string | null;
   onSelectPlayer: (player: Player) => void;
+  // Threaded through to DashboardClient's single shared toast instance rather
+  // than this column owning its own ToastViewport — two independent toasts
+  // would stack at the same fixed bottom-center position.
+  showToast: (message: string, onUndo?: () => void, undoLabel?: string) => void;
 }
 
 const EASE: [number, number, number, number] = [0.25, 1, 0.5, 1];
@@ -48,6 +62,7 @@ function PlayerRow({
   onMoveToBench,
   onReturnToQueue,
   onRemove,
+  onEdit,
   onSelect,
   onDragStart,
   onDragEnd,
@@ -62,6 +77,7 @@ function PlayerRow({
   // position (not total session time; see QueueEntry.enteredQueueAt).
   waitingSinceISO?: string;
   onMoveToBench?: () => void;
+  onEdit?: () => void;
   onReturnToQueue?: () => void;
   onRemove?: () => void;
   onSelect?: () => void;
@@ -157,7 +173,7 @@ function PlayerRow({
       </div>
 
       {/* Controls */}
-      {!isInMatch && (onRemove || onReturnToQueue) && (
+      {!isInMatch && (onRemove || onReturnToQueue || onEdit) && (
         <div className="flex-shrink-0">
           <AnimatePresence mode="wait" initial={false}>
             {confirmRemove ? (
@@ -193,6 +209,15 @@ function PlayerRow({
                 transition={{ duration: 0.12, ease: EASE }}
                 className="flex items-center gap-1 opacity-0 group-hover:opacity-100 [@media(hover:none)]:opacity-100 transition-opacity"
               >
+                {onEdit && (
+                  <button
+                    onClick={(e) => { e.stopPropagation(); onEdit(); }}
+                    className="p-3 text-muted hover:text-ink hover:bg-surface-elevated rounded-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-border"
+                    aria-label={`Edit ${displayName}`}
+                  >
+                    <Pencil size={11} strokeWidth={2} aria-hidden />
+                  </button>
+                )}
                 {onMoveToBench && (
                   <button
                     onClick={(e) => { e.stopPropagation(); onMoveToBench(); }}
@@ -244,9 +269,73 @@ export function PlayerPoolColumn({
   existingPlayerNames,
   selectedPlayerId,
   onSelectPlayer,
+  showToast,
 }: Props) {
   const waitingCount = queue.filter((e) => !e.isInMatch).length;
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+
+  // Edit modal — reuses PlayerModal verbatim (same component /players opens
+  // in edit mode), a second entry point onto the same shared save/remove
+  // logic rather than a parallel implementation. Tracked by entryId+source
+  // (not the Player object itself) so the modal always reflects the live
+  // queue/bench props, not a stale snapshot taken when it was opened.
+  const [editingEntry, setEditingEntry] = useState<{ entryId: string; source: "queue" | "bench" } | null>(null);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+
+  const editingPlayer = editingEntry
+    ? (editingEntry.source === "queue"
+        ? queue.find((e) => e.id === editingEntry.entryId)?.player
+        : bench.find((e) => e.id === editingEntry.entryId)?.player) ?? null
+    : null;
+
+  function handleEditPlayer(entryId: string, source: "queue" | "bench") {
+    setEditingEntry({ entryId, source });
+    setIsEditModalOpen(true);
+  }
+
+  function handleEditModalClose() {
+    setIsEditModalOpen(false);
+    setTimeout(() => setEditingEntry(null), 220);
+  }
+
+  function handleEditSave(data: { name: string; skillLevel: SkillLevel; gender?: Gender; notes: string }) {
+    if (!editingEntry) return;
+    const patch = {
+      name: data.name,
+      skillLevel: data.skillLevel,
+      gender: data.gender,
+      notes: data.notes || undefined,
+    };
+    if (editingEntry.source === "queue") {
+      updateQueuePlayer(editingEntry.entryId, patch);
+    } else {
+      updateBenchPlayer(editingEntry.entryId, patch);
+    }
+  }
+
+  function handleEditRemove() {
+    if (!editingEntry) return;
+    const { entryId, source } = editingEntry;
+    if (source === "queue") {
+      const removed = removeQueueEntry(entryId);
+      if (removed) {
+        showToast(
+          `Removed ${removed.player.name.split(" ")[0]} from the session`,
+          () => restoreQueueEntry(removed),
+          "Undo remove from session"
+        );
+      }
+    } else {
+      const removed = removeBenchEntry(entryId);
+      if (removed) {
+        showToast(
+          `Removed ${removed.player.name.split(" ")[0]} from the session`,
+          () => restoreBenchEntry(removed),
+          "Undo remove from session"
+        );
+      }
+    }
+  }
 
   return (
     <MotionConfig reducedMotion="user">
@@ -303,6 +392,7 @@ export function PlayerPoolColumn({
                         waitingSinceISO={entry.enteredQueueAt}
                         onMoveToBench={() => onMoveToBench(entry.id)}
                         onRemove={() => onQueueRemove(entry.id)}
+                        onEdit={() => handleEditPlayer(entry.id, "queue")}
                         onSelect={() => onSelectPlayer(entry.player)}
                         onDragStart={() => onPlayerDragStart(entry.player.id)}
                         onDragEnd={onPlayerDragEnd}
@@ -343,6 +433,7 @@ export function PlayerPoolColumn({
                         gamesPlayed={gamesPlayedMap.get(entry.player.id)}
                         onReturnToQueue={() => onBenchReturnToQueue(entry.id)}
                         onRemove={() => onBenchRemove(entry.id)}
+                        onEdit={() => handleEditPlayer(entry.id, "bench")}
                         onSelect={() => onSelectPlayer(entry.player)}
                         onDragStart={() => onPlayerDragStart(entry.player.id)}
                         onDragEnd={onPlayerDragEnd}
@@ -368,6 +459,14 @@ export function PlayerPoolColumn({
         onClose={() => setIsAddModalOpen(false)}
         onSubmit={onAddPlayers}
         existingPlayerNames={existingPlayerNames}
+      />
+
+      <PlayerModal
+        isOpen={isEditModalOpen}
+        editingPlayer={editingPlayer}
+        onClose={handleEditModalClose}
+        onSave={handleEditSave}
+        onRemove={handleEditRemove}
       />
     </MotionConfig>
   );

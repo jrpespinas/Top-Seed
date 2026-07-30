@@ -766,6 +766,7 @@ export function DashboardClient({ sessionId }: Props) {
             existingPlayerNames={existingPlayerNames}
             selectedPlayerId={selectedPlayer?.id ?? null}
             onSelectPlayer={handleSelectPlayer}
+            showToast={showToast}
           />
         </div>
 

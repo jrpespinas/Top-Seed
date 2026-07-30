@@ -73,16 +73,16 @@ Default sort: Name ascending. Clicking a sortable header toggles direction. Sort
 - Gender filter: multi-select chips (M/F)
 - "Clear" link resets search + skill + gender filters
 
-**Row interaction**: for the **open session**, the entire row is clickable (mouse or keyboard) and opens `PlayerDrawer` in edit mode, exactly as before. For a **closed session**, rows are plain read-outs — no click handler, no drawer, matching `SessionDetailView`'s existing read-only player table for the same reason (frozen snapshot, nothing to edit).
+**Row interaction**: for the **open session**, the entire row is clickable (mouse or keyboard) and opens `PlayerModal` in edit mode, exactly as before. For a **closed session**, rows are plain read-outs — no click handler, no modal, matching `SessionDetailView`'s existing read-only player table for the same reason (frozen snapshot, nothing to edit).
 
-### `PlayerDrawer.tsx` — single-player edit/remove
-Right-side drawer, edit mode only (`editingPlayer: Player | null`) — opens from a `/players` row when the open session is selected.
+### `PlayerModal.tsx` — single-player edit/remove
+Centered modal dialog (matches `AddPlayersModal`'s chrome — backdrop, `max-w-md`, scale/opacity transition, padded at every breakpoint), edit mode only (`editingPlayer: Player | null`) — opens from a `/players` row when the open session is selected, and from the Dashboard's Player Pool via a row-level Edit action. Previously a right-side sliding drawer; converted to a modal for visual consistency with `AddPlayersModal` (the app's other player-data-entry surface) and because a right-docked panel risked visually colliding with the Dashboard's Courts column once this component started mounting there too.
 
 Fields: Name (required, min 2 characters), Skill Level (`SkillLevelSelect`, shared component — see below), Gender (`GenderToggle`, `variant="full"`, optional, click-to-deselect), Notes (textarea, organizer-only). A **"Remove from session"** action pulls the entry out of whichever store (queue or bench) it's in; `PlayersView` shows a 5-second undo toast (`restoreQueueEntry`/`restoreBenchEntry`), matching the toast/undo convention used on the Dashboard and Matches page.
 
 Standard dialog behaviors: discard-confirmation when closing with unsaved changes, Escape/focus-trap, a simulated 300ms save delay before committing (no real async work — see Known Gaps).
 
-**Skill-level history is not implemented.** The drawer shows the copy "Changing skill level creates a history entry" when editing a player's skill level — this is currently misleading UI text; no history record of any kind is created anywhere in the codebase. A real backend should either implement the write path this copy implies, or the copy should be removed until it does.
+**Skill-level history is not implemented.** The modal shows the copy "Changing skill level creates a history entry" when editing a player's skill level — this is currently misleading UI text; no history record of any kind is created anywhere in the codebase. A real backend should either implement the write path this copy implies, or the copy should be removed until it does.
 
 ### Dashboard bulk-add (`AddPlayersModal.tsx`, opened from `PlayerPoolColumn.tsx`'s "Add" button)
 The Dashboard's own multi-player creation entry point, writing into the same session queue `/players` reads from `session-store.ts`.
@@ -98,17 +98,17 @@ Repeatable-row form: each row is Name (required) + Skill Level (`SkillLevelSelec
 On submit, each valid row becomes a new `QueueEntry` with a client-generated player id (`p-{timestamp}-{i}`) and a `sessionJoinedAt`/`enteredQueueAt` staggered by `i` milliseconds so multiple players typed in the same batch preserve their row order when the FIFO queue later sorts by check-in time (see `05-queue-matchup.md`). These are immediately visible on `/players`.
 
 ### Shared form controls (`src/components/ui/`)
-- **`SkillLevelSelect`** — a custom combobox (not a native `<select>`), showing the selected `SkillBadge` plus the full skill label ("Intermediate", "Advanced", etc.) with a portaled dropdown list. Used by both `PlayerDrawer` and `AddPlayersModal` so the two entry points stay visually and behaviorally identical.
-- **`GenderToggle`** — a two-button (M/F) toggle-radio group, click-again-to-deselect. `variant="full"` renders full words in a 2-column grid (`PlayerDrawer`); `variant="compact"` renders bare letters in a single-line pair (`AddPlayersModal`'s repeatable rows, where horizontal space is tight).
-- **`PaymentToggle`** — a three-button (Paid/Unpaid/Waived) toggle-radio group rendered directly in the `/players` table row (not in `PlayerDrawer`). Single tap sets the exact state; no cycling.
+- **`SkillLevelSelect`** — a custom combobox (not a native `<select>`), showing the selected `SkillBadge` plus the full skill label ("Intermediate", "Advanced", etc.) with a portaled dropdown list. Used by both `PlayerModal` and `AddPlayersModal` so the two entry points stay visually and behaviorally identical.
+- **`GenderToggle`** — a two-button (M/F) toggle-radio group, click-again-to-deselect. `variant="full"` renders full words in a 2-column grid (`PlayerModal`); `variant="compact"` renders bare letters in a single-line pair (`AddPlayersModal`'s repeatable rows, where horizontal space is tight).
+- **`PaymentToggle`** — a three-button (Paid/Unpaid/Waived) toggle-radio group rendered directly in the `/players` table row (not in `PlayerModal`). Single tap sets the exact state; no cycling.
 
 ---
 
 ## Validation
 
-- **`PlayerDrawer`**: name required, minimum 2 characters after trim.
-- **`AddPlayersModal`**: name required (non-empty after trim) — no minimum length enforced, an inconsistency with `PlayerDrawer`'s stricter rule for the same underlying field.
-- **No duplicate-name detection exists anywhere** — not in `PlayerDrawer`, not in `PlayersView`'s save logic, not in `AddPlayersModal`/the Dashboard's add-players handler. Two players with an identical name can be created without warning on either surface.
+- **`PlayerModal`**: name required, minimum 2 characters after trim.
+- **`AddPlayersModal`**: name required (non-empty after trim) — no minimum length enforced, an inconsistency with `PlayerModal`'s stricter rule for the same underlying field.
+- **No duplicate-name detection exists anywhere** — not in `PlayerModal`, not in `PlayersView`'s save logic, not in `AddPlayersModal`/the Dashboard's add-players handler. Two players with an identical name can be created without warning on either surface.
 
 ---
 
@@ -121,7 +121,7 @@ Places where the UI implies behavior that has no real implementation behind it �
 3. **Skill-level history is UI-only copy with no data behind it.** No history record is ever created on a skill-level change.
 4. **No duplicate-name detection**, despite name being the only required, user-typed identifier.
 5. **In-match players are invisible on `/players`.** See the "Known limitation" note above — court state isn't in a shared store yet.
-6. **Validation is inconsistent between `PlayerDrawer` and the Dashboard bulk-add** (2-character minimum in the drawer, none in `AddPlayersModal`) — `/players` itself has no creation entry point, only edit, so this surfaces only via the drawer opened from a row.
+6. **Validation is inconsistent between `PlayerModal` and the Dashboard bulk-add** (2-character minimum in the modal, none in `AddPlayersModal`) — `/players` itself has no creation entry point, only edit, so this surfaces only via the modal opened from a row.
 
 ---
 
