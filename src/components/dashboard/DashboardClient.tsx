@@ -278,7 +278,7 @@ export function DashboardClient({ sessionId }: Props) {
   );
 
   const handlePlayerDropOnCard = useCallback(
-    (cardId: string, player: Player) => {
+    (cardId: string, player: Player, target: { side: "A" | "B"; index: number }) => {
       const isDuplicate = planningCards.some(
         (card) =>
           card.suggestion &&
@@ -318,16 +318,9 @@ export function DashboardClient({ sessionId }: Props) {
             ? [...card.suggestion.sideB]
             : Array(max).fill(null);
 
-          let filled = false;
-          for (let i = 0; i < max && !filled; i++) {
-            if (!sideA[i]) { sideA[i] = player; filled = true; }
-          }
-          if (!filled) {
-            for (let i = 0; i < max && !filled; i++) {
-              if (!sideB[i]) { sideB[i] = player; filled = true; }
-            }
-          }
-          if (!filled) return card;
+          const targetSide = target.side === "A" ? sideA : sideB;
+          if (target.index < 0 || target.index >= max || targetSide[target.index]) return card;
+          targetSide[target.index] = player;
 
           const allFull =
             sideA.slice(0, max).every(Boolean) && sideB.slice(0, max).every(Boolean);

@@ -21,33 +21,19 @@ interface Props {
     to: { side: "A" | "B"; index: number }
   ) => void;
   onCourtsAssign: (courtId: string) => void;
-  onPlayerDrop?: (player: Player) => void;
+  onPlayerDrop?: (player: Player, target: SlotRef) => void;
   onRemovePlayer?: (side: "A" | "B", index: number) => void;
   onDragStart: () => void;
   onDragEnd: () => void;
   isDraggingAny: boolean;
   selectedPlayer?: Player | null;
-  onPlaceSelectedPlayer?: () => void;
+  onPlaceSelectedPlayer?: (target: SlotRef) => void;
 }
 
 const EASE: [number, number, number, number] = [0.25, 1, 0.5, 1];
 
-type ChipRef = { side: "A" | "B"; index: number } | null;
-
-function getNextEmptySlot(
-  suggestion: PlanningCard["suggestion"],
-  matchType: MatchType
-): { side: "A" | "B"; index: number } | null {
-  const max = matchType === "DOUBLES" ? 2 : 1;
-  if (!suggestion) return { side: "A", index: 0 };
-  for (let i = 0; i < max; i++) {
-    if (!suggestion.sideA[i]) return { side: "A", index: i };
-  }
-  for (let i = 0; i < max; i++) {
-    if (!suggestion.sideB[i]) return { side: "B", index: i };
-  }
-  return null;
-}
+type SlotRef = { side: "A" | "B"; index: number };
+type ChipRef = SlotRef | null;
 
 function PlayerChip({
   player,
@@ -115,7 +101,7 @@ export function PlanningCard({
   const { state, matchType, suggestion } = card;
 
   const [selectedChip, setSelectedChip] = useState<ChipRef>(null);
-  const [isDragOverForPlayer, setIsDragOverForPlayer] = useState(false);
+  const [dragOverSlot, setDragOverSlot] = useState<SlotRef | null>(null);
   const [isPickingCourt, setIsPickingCourt] = useState(false);
   const assignBtnRef = useRef<HTMLButtonElement>(null);
   const dragPreviewRef = useRef<HTMLDivElement>(null);
@@ -138,9 +124,12 @@ export function PlanningCard({
     prevStateRef.current = state;
   }, [state]);
   const rowCount = matchType === "DOUBLES" ? 2 : 1;
-  const isFull = getNextEmptySlot(suggestion, matchType) === null;
-  const nextEmpty = isDragOverForPlayer ? getNextEmptySlot(suggestion, matchType) : null;
-  const canPlaceHere = !!selectedPlayer && !isFull;
+  // Every slot renders from these two arrays, whether or not a suggestion
+  // exists yet — an untouched card is just an all-null grid, so the very
+  // first placement is exactly as slot-precise as any later one.
+  const sideA: (Player | null)[] = suggestion ? suggestion.sideA : Array(rowCount).fill(null);
+  const sideB: (Player | null)[] = suggestion ? suggestion.sideB : Array(rowCount).fill(null);
+  const canPlaceHere = !!selectedPlayer;
   const selectedName = selectedPlayer?.name;
 
   function handleChipClick(side: "A" | "B", index: number) {
@@ -156,42 +145,40 @@ export function PlanningCard({
     setSelectedChip(null);
   }
 
-  function handleDragOver(e: React.DragEvent) {
+  function handleSlotDragOver(e: React.DragEvent, target: SlotRef) {
     if (!onPlayerDrop) return;
     if (!Array.from(e.dataTransfer.types).includes("application/x-player")) return;
-    if (isFull) return;
     e.preventDefault();
     e.dataTransfer.dropEffect = "copy";
-    setIsDragOverForPlayer(true);
+    setDragOverSlot(target);
   }
 
-  function handleDragLeave(e: React.DragEvent) {
+  function handleSlotDragLeave(e: React.DragEvent) {
     if (!e.currentTarget.contains(e.relatedTarget as Node)) {
-      setIsDragOverForPlayer(false);
+      setDragOverSlot(null);
     }
   }
 
-  function handleDrop(e: React.DragEvent) {
-    setIsDragOverForPlayer(false);
+  function handleSlotDrop(e: React.DragEvent, target: SlotRef) {
+    setDragOverSlot(null);
     if (!onPlayerDrop) return;
     const raw = e.dataTransfer.getData("application/x-player");
     if (!raw) return;
     try {
       const player = JSON.parse(raw) as Player;
       e.preventDefault();
-      onPlayerDrop(player);
+      onPlayerDrop(player, target);
     } catch {
       // malformed data — ignore
     }
   }
 
-  const borderClass = isDragOverForPlayer
-    ? "border-primary/60 ring-1 ring-primary/20"
-    : state === "empty"
-    ? "border-dashed border-border/50"
-    : state === "ready"
-    ? "border-primary/40"
-    : "border-border";
+  const borderClass =
+    state === "empty"
+      ? "border-dashed border-border/50"
+      : state === "ready"
+      ? "border-primary/40"
+      : "border-border";
 
   const isDraggable = state === "ready";
 
@@ -207,9 +194,6 @@ export function PlanningCard({
         onDragStart();
       }}
       onDragEnd={onDragEnd}
-      onDragOver={handleDragOver}
-      onDragLeave={handleDragLeave}
-      onDrop={handleDrop}
       className={cn(
         "flex-shrink-0 rounded-lg border bg-surface flex flex-col transition-all duration-150",
         fullWidth ? "w-full" : "w-[76vw] md:w-[252px]",
@@ -293,182 +277,164 @@ export function PlanningCard({
         </div>
       </div>
 
-      {/* Body */}
-      {state === "empty" && !isDragOverForPlayer ? (
-        <div
-          onClick={canPlaceHere ? onPlaceSelectedPlayer : undefined}
-          className={cn(
-            "flex-1 flex items-center justify-center px-3 pb-5 pt-2 min-h-[100px] transition-colors rounded-md",
-            canPlaceHere && "cursor-pointer hover:bg-primary/10"
-          )}
-        >
-          <p className={cn("text-xs text-center", canPlaceHere ? "text-primary" : "text-muted")}>
-            {canPlaceHere
-              ? `Tap to place ${selectedName}`
-              : onPlayerDrop
-              ? "Drop a player to fill this card"
-              : "Not enough players in queue"}
-          </p>
+      {/* Body — every slot is always rendered, empty or filled, so a
+          drag/tap can target any specific slot from the card's very first
+          placement onward; nothing auto-cascades into "next empty slot". */}
+      <div className="flex-1 px-3 pb-2 pt-0.5">
+        <div className="flex flex-col gap-0.5">
+          {Array.from({ length: rowCount }, (_, i) => {
+            const playerA = sideA[i] ?? null;
+            const isDragOverA = dragOverSlot?.side === "A" && dragOverSlot?.index === i;
+            return playerA ? (
+              <PlayerChip
+                key={`a-${i}`}
+                player={playerA}
+                isSelected={selectedChip?.side === "A" && selectedChip?.index === i}
+                onClick={() => handleChipClick("A", i)}
+                onRemove={onRemovePlayer ? () => onRemovePlayer("A", i) : undefined}
+              />
+            ) : (
+              <div
+                key={`a-empty-${i}`}
+                onClick={canPlaceHere ? () => onPlaceSelectedPlayer?.({ side: "A", index: i }) : undefined}
+                onDragOver={(e) => handleSlotDragOver(e, { side: "A", index: i })}
+                onDragLeave={handleSlotDragLeave}
+                onDrop={(e) => handleSlotDrop(e, { side: "A", index: i })}
+                role={canPlaceHere ? "button" : undefined}
+                aria-label={canPlaceHere ? `Place ${selectedName} here` : undefined}
+                className={cn(
+                  "h-9 rounded-sm border border-dashed transition-colors",
+                  isDragOverA
+                    ? "border-primary/60 bg-primary/15 ring-1 ring-primary/30"
+                    : canPlaceHere
+                    ? "border-primary/40 bg-primary/5 cursor-pointer hover:bg-primary/10"
+                    : "border-border/50"
+                )}
+              />
+            );
+          })}
+          <div className="flex items-center gap-1.5 py-1">
+            <div className="flex-1 border-t border-border/40" />
+            <span className="text-[10px] font-medium text-muted/60">vs</span>
+            <div className="flex-1 border-t border-border/40" />
+          </div>
+          {Array.from({ length: rowCount }, (_, i) => {
+            const playerB = sideB[i] ?? null;
+            const isDragOverB = dragOverSlot?.side === "B" && dragOverSlot?.index === i;
+            return playerB ? (
+              <PlayerChip
+                key={`b-${i}`}
+                player={playerB}
+                isSelected={selectedChip?.side === "B" && selectedChip?.index === i}
+                onClick={() => handleChipClick("B", i)}
+                onRemove={onRemovePlayer ? () => onRemovePlayer("B", i) : undefined}
+              />
+            ) : (
+              <div
+                key={`b-empty-${i}`}
+                onClick={canPlaceHere ? () => onPlaceSelectedPlayer?.({ side: "B", index: i }) : undefined}
+                onDragOver={(e) => handleSlotDragOver(e, { side: "B", index: i })}
+                onDragLeave={handleSlotDragLeave}
+                onDrop={(e) => handleSlotDrop(e, { side: "B", index: i })}
+                role={canPlaceHere ? "button" : undefined}
+                aria-label={canPlaceHere ? `Place ${selectedName} here` : undefined}
+                className={cn(
+                  "h-9 rounded-sm border border-dashed transition-colors",
+                  isDragOverB
+                    ? "border-primary/60 bg-primary/15 ring-1 ring-primary/30"
+                    : canPlaceHere
+                    ? "border-primary/40 bg-primary/5 cursor-pointer hover:bg-primary/10"
+                    : "border-border/50"
+                )}
+              />
+            );
+          })}
         </div>
-      ) : (
-        <div className="flex-1 px-3 pb-2 pt-0.5">
-          {/* Empty card receiving first player drop */}
-          {state === "empty" && isDragOverForPlayer && (
-            <div className="h-7 rounded-sm border border-primary/50 bg-primary/10 mb-1" />
-          )}
-          {suggestion && (
-            <div className="flex flex-col gap-0.5">
-              {Array.from({ length: rowCount }, (_, i) => {
-                const playerA = suggestion.sideA[i] ?? null;
-                const highlightA = nextEmpty?.side === "A" && nextEmpty?.index === i;
-                return playerA ? (
-                  <PlayerChip
-                    key={`a-${i}`}
-                    player={playerA}
-                    isSelected={selectedChip?.side === "A" && selectedChip?.index === i}
-                    onClick={() => handleChipClick("A", i)}
-                    onRemove={onRemovePlayer ? () => onRemovePlayer("A", i) : undefined}
-                  />
-                ) : (
-                  <div
-                    key={`a-empty-${i}`}
-                    onClick={canPlaceHere ? onPlaceSelectedPlayer : undefined}
-                    role={canPlaceHere ? "button" : undefined}
-                    aria-label={canPlaceHere ? `Place ${selectedName} here` : undefined}
-                    className={cn(
-                      "h-9 rounded-sm border border-dashed transition-colors",
-                      highlightA
-                        ? "border-primary/50 bg-primary/10"
-                        : canPlaceHere
-                        ? "border-primary/40 bg-primary/5 cursor-pointer hover:bg-primary/10"
-                        : "border-border/50"
-                    )}
-                  />
-                );
-              })}
-              <div className="flex items-center gap-1.5 py-1">
-                <div className="flex-1 border-t border-border/40" />
-                <span className="text-[10px] font-medium text-muted/60">vs</span>
-                <div className="flex-1 border-t border-border/40" />
+        {suggestion?.pairsExhausted && (
+          <p className="text-[10px] text-muted mt-1.5 px-1.5">
+            All unique pairs used — suggesting least recently repeated
+          </p>
+        )}
+        {selectedChip && (
+          <div className="flex items-center justify-between mt-2 px-1.5">
+            <p className="text-[10px] text-primary">Tap another player to swap</p>
+            <button
+              onClick={() => setSelectedChip(null)}
+              className="text-[10px] text-muted hover:text-ink transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-border rounded-sm px-1"
+            >
+              Cancel
+            </button>
+          </div>
+        )}
+      </div>
+
+      {/* Footer */}
+      <div className="px-3 pb-3 pt-2 border-t border-border/60">
+        <AnimatePresence mode="wait" initial={false}>
+          {isPickingCourt ? (
+            <motion.div
+              key="picker"
+              initial={{ opacity: 0, y: 4 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: 4 }}
+              transition={{ duration: 0.15, ease: EASE }}
+              className="space-y-2"
+            >
+              <p className="text-[10px] text-muted">Assign to court:</p>
+              <div className="flex flex-wrap gap-1">
+                {availableCourts.map((c) => (
+                  <button
+                    key={c.id}
+                    onClick={() => {
+                      onCourtsAssign(c.id);
+                      setIsPickingCourt(false);
+                    }}
+                    className="text-xs font-semibold bg-primary/10 hover:bg-primary text-primary hover:text-bg px-2.5 py-1.5 rounded-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary/50"
+                  >
+                    Court {c.number}
+                  </button>
+                ))}
               </div>
-              {Array.from({ length: rowCount }, (_, i) => {
-                const playerB = suggestion.sideB[i] ?? null;
-                const highlightB = nextEmpty?.side === "B" && nextEmpty?.index === i;
-                return playerB ? (
-                  <PlayerChip
-                    key={`b-${i}`}
-                    player={playerB}
-                    isSelected={selectedChip?.side === "B" && selectedChip?.index === i}
-                    onClick={() => handleChipClick("B", i)}
-                    onRemove={onRemovePlayer ? () => onRemovePlayer("B", i) : undefined}
-                  />
-                ) : (
-                  <div
-                    key={`b-empty-${i}`}
-                    onClick={canPlaceHere ? onPlaceSelectedPlayer : undefined}
-                    role={canPlaceHere ? "button" : undefined}
-                    aria-label={canPlaceHere ? `Place ${selectedName} here` : undefined}
-                    className={cn(
-                      "h-9 rounded-sm border border-dashed transition-colors",
-                      highlightB
-                        ? "border-primary/50 bg-primary/10"
-                        : canPlaceHere
-                        ? "border-primary/40 bg-primary/5 cursor-pointer hover:bg-primary/10"
-                        : "border-border/50"
-                    )}
-                  />
-                );
-              })}
-            </div>
-          )}
-          {suggestion?.pairsExhausted && (
-            <p className="text-[10px] text-muted mt-1.5 px-1.5">
-              All unique pairs used — suggesting least recently repeated
-            </p>
-          )}
-          {selectedChip && (
-            <div className="flex items-center justify-between mt-2 px-1.5">
-              <p className="text-[10px] text-primary">Tap another player to swap</p>
               <button
-                onClick={() => setSelectedChip(null)}
-                className="text-[10px] text-muted hover:text-ink transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-border rounded-sm px-1"
+                onClick={() => setIsPickingCourt(false)}
+                className="text-[10px] text-muted hover:text-ink transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-border rounded-sm"
               >
                 Cancel
               </button>
-            </div>
+            </motion.div>
+          ) : (
+            <motion.div
+              key="assign"
+              initial={{ opacity: 0, y: -4 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -4 }}
+              transition={{ duration: 0.15, ease: EASE }}
+            >
+              <button
+                ref={assignBtnRef}
+                onClick={() => setIsPickingCourt(true)}
+                disabled={state !== "ready" || availableCourts.length === 0}
+                className={cn(
+                  "w-full text-xs font-semibold py-2.5 rounded-md transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50",
+                  state === "ready" && availableCourts.length > 0
+                    ? "bg-primary hover:bg-primary-hover text-bg"
+                    : "bg-surface-elevated text-muted cursor-not-allowed opacity-60"
+                )}
+                title={
+                  state !== "ready"
+                    ? "Fill all player slots first"
+                    : availableCourts.length === 0
+                    ? "No courts available"
+                    : undefined
+                }
+                aria-label="Assign to court"
+              >
+                {state !== "ready" ? "Fill all slots to assign" : "Assign to court"}
+              </button>
+            </motion.div>
           )}
-        </div>
-      )}
-
-      {/* Footer */}
-      {state !== "empty" && (
-        <div className="px-3 pb-3 pt-2 border-t border-border/60">
-          <AnimatePresence mode="wait" initial={false}>
-            {isPickingCourt ? (
-              <motion.div
-                key="picker"
-                initial={{ opacity: 0, y: 4 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: 4 }}
-                transition={{ duration: 0.15, ease: EASE }}
-                className="space-y-2"
-              >
-                <p className="text-[10px] text-muted">Assign to court:</p>
-                <div className="flex flex-wrap gap-1">
-                  {availableCourts.map((c) => (
-                    <button
-                      key={c.id}
-                      onClick={() => {
-                        onCourtsAssign(c.id);
-                        setIsPickingCourt(false);
-                      }}
-                      className="text-xs font-semibold bg-primary/10 hover:bg-primary text-primary hover:text-bg px-2.5 py-1.5 rounded-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary/50"
-                    >
-                      Court {c.number}
-                    </button>
-                  ))}
-                </div>
-                <button
-                  onClick={() => setIsPickingCourt(false)}
-                  className="text-[10px] text-muted hover:text-ink transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-border rounded-sm"
-                >
-                  Cancel
-                </button>
-              </motion.div>
-            ) : (
-              <motion.div
-                key="assign"
-                initial={{ opacity: 0, y: -4 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -4 }}
-                transition={{ duration: 0.15, ease: EASE }}
-              >
-                <button
-                  ref={assignBtnRef}
-                  onClick={() => setIsPickingCourt(true)}
-                  disabled={state !== "ready" || availableCourts.length === 0}
-                  className={cn(
-                    "w-full text-xs font-semibold py-2.5 rounded-md transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50",
-                    state === "ready" && availableCourts.length > 0
-                      ? "bg-primary hover:bg-primary-hover text-bg"
-                      : "bg-surface-elevated text-muted cursor-not-allowed opacity-60"
-                  )}
-                  title={
-                    state !== "ready"
-                      ? "Fill all player slots first"
-                      : availableCourts.length === 0
-                      ? "No courts available"
-                      : undefined
-                  }
-                  aria-label="Assign to court"
-                >
-                  {state !== "ready" ? "Fill all slots to assign" : "Assign to court"}
-                </button>
-              </motion.div>
-            )}
-          </AnimatePresence>
-        </div>
-      )}
+        </AnimatePresence>
+      </div>
     </div>
   );
 }

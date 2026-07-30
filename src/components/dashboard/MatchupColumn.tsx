@@ -20,7 +20,11 @@ interface Props {
   onCardAssign: (cardId: string, courtId: string) => void;
   onCardDragStart: (cardId: string) => void;
   onCardDragEnd: () => void;
-  onPlayerDropOnCard: (cardId: string, player: Player) => void;
+  onPlayerDropOnCard: (
+    cardId: string,
+    player: Player,
+    target: { side: "A" | "B"; index: number }
+  ) => void;
   onRemovePlayerFromCard: (cardId: string, side: "A" | "B", index: number) => void;
   onAddCard: () => void;
   onSuggestCard: () => void;
@@ -126,7 +130,7 @@ export function MatchupColumn({
                       onMatchTypeChange={(type) => onCardMatchTypeChange(card.id, type)}
                       onSwap={(from, to) => onCardSwap(card.id, from, to)}
                       onCourtsAssign={(courtId) => onCardAssign(card.id, courtId)}
-                      onPlayerDrop={(player) => onPlayerDropOnCard(card.id, player)}
+                      onPlayerDrop={(player, target) => onPlayerDropOnCard(card.id, player, target)}
                       onRemovePlayer={(side, index) =>
                         onRemovePlayerFromCard(card.id, side, index)
                       }
@@ -135,7 +139,9 @@ export function MatchupColumn({
                       isDraggingAny={draggingCardId !== null}
                       selectedPlayer={selectedPlayer}
                       onPlaceSelectedPlayer={
-                        selectedPlayer ? () => onPlayerDropOnCard(card.id, selectedPlayer) : undefined
+                        selectedPlayer
+                          ? (target) => onPlayerDropOnCard(card.id, selectedPlayer, target)
+                          : undefined
                       }
                     />
                   </motion.li>

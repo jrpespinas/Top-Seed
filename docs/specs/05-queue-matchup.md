@@ -96,9 +96,9 @@ The "Add" button opens `AddPlayersModal` (bulk add — see `01-player-management
 ## Matchup Planning (`MatchupColumn.tsx` / `PlanningCard.tsx`)
 
 ### What exists today
-Manual matchup building only. Each `PlanningCard` represents one prospective match (`SINGLES` = 1 slot/side, `DOUBLES` = 2 slots/side, toggled in the card header). Cards are built by:
-1. **Drag-and-drop**: drag a queued player's row onto an empty slot.
-2. **Tap-to-place**: tap a queued player to select them, then tap any open slot across any card.
+Manual matchup building only. Each `PlanningCard` represents one prospective match (`SINGLES` = 1 slot/side, `DOUBLES` = 2 slots/side, toggled in the card header). Every slot — both sides, all indices — renders as soon as a card exists, empty or not, so placement is always slot-precise: dropping or tapping onto a specific slot puts the player exactly there, in any order, with no requirement to fill Side A before Side B. Cards are built by:
+1. **Drag-and-drop**: drag a queued player's row onto a specific empty slot; that slot (and only that slot) highlights while hovering it.
+2. **Tap-to-place**: tap a queued player to select them, then tap the specific open slot — on any card, either side — you want them in.
 
 There is no automatic suggestion engine wired up despite a "Suggest" button being visible in `MatchupColumn`'s header — **it is permanently disabled**, labeled with a "Coming soon" tooltip. `07-smart-matchup.md` describes the intended algorithm; it is not implemented in the current UI.
 
