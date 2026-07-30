@@ -109,8 +109,11 @@ There is no automatic suggestion engine wired up despite a "Suggest" button bein
 | `proposed` | Some but not all slots filled |
 | `ready` | All slots filled — the only state from which "Assign to court" is enabled |
 
-### Swapping and switching
-- Clicking a filled slot's chip selects it; clicking another filled chip swaps the two players' positions.
+### Relocating and swapping placed players
+- An already-placed player can be moved by **drag** (each chip is its own drag source) or by **tap** (tap the chip to select it, then tap a destination slot) — either way, the destination can be any slot on any card, not just within the same card.
+- Dropping/tapping a selected chip on an **empty** slot relocates them there. Dropping/tapping on an **occupied** slot swaps the two players — same-card or across two different cards.
+- Chip selection is global, not per-card: selecting a chip in one card and a queue player are mutually exclusive — picking one clears the other. While a chip is selected, its origin card shows a "Tap a slot to move, or a player to swap" hint with a Cancel button; tapping the same chip again also deselects it.
+- Dragging or tapping a chip onto its own current slot is a no-op.
 - Switching a card's match type from Doubles to Singles truncates each side to its first slot, dropping any second-slot players (with an undo-capable toast).
 
 ### Assigning to a court

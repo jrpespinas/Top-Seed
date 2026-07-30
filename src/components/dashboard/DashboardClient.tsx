@@ -46,6 +46,8 @@ interface Props {
   sessionId: string;
 }
 
+export type SlotAddress = { cardId: string; side: "A" | "B"; index: number };
+
 export function DashboardClient({ sessionId }: Props) {
   const [courts, setCourts] = useSessionCourts([]);
   const [queue, setQueue] = useSessionQueue([]);
@@ -53,6 +55,10 @@ export function DashboardClient({ sessionId }: Props) {
   const [bench, setBench] = useSessionBench([]);
   const [draggingCardId, setDraggingCardId] = useState<string | null>(null);
   const [selectedPlayer, setSelectedPlayer] = useState<Player | null>(null);
+  // Chip selection lives here, not inside PlanningCard, so a chip selected in
+  // one card can be relocated or swapped into a slot on a different card —
+  // the same reason selectedPlayer (queue tap-to-place) already lives here.
+  const [selectedChip, setSelectedChip] = useState<SlotAddress | null>(null);
   const [justSuggestedCardId, setJustSuggestedCardId] = useState<string | null>(null);
   const justSuggestedTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const { toast, showToast, dismissAndUndo } = useToast();
@@ -107,6 +113,7 @@ export function DashboardClient({ sessionId }: Props) {
 
   // Tap-to-place: touch-friendly alternative to dragging a player onto a card.
   const handleSelectPlayer = useCallback((player: Player) => {
+    setSelectedChip(null);
     setSelectedPlayer((prev) => (prev?.id === player.id ? null : player));
   }, []);
 
@@ -248,31 +255,85 @@ export function DashboardClient({ sessionId }: Props) {
     [planningCards, showToast, setPlanningCards]
   );
 
-  const handleCardSwap = useCallback(
-    (
-      cardId: string,
-      from: { side: "A" | "B"; index: number },
-      to: { side: "A" | "B"; index: number }
-    ) => {
-      setPlanningCards((prev) =>
-        prev.map((c) => {
-          if (c.id !== cardId || !c.suggestion) return c;
-          const sideA = [...c.suggestion.sideA];
-          const sideB = [...c.suggestion.sideB];
-          const fromPlayer = from.side === "A" ? sideA[from.index] : sideB[from.index];
+  // Moves an already-placed player from one slot to another — same card or a
+  // different one. An empty target relocates them; an occupied target swaps
+  // the two. Both cards' arrays are mutated in one state update so there's
+  // never a transient frame where the mover exists in neither (or both).
+  const handleRelocatePlacedPlayer = useCallback(
+    (from: SlotAddress, to: SlotAddress) => {
+      if (from.cardId === to.cardId && from.side === to.side && from.index === to.index) {
+        setSelectedChip(null);
+        return;
+      }
+      setPlanningCards((prev) => {
+        const fromCard = prev.find((c) => c.id === from.cardId);
+        const toCard = prev.find((c) => c.id === to.cardId);
+        if (!fromCard?.suggestion || !toCard) return prev;
+        const fromMax = fromCard.matchType === "DOUBLES" ? 2 : 1;
+        const toMax = toCard.matchType === "DOUBLES" ? 2 : 1;
+        if (from.index >= fromMax || to.index >= toMax) return prev;
+        const movingPlayer =
+          from.side === "A" ? fromCard.suggestion.sideA[from.index] : fromCard.suggestion.sideB[from.index];
+        if (!movingPlayer) return prev;
+
+        if (from.cardId === to.cardId) {
+          const sideA = [...fromCard.suggestion.sideA];
+          const sideB = [...fromCard.suggestion.sideB];
           const toPlayer = to.side === "A" ? sideA[to.index] : sideB[to.index];
-          if (!fromPlayer) return c;
           if (from.side === "A") sideA[from.index] = toPlayer ?? null;
           else sideB[from.index] = toPlayer ?? null;
-          if (to.side === "A") sideA[to.index] = fromPlayer;
-          else sideB[to.index] = fromPlayer;
-          return {
-            ...c,
-            state: "ready" as const,
-            suggestion: { ...c.suggestion, sideA, sideB },
-          };
-        })
-      );
+          if (to.side === "A") sideA[to.index] = movingPlayer;
+          else sideB[to.index] = movingPlayer;
+          const isFull = sideA.slice(0, fromMax).every(Boolean) && sideB.slice(0, fromMax).every(Boolean);
+          return prev.map((c) =>
+            c.id === from.cardId
+              ? {
+                  ...c,
+                  state: isFull ? ("ready" as const) : ("proposed" as const),
+                  suggestion: { ...c.suggestion!, sideA, sideB },
+                }
+              : c
+          );
+        }
+
+        const fromSideA = [...fromCard.suggestion.sideA];
+        const fromSideB = [...fromCard.suggestion.sideB];
+        const toSideA = toCard.suggestion ? [...toCard.suggestion.sideA] : Array(toMax).fill(null);
+        const toSideB = toCard.suggestion ? [...toCard.suggestion.sideB] : Array(toMax).fill(null);
+        const displacedPlayer = to.side === "A" ? toSideA[to.index] : toSideB[to.index];
+
+        if (from.side === "A") fromSideA[from.index] = displacedPlayer;
+        else fromSideB[from.index] = displacedPlayer;
+        if (to.side === "A") toSideA[to.index] = movingPlayer;
+        else toSideB[to.index] = movingPlayer;
+
+        const fromHasAny = [...fromSideA, ...fromSideB].some(Boolean);
+        const fromFull = fromSideA.slice(0, fromMax).every(Boolean) && fromSideB.slice(0, fromMax).every(Boolean);
+        const toFull = toSideA.slice(0, toMax).every(Boolean) && toSideB.slice(0, toMax).every(Boolean);
+
+        return prev.map((c) => {
+          if (c.id === from.cardId) {
+            return {
+              ...c,
+              state: fromFull ? ("ready" as const) : fromHasAny ? ("proposed" as const) : ("empty" as const),
+              suggestion: fromHasAny ? { ...c.suggestion!, sideA: fromSideA, sideB: fromSideB } : null,
+            };
+          }
+          if (c.id === to.cardId) {
+            return {
+              ...c,
+              state: toFull ? ("ready" as const) : ("proposed" as const),
+              suggestion: {
+                pairsExhausted: c.suggestion?.pairsExhausted ?? false,
+                sideA: toSideA,
+                sideB: toSideB,
+              },
+            };
+          }
+          return c;
+        });
+      });
+      setSelectedChip(null);
     },
     [setPlanningCards]
   );
@@ -334,6 +395,49 @@ export function DashboardClient({ sessionId }: Props) {
       setSelectedPlayer(null);
     },
     [planningCards, showToast, bench, setBench, setQueue, setPlanningCards]
+  );
+
+  // Single decision point for every slot tap (empty or filled, any card):
+  // resolves against whichever selection — a queue player or a placed chip —
+  // is currently active, so PlanningCard itself doesn't need to know the
+  // difference between "start a selection" and "act on one".
+  const handleSlotTap = useCallback(
+    (cardId: string, side: "A" | "B", index: number) => {
+      const card = planningCards.find((c) => c.id === cardId);
+      const occupant = card?.suggestion
+        ? side === "A"
+          ? card.suggestion.sideA[index]
+          : card.suggestion.sideB[index]
+        : null;
+
+      if (occupant) {
+        if (
+          selectedChip &&
+          selectedChip.cardId === cardId &&
+          selectedChip.side === side &&
+          selectedChip.index === index
+        ) {
+          setSelectedChip(null);
+          return;
+        }
+        if (selectedChip) {
+          handleRelocatePlacedPlayer(selectedChip, { cardId, side, index });
+          return;
+        }
+        setSelectedPlayer(null);
+        setSelectedChip({ cardId, side, index });
+        return;
+      }
+
+      if (selectedPlayer) {
+        handlePlayerDropOnCard(cardId, selectedPlayer, { side, index });
+        return;
+      }
+      if (selectedChip) {
+        handleRelocatePlacedPlayer(selectedChip, { cardId, side, index });
+      }
+    },
+    [planningCards, selectedChip, selectedPlayer, handleRelocatePlacedPlayer, handlePlayerDropOnCard]
   );
 
   const handleRemovePlayerFromCard = useCallback(
@@ -771,7 +875,6 @@ export function DashboardClient({ sessionId }: Props) {
             draggingCardId={draggingCardId}
             onCardDismiss={handleCardDismiss}
             onCardMatchTypeChange={handleCardMatchTypeChange}
-            onCardSwap={handleCardSwap}
             onCardAssign={handleCardAssign}
             onCardDragStart={setDraggingCardId}
             onCardDragEnd={() => setDraggingCardId(null)}
@@ -782,6 +885,10 @@ export function DashboardClient({ sessionId }: Props) {
             onResuggestCard={handleResuggestCard}
             justSuggestedCardId={justSuggestedCardId}
             selectedPlayer={selectedPlayer}
+            selectedChip={selectedChip}
+            onSlotTap={handleSlotTap}
+            onChipRelocateDrop={handleRelocatePlacedPlayer}
+            onCancelChipSelection={() => setSelectedChip(null)}
           />
         </div>
       </div>

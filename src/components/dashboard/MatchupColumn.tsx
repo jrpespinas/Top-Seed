@@ -3,6 +3,7 @@
 import { motion, AnimatePresence, MotionConfig } from "motion/react";
 import type { Court, PlanningCard, MatchType, Player } from "@/types";
 import { PlanningCard as PlanningCardComponent } from "./PlanningCard";
+import type { SlotAddress } from "./DashboardClient";
 import { cn } from "@/lib/utils";
 import { Swords, Plus, Shuffle } from "lucide-react";
 
@@ -12,11 +13,6 @@ interface Props {
   draggingCardId: string | null;
   onCardDismiss: (id: string) => void;
   onCardMatchTypeChange: (id: string, type: MatchType) => void;
-  onCardSwap: (
-    cardId: string,
-    from: { side: "A" | "B"; index: number },
-    to: { side: "A" | "B"; index: number }
-  ) => void;
   onCardAssign: (cardId: string, courtId: string) => void;
   onCardDragStart: (cardId: string) => void;
   onCardDragEnd: () => void;
@@ -31,6 +27,10 @@ interface Props {
   onResuggestCard: (cardId: string) => void;
   justSuggestedCardId?: string | null;
   selectedPlayer?: Player | null;
+  selectedChip: SlotAddress | null;
+  onSlotTap: (cardId: string, side: "A" | "B", index: number) => void;
+  onChipRelocateDrop: (from: SlotAddress, to: SlotAddress) => void;
+  onCancelChipSelection: () => void;
 }
 
 const EASE: [number, number, number, number] = [0.25, 1, 0.5, 1];
@@ -41,7 +41,6 @@ export function MatchupColumn({
   draggingCardId,
   onCardDismiss,
   onCardMatchTypeChange,
-  onCardSwap,
   onCardAssign,
   onCardDragStart,
   onCardDragEnd,
@@ -52,6 +51,10 @@ export function MatchupColumn({
   onResuggestCard,
   justSuggestedCardId,
   selectedPlayer,
+  selectedChip,
+  onSlotTap,
+  onChipRelocateDrop,
+  onCancelChipSelection,
 }: Props) {
   const availableCourts = courts.filter((c) => c.status === "AVAILABLE");
 
@@ -128,7 +131,6 @@ export function MatchupColumn({
                       onResuggest={() => onResuggestCard(card.id)}
                       justSuggested={card.id === justSuggestedCardId}
                       onMatchTypeChange={(type) => onCardMatchTypeChange(card.id, type)}
-                      onSwap={(from, to) => onCardSwap(card.id, from, to)}
                       onCourtsAssign={(courtId) => onCardAssign(card.id, courtId)}
                       onPlayerDrop={(player, target) => onPlayerDropOnCard(card.id, player, target)}
                       onRemovePlayer={(side, index) =>
@@ -138,11 +140,12 @@ export function MatchupColumn({
                       onDragEnd={onCardDragEnd}
                       isDraggingAny={draggingCardId !== null}
                       selectedPlayer={selectedPlayer}
-                      onPlaceSelectedPlayer={
-                        selectedPlayer
-                          ? (target) => onPlayerDropOnCard(card.id, selectedPlayer, target)
-                          : undefined
+                      selectedChip={selectedChip}
+                      onSlotTap={(side, index) => onSlotTap(card.id, side, index)}
+                      onChipDrop={(from, to) =>
+                        onChipRelocateDrop(from, { cardId: card.id, side: to.side, index: to.index })
                       }
+                      onCancelChipSelection={onCancelChipSelection}
                     />
                   </motion.li>
                 ))}

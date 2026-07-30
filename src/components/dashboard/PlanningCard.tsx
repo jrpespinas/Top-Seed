@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import type { Court, PlanningCard, MatchType, Player } from "@/types";
+import type { SlotAddress } from "./DashboardClient";
 import { SkillBadge } from "@/components/ui/SkillBadge";
 import { GenderIcon } from "@/components/ui/GenderIcon";
 import { cn } from "@/lib/utils";
@@ -16,10 +17,6 @@ interface Props {
   onResuggest?: () => void;
   justSuggested?: boolean;
   onMatchTypeChange: (type: MatchType) => void;
-  onSwap: (
-    from: { side: "A" | "B"; index: number },
-    to: { side: "A" | "B"; index: number }
-  ) => void;
   onCourtsAssign: (courtId: string) => void;
   onPlayerDrop?: (player: Player, target: SlotRef) => void;
   onRemovePlayer?: (side: "A" | "B", index: number) => void;
@@ -27,28 +24,50 @@ interface Props {
   onDragEnd: () => void;
   isDraggingAny: boolean;
   selectedPlayer?: Player | null;
-  onPlaceSelectedPlayer?: (target: SlotRef) => void;
+  selectedChip: SlotAddress | null;
+  onSlotTap: (side: "A" | "B", index: number) => void;
+  onChipDrop?: (from: SlotAddress, to: SlotRef) => void;
+  onCancelChipSelection: () => void;
 }
 
 const EASE: [number, number, number, number] = [0.25, 1, 0.5, 1];
 
 type SlotRef = { side: "A" | "B"; index: number };
-type ChipRef = SlotRef | null;
 
 function PlayerChip({
   player,
   isSelected,
+  isDragOver,
   onClick,
   onRemove,
+  onDragStart,
+  onDragOver,
+  onDragLeave,
+  onDrop,
 }: {
   player: Player;
   isSelected: boolean;
+  isDragOver: boolean;
   onClick: () => void;
   onRemove?: () => void;
+  onDragStart: (e: React.DragEvent) => void;
+  onDragOver: (e: React.DragEvent) => void;
+  onDragLeave: (e: React.DragEvent) => void;
+  onDrop: (e: React.DragEvent) => void;
 }) {
   const displayName = player.name;
   return (
-    <div className="relative group/chip">
+    <div
+      className={cn(
+        "relative group/chip rounded-sm cursor-grab active:cursor-grabbing transition-shadow",
+        isDragOver && "ring-1 ring-primary/60 bg-primary/15"
+      )}
+      draggable
+      onDragStart={onDragStart}
+      onDragOver={onDragOver}
+      onDragLeave={onDragLeave}
+      onDrop={onDrop}
+    >
       <button
         onClick={onClick}
         className={cn(
@@ -88,7 +107,6 @@ export function PlanningCard({
   onResuggest,
   justSuggested,
   onMatchTypeChange,
-  onSwap,
   onCourtsAssign,
   onPlayerDrop,
   onRemovePlayer,
@@ -96,11 +114,13 @@ export function PlanningCard({
   onDragEnd,
   isDraggingAny,
   selectedPlayer,
-  onPlaceSelectedPlayer,
+  selectedChip,
+  onSlotTap,
+  onChipDrop,
+  onCancelChipSelection,
 }: Props) {
   const { state, matchType, suggestion } = card;
 
-  const [selectedChip, setSelectedChip] = useState<ChipRef>(null);
   const [dragOverSlot, setDragOverSlot] = useState<SlotRef | null>(null);
   const [isPickingCourt, setIsPickingCourt] = useState(false);
   const assignBtnRef = useRef<HTMLButtonElement>(null);
@@ -129,27 +149,24 @@ export function PlanningCard({
   // first placement is exactly as slot-precise as any later one.
   const sideA: (Player | null)[] = suggestion ? suggestion.sideA : Array(rowCount).fill(null);
   const sideB: (Player | null)[] = suggestion ? suggestion.sideB : Array(rowCount).fill(null);
-  const canPlaceHere = !!selectedPlayer;
+  // A slot invites a click/drop when either kind of selection is armed — a
+  // queue player waiting for a home, or an already-placed chip waiting to be
+  // relocated or swapped. Filled chips are always clickable regardless (see
+  // PlayerChip's own button styling), so this only gates empty slots.
+  const canPlaceHere = !!selectedPlayer || !!selectedChip;
   const selectedName = selectedPlayer?.name;
 
-  function handleChipClick(side: "A" | "B", index: number) {
-    if (!selectedChip) {
-      setSelectedChip({ side, index });
-      return;
-    }
-    if (selectedChip.side === side && selectedChip.index === index) {
-      setSelectedChip(null);
-      return;
-    }
-    onSwap(selectedChip, { side, index });
-    setSelectedChip(null);
-  }
-
+  // Empty slots accept two different drag origins: a queue/bench row
+  // (application/x-player, existing) or an already-placed chip
+  // (application/x-slot, relocate). Only one type is ever present on a given
+  // drag, so checking both here is safe.
   function handleSlotDragOver(e: React.DragEvent, target: SlotRef) {
-    if (!onPlayerDrop) return;
-    if (!Array.from(e.dataTransfer.types).includes("application/x-player")) return;
+    const types = Array.from(e.dataTransfer.types);
+    const acceptsPlayer = !!onPlayerDrop && types.includes("application/x-player");
+    const acceptsChip = !!onChipDrop && types.includes("application/x-slot");
+    if (!acceptsPlayer && !acceptsChip) return;
     e.preventDefault();
-    e.dataTransfer.dropEffect = "copy";
+    e.dataTransfer.dropEffect = acceptsPlayer ? "copy" : "move";
     setDragOverSlot(target);
   }
 
@@ -161,13 +178,48 @@ export function PlanningCard({
 
   function handleSlotDrop(e: React.DragEvent, target: SlotRef) {
     setDragOverSlot(null);
-    if (!onPlayerDrop) return;
-    const raw = e.dataTransfer.getData("application/x-player");
+    const rawPlayer = e.dataTransfer.getData("application/x-player");
+    if (rawPlayer && onPlayerDrop) {
+      try {
+        const player = JSON.parse(rawPlayer) as Player;
+        e.preventDefault();
+        onPlayerDrop(player, target);
+      } catch {
+        // malformed data — ignore
+      }
+      return;
+    }
+    const rawSlot = e.dataTransfer.getData("application/x-slot");
+    if (rawSlot && onChipDrop) {
+      try {
+        const from = JSON.parse(rawSlot) as { fromCardId: string; fromSide: "A" | "B"; fromIndex: number };
+        e.preventDefault();
+        onChipDrop({ cardId: from.fromCardId, side: from.fromSide, index: from.fromIndex }, target);
+      } catch {
+        // malformed data — ignore
+      }
+    }
+  }
+
+  // Filled slots (PlayerChip) only ever accept a chip-relocate drop — a
+  // queue/bench player can never replace someone already placed via drag.
+  function handleChipDragOver(e: React.DragEvent, target: SlotRef) {
+    if (!onChipDrop) return;
+    if (!Array.from(e.dataTransfer.types).includes("application/x-slot")) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "move";
+    setDragOverSlot(target);
+  }
+
+  function handleChipDrop(e: React.DragEvent, target: SlotRef) {
+    setDragOverSlot(null);
+    if (!onChipDrop) return;
+    const raw = e.dataTransfer.getData("application/x-slot");
     if (!raw) return;
     try {
-      const player = JSON.parse(raw) as Player;
+      const from = JSON.parse(raw) as { fromCardId: string; fromSide: "A" | "B"; fromIndex: number };
       e.preventDefault();
-      onPlayerDrop(player, target);
+      onChipDrop({ cardId: from.fromCardId, side: from.fromSide, index: from.fromIndex }, target);
     } catch {
       // malformed data — ignore
     }
@@ -279,7 +331,9 @@ export function PlanningCard({
 
       {/* Body — every slot is always rendered, empty or filled, so a
           drag/tap can target any specific slot from the card's very first
-          placement onward; nothing auto-cascades into "next empty slot". */}
+          placement onward; nothing auto-cascades into "next empty slot".
+          Placed chips are themselves draggable and always tappable, so a
+          player can be relocated or swapped into any slot on any card. */}
       <div className="flex-1 px-3 pb-2 pt-0.5">
         <div className="flex flex-col gap-0.5">
           {Array.from({ length: rowCount }, (_, i) => {
@@ -289,19 +343,35 @@ export function PlanningCard({
               <PlayerChip
                 key={`a-${i}`}
                 player={playerA}
-                isSelected={selectedChip?.side === "A" && selectedChip?.index === i}
-                onClick={() => handleChipClick("A", i)}
+                isSelected={
+                  selectedChip?.cardId === card.id && selectedChip?.side === "A" && selectedChip?.index === i
+                }
+                isDragOver={isDragOverA}
+                onClick={() => onSlotTap("A", i)}
                 onRemove={onRemovePlayer ? () => onRemovePlayer("A", i) : undefined}
+                onDragStart={(e) => {
+                  e.stopPropagation();
+                  e.dataTransfer.setData(
+                    "application/x-slot",
+                    JSON.stringify({ fromCardId: card.id, fromSide: "A", fromIndex: i })
+                  );
+                  e.dataTransfer.effectAllowed = "move";
+                }}
+                onDragOver={(e) => handleChipDragOver(e, { side: "A", index: i })}
+                onDragLeave={handleSlotDragLeave}
+                onDrop={(e) => handleChipDrop(e, { side: "A", index: i })}
               />
             ) : (
               <div
                 key={`a-empty-${i}`}
-                onClick={canPlaceHere ? () => onPlaceSelectedPlayer?.({ side: "A", index: i }) : undefined}
+                onClick={canPlaceHere ? () => onSlotTap("A", i) : undefined}
                 onDragOver={(e) => handleSlotDragOver(e, { side: "A", index: i })}
                 onDragLeave={handleSlotDragLeave}
                 onDrop={(e) => handleSlotDrop(e, { side: "A", index: i })}
                 role={canPlaceHere ? "button" : undefined}
-                aria-label={canPlaceHere ? `Place ${selectedName} here` : undefined}
+                aria-label={
+                  canPlaceHere ? `Place ${selectedName ?? "selected player"} here` : undefined
+                }
                 className={cn(
                   "h-9 rounded-sm border border-dashed transition-colors",
                   isDragOverA
@@ -325,19 +395,35 @@ export function PlanningCard({
               <PlayerChip
                 key={`b-${i}`}
                 player={playerB}
-                isSelected={selectedChip?.side === "B" && selectedChip?.index === i}
-                onClick={() => handleChipClick("B", i)}
+                isSelected={
+                  selectedChip?.cardId === card.id && selectedChip?.side === "B" && selectedChip?.index === i
+                }
+                isDragOver={isDragOverB}
+                onClick={() => onSlotTap("B", i)}
                 onRemove={onRemovePlayer ? () => onRemovePlayer("B", i) : undefined}
+                onDragStart={(e) => {
+                  e.stopPropagation();
+                  e.dataTransfer.setData(
+                    "application/x-slot",
+                    JSON.stringify({ fromCardId: card.id, fromSide: "B", fromIndex: i })
+                  );
+                  e.dataTransfer.effectAllowed = "move";
+                }}
+                onDragOver={(e) => handleChipDragOver(e, { side: "B", index: i })}
+                onDragLeave={handleSlotDragLeave}
+                onDrop={(e) => handleChipDrop(e, { side: "B", index: i })}
               />
             ) : (
               <div
                 key={`b-empty-${i}`}
-                onClick={canPlaceHere ? () => onPlaceSelectedPlayer?.({ side: "B", index: i }) : undefined}
+                onClick={canPlaceHere ? () => onSlotTap("B", i) : undefined}
                 onDragOver={(e) => handleSlotDragOver(e, { side: "B", index: i })}
                 onDragLeave={handleSlotDragLeave}
                 onDrop={(e) => handleSlotDrop(e, { side: "B", index: i })}
                 role={canPlaceHere ? "button" : undefined}
-                aria-label={canPlaceHere ? `Place ${selectedName} here` : undefined}
+                aria-label={
+                  canPlaceHere ? `Place ${selectedName ?? "selected player"} here` : undefined
+                }
                 className={cn(
                   "h-9 rounded-sm border border-dashed transition-colors",
                   isDragOverB
@@ -355,11 +441,11 @@ export function PlanningCard({
             All unique pairs used — suggesting least recently repeated
           </p>
         )}
-        {selectedChip && (
+        {selectedChip?.cardId === card.id && (
           <div className="flex items-center justify-between mt-2 px-1.5">
-            <p className="text-[10px] text-primary">Tap another player to swap</p>
+            <p className="text-[10px] text-primary">Tap a slot to move, or a player to swap</p>
             <button
-              onClick={() => setSelectedChip(null)}
+              onClick={onCancelChipSelection}
               className="text-[10px] text-muted hover:text-ink transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-border rounded-sm px-1"
             >
               Cancel
