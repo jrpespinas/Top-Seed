@@ -75,14 +75,14 @@ Three panels render together on the Dashboard page (not separate routes):
 
 ### Queue
 - Strict FIFO ordering by `position` (1-indexed, always contiguous, renumbered on every removal/insertion).
-- Each row: position, name, skill badge, gender icon, games-played count, and (on hover/focus) actions: move to bench, remove.
+- Each row: position, name, skill badge, gender icon, games-played count, and (on hover/focus) actions: move to bench, remove. Both actions also scrub the player out of any planning card they're currently slotted in (a card doesn't lock a player in place any more than the queue does) — a card that drops below full reverts from `ready`/ `proposed` to `proposed`/`empty` accordingly.
 - Players currently in a match hold **no** queue entry at all — it's removed on assignment and a fresh one is added back on match end (see below). There is no "in match, position held" state.
 - Tap a row (when not in a match) to select it for **tap-to-place** into a planning-card slot; tapping the same row again deselects.
 - Drag a row (when not in a match) onto a planning-card slot as an alternative to tap-to-place.
 
 ### Bench
 - Unordered holding area for players present but not ready to queue. Carries the same `sessionJoinedAt` as the queue for FIFO purposes if/when the player later (re-)joins the queue.
-- Actions: return to queue (appends via the FIFO rule below, silently — no toast), remove entirely (no undo).
+- Actions: return to queue (appends via the FIFO rule below, silently — no toast), remove entirely (no undo). Remove also runs the same planning-card cleanup queue-remove does — belt-and-suspenders, since a bench entry is promoted into the queue before ever reaching a card (see below), so a bench player shouldn't actually be reachable from a card's suggestion in practice.
 - Bench players are excluded from smart-matchup candidates (per `07-smart-matchup.md`) and cannot be dragged/tap-placed into a planning card directly — dropping a bench player onto a planning-card slot first promotes them into the queue, then places them.
 
 ### FIFO re-entry rule (applies to match-end, match-void, and bench→queue)
@@ -96,11 +96,10 @@ The "Add" button opens `AddPlayersModal` (bulk add — see `01-player-management
 ## Matchup Planning (`MatchupColumn.tsx` / `PlanningCard.tsx`)
 
 ### What exists today
-Manual matchup building only. Each `PlanningCard` represents one prospective match (`SINGLES` = 1 slot/side, `DOUBLES` = 2 slots/side, toggled in the card header). Every slot — both sides, all indices — renders as soon as a card exists, empty or not, so placement is always slot-precise: dropping or tapping onto a specific slot puts the player exactly there, in any order, with no requirement to fill Side A before Side B. Cards are built by:
-1. **Drag-and-drop**: drag a queued player's row onto a specific empty slot; that slot (and only that slot) highlights while hovering it.
-2. **Tap-to-place**: tap a queued player to select them, then tap the specific open slot — on any card, either side — you want them in.
-
-There is no automatic suggestion engine wired up despite a "Suggest" button being visible in `MatchupColumn`'s header — **it is permanently disabled**, labeled with a "Coming soon" tooltip. `07-smart-matchup.md` describes the intended algorithm; it is not implemented in the current UI.
+Each `PlanningCard` represents one prospective match (`SINGLES` = 1 slot/side, `DOUBLES` = 2 slots/side, toggled in the card header). Every slot — both sides, all indices — renders as soon as a card exists, empty or not, so placement is always slot-precise: dropping or tapping onto a specific slot puts the player exactly there, in any order, with no requirement to fill Side A before Side B. Cards are built by:
+1. **Suggest** — `MatchupColumn`'s header button fills every card that isn't already `ready` in one pass (full generate for `empty` cards, lock-and-fill for `proposed` ones — placed players stay put, only open slots are searched), per the algorithm in `07-smart-matchup.md`. The per-card `↺ Resuggest` icon does the same, scoped to just that one card.
+2. **Drag-and-drop**: drag a queued player's row onto a specific empty slot; that slot (and only that slot) highlights while hovering it.
+3. **Tap-to-place**: tap a queued player to select them, then tap the specific open slot — on any card, either side — you want them in.
 
 ### Card states
 | State | Meaning |
@@ -135,6 +134,16 @@ Single tap on "End Match" — **no confirmation step**. Immediately: both sides'
 ### Voiding a match
 Requires a confirmation step ("Void this match?" / "Confirm Void" / "Cancel") before it proceeds — the one court action in the current UI that still uses a blocking confirmation rather than undo-after-the-fact. **Voiding currently has identical bookkeeping to ending a match**, including the same `gamesPlayed + 1` increment for every voided player — there is no distinction between a legitimately completed game and a voided one in the data. A backend implementation should deliberately decide whether voided matches should count toward games played before carrying this behavior forward.
 
+### Substituting a player mid-match
+An `IN_USE` court's player rows are substitution targets, not just a read-out: drag a queue/bench row, or drag/tap-place an already-placed chip from a planning card (the same relocate mechanism described above), directly onto a live match's player row to swap them in. Reuses the exact same drag-target/tap-target treatment as an occupied planning-card slot (`ring-1 ring-primary/60 bg-primary/15` drag-over state, global `selectedPlayer`/`selectedChip` selection).
+
+- **The outgoing player goes to bench**, not the queue — leaving a live match is treated as resting, not re-queueing for another game.
+- **The match's identity is untouched**: same `activeMatch.startedAt`, same elapsed-time counter. This is a roster correction, not a new match.
+- **Credit follows the roster at End/Void time**, unchanged from the existing behavior — `MatchRecord.sideA`/`sideB` (and therefore `gamesPlayed`, derived from the match log) is built from whatever `activeMatch.sideA`/`sideB` holds *when the match ends or is voided*, not who started it. A substituted-in player who finishes the match gets credit; a substituted-out player who left early does not. No extra bookkeeping was needed to get this right — mutating the live roster was sufficient.
+- **A "matched" queue row (one already placed in a planning card) can't be double-booked** this way — substituting checks every planning card's slots first, mirroring the same cross-card duplicate guard used when placing a queue player into a card.
+- A court's player rows are destination-only: there's no way to pull someone out with no replacement through this mechanism. That stays Void's (whole match) or End's (whole match) job.
+- Instant + 5-second undo toast, not a blocking confirm (substitution is fully reversible, unlike Void) — undo restores the exact original `activeMatch` roster, removes the outgoing player's bench entry, and reinserts the incoming player into their original queue position or planning-card slot.
+
 **No match result is ever recorded.** Neither ending nor voiding a match creates any persisted record of who played, the score, or who won — the court's `activeMatch` is simply discarded. `MatchResult` (`SIDE_A`/`SIDE_B`/`DRAW`) exists as a type and is used only by the separate, static `/matches` page's mock data — that page is entirely disconnected from the live Dashboard and reflects nothing that actually happens there. **This is the largest gap for a backend to close**: there is currently no write path from "a match ended on the dashboard" to any match-history record.
 
 ### Adding/deleting courts
@@ -152,7 +161,6 @@ Two exceptions with no toast/undo: bench removal and bench→queue return — bo
 
 ## Known Gaps (for backend implementation)
 
-1. **No automatic matchup suggestion** — "Suggest" is a disabled stub; only manual card-building exists today. See `07-smart-matchup.md` for the intended (not-yet-implemented) algorithm.
-2. **Court numbering has no gap-preservation** — deleting a court always renumbers everything contiguously; there's no concept of a stable court identity independent of its display number beyond the `id` field itself.
+1. **Court numbering has no gap-preservation** — deleting a court always renumbers everything contiguously; there's no concept of a stable court identity independent of its display number beyond the `id` field itself.
 
-Resolved since this file was first written, kept here only so the history isn't lost: match history now IS written (`match-log-store.ts`, real `MatchRecord`s); voided matches are correctly excluded from `gamesPlayed`; the Dashboard's queue/bench and `/players` are the same live `session-store.ts` data, not separate datasets. See `docs/specs/08-sessions.md` for the one gap this created — `MatchRecord.sessionId` exists but the Matches/Leaderboard pages aren't session-filtered yet.
+Resolved since this file was first written, kept here only so the history isn't lost: match history now IS written (`match-log-store.ts`, real `MatchRecord`s); voided matches are correctly excluded from `gamesPlayed`; the Dashboard's queue/bench and `/players` are the same live `session-store.ts` data, not separate datasets; **automatic matchup suggestion is now wired up** — "Suggest" calls the live algorithm in `07-smart-matchup.md`, it is not a disabled stub. See `docs/specs/08-sessions.md` for the one gap this created — `MatchRecord.sessionId` exists but the Matches/Leaderboard pages aren't session-filtered yet.

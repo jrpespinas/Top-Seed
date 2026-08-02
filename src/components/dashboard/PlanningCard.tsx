@@ -58,6 +58,7 @@ function PlayerChip({
   const displayName = player.name;
   return (
     <div
+      data-tutorial-target="placed-chip"
       className={cn(
         "relative group/chip rounded-sm cursor-grab active:cursor-grabbing transition-shadow",
         isDragOver && "ring-1 ring-primary/60 bg-primary/15"
@@ -498,6 +499,9 @@ export function PlanningCard({
             >
               <button
                 ref={assignBtnRef}
+                data-tutorial-target={
+                  state === "ready" && availableCourts.length > 0 ? "assign-to-court-button" : undefined
+                }
                 onClick={() => setIsPickingCourt(true)}
                 disabled={state !== "ready" || availableCourts.length === 0}
                 className={cn(

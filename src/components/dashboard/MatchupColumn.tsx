@@ -25,7 +25,7 @@ interface Props {
   onAddCard: () => void;
   onSuggestCard: () => void;
   onResuggestCard: (cardId: string) => void;
-  justSuggestedCardId?: string | null;
+  justSuggestedCardIds?: Set<string>;
   selectedPlayer?: Player | null;
   selectedChip: SlotAddress | null;
   onSlotTap: (cardId: string, side: "A" | "B", index: number) => void;
@@ -49,7 +49,7 @@ export function MatchupColumn({
   onAddCard,
   onSuggestCard,
   onResuggestCard,
-  justSuggestedCardId,
+  justSuggestedCardIds,
   selectedPlayer,
   selectedChip,
   onSlotTap,
@@ -72,9 +72,11 @@ export function MatchupColumn({
           </h2>
           <div className="flex items-center gap-1.5">
             <button
+              data-tutorial-target="suggest-button"
               onClick={onSuggestCard}
               className="flex items-center gap-1 text-xs font-semibold bg-primary/10 hover:bg-primary text-primary hover:text-bg px-2.5 py-1.5 rounded-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
-              aria-label="Suggest a matchup from the queue"
+              aria-label="Fill every open and partial matchup card from the queue"
+              title="Fill every open and partial matchup card"
             >
               <Shuffle size={11} strokeWidth={2.5} aria-hidden />
               Suggest
@@ -129,7 +131,7 @@ export function MatchupColumn({
                       availableCourts={availableCourts}
                       onDismiss={() => onCardDismiss(card.id)}
                       onResuggest={() => onResuggestCard(card.id)}
-                      justSuggested={card.id === justSuggestedCardId}
+                      justSuggested={justSuggestedCardIds?.has(card.id) ?? false}
                       onMatchTypeChange={(type) => onCardMatchTypeChange(card.id, type)}
                       onCourtsAssign={(courtId) => onCardAssign(card.id, courtId)}
                       onPlayerDrop={(player, target) => onPlayerDropOnCard(card.id, player, target)}

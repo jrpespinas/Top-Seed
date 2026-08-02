@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import type { Court, Player, MatchResult } from "@/types";
+import type { SlotAddress } from "./DashboardClient";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { SkillBadge } from "@/components/ui/SkillBadge";
 import { GenderIcon } from "@/components/ui/GenderIcon";
@@ -10,14 +11,53 @@ import { Plus, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 type ConfirmMode = "end" | "void" | "delete" | null;
+type Slot = { side: "A" | "B"; index: number };
 
 function sideLabel(players: Player[]) {
   return players.map((p) => p.name).join("/");
 }
 
-function PlayerRow({ player }: { player: Player }) {
+// A live match's player row is a substitution target only — it never starts
+// a selection of its own (removing someone with no replacement ready is
+// still Void/End's job), so it's clickable exactly when something else
+// (a queue player or a placed chip) is already armed. Accepts either drag
+// origin used elsewhere: a queue/bench row (application/x-player) or a
+// placed chip from a planning card (application/x-slot).
+function PlayerRow({
+  player,
+  canSubstitute,
+  isDragOver,
+  onClick,
+  onDragOver,
+  onDragLeave,
+  onDrop,
+}: {
+  player: Player;
+  canSubstitute: boolean;
+  isDragOver: boolean;
+  onClick?: () => void;
+  onDragOver: (e: React.DragEvent) => void;
+  onDragLeave: (e: React.DragEvent) => void;
+  onDrop: (e: React.DragEvent) => void;
+}) {
   return (
-    <span className="flex items-center gap-1.5 min-w-0">
+    <span
+      data-tutorial-target="court-player-row"
+      onClick={canSubstitute ? onClick : undefined}
+      onDragOver={onDragOver}
+      onDragLeave={onDragLeave}
+      onDrop={onDrop}
+      role={canSubstitute ? "button" : undefined}
+      aria-label={canSubstitute ? `Substitute in for ${player.name}` : undefined}
+      className={cn(
+        "flex items-center gap-1.5 min-w-0 rounded-sm px-1 -mx-1 py-0.5 transition-colors",
+        isDragOver
+          ? "ring-1 ring-primary/60 bg-primary/15"
+          : canSubstitute
+          ? "cursor-pointer hover:bg-surface-elevated"
+          : undefined
+      )}
+    >
       <span className="text-xs text-ink truncate leading-none min-w-[44px]">
         {player.name}
       </span>
@@ -34,6 +74,11 @@ interface CourtCardProps {
   onDelete?: (id: string) => void;
   onEndMatch?: (courtId: string, result: MatchResult) => void;
   onVoidMatch?: (courtId: string) => void;
+  selectedPlayer?: Player | null;
+  selectedChip?: SlotAddress | null;
+  onSubstituteFromQueue?: (courtId: string, side: "A" | "B", index: number, player: Player) => void;
+  onSubstituteFromChip?: (courtId: string, side: "A" | "B", index: number, from: SlotAddress) => void;
+  onSlotTap?: (courtId: string, side: "A" | "B", index: number) => void;
 }
 
 export function CourtCard({
@@ -43,13 +88,63 @@ export function CourtCard({
   onDelete,
   onEndMatch,
   onVoidMatch,
+  selectedPlayer,
+  selectedChip,
+  onSubstituteFromQueue,
+  onSubstituteFromChip,
+  onSlotTap,
 }: CourtCardProps) {
-  const { number, status, activeMatch } = court;
+  const { id: courtId, number, status, activeMatch } = court;
   const [confirmMode, setConfirmMode] = useState<ConfirmMode>(null);
   const [isDragOver, setIsDragOver] = useState(false);
+  const [dragOverSlot, setDragOverSlot] = useState<Slot | null>(null);
 
   const isDropTarget = isDragging && status === "AVAILABLE";
   const isBlocked = isDragging && status === "IN_USE";
+  const canSubstitute = status === "IN_USE" && (!!selectedPlayer || !!selectedChip);
+
+  function handleRowDragOver(e: React.DragEvent, slot: Slot) {
+    const types = Array.from(e.dataTransfer.types);
+    if (!types.includes("application/x-player") && !types.includes("application/x-slot")) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "move";
+    setDragOverSlot(slot);
+  }
+
+  function handleRowDragLeave(e: React.DragEvent) {
+    if (!e.currentTarget.contains(e.relatedTarget as Node)) {
+      setDragOverSlot(null);
+    }
+  }
+
+  function handleRowDrop(e: React.DragEvent, slot: Slot) {
+    setDragOverSlot(null);
+    const rawPlayer = e.dataTransfer.getData("application/x-player");
+    if (rawPlayer && onSubstituteFromQueue) {
+      try {
+        const player = JSON.parse(rawPlayer) as Player;
+        e.preventDefault();
+        onSubstituteFromQueue(courtId, slot.side, slot.index, player);
+      } catch {
+        // malformed data — ignore
+      }
+      return;
+    }
+    const rawSlot = e.dataTransfer.getData("application/x-slot");
+    if (rawSlot && onSubstituteFromChip) {
+      try {
+        const from = JSON.parse(rawSlot) as { fromCardId: string; fromSide: "A" | "B"; fromIndex: number };
+        e.preventDefault();
+        onSubstituteFromChip(courtId, slot.side, slot.index, {
+          cardId: from.fromCardId,
+          side: from.fromSide,
+          index: from.fromIndex,
+        });
+      } catch {
+        // malformed data — ignore
+      }
+    }
+  }
 
   return (
     <div
@@ -162,12 +257,30 @@ export function CourtCard({
         <div className="flex-1 flex flex-col px-3 pb-3 gap-2">
           {/* Players */}
           <div className="flex flex-col gap-0.5">
-            {activeMatch.sideA.map((p) => (
-              <PlayerRow key={p.id} player={p} />
+            {activeMatch.sideA.map((p, i) => (
+              <PlayerRow
+                key={p.id}
+                player={p}
+                canSubstitute={canSubstitute}
+                isDragOver={dragOverSlot?.side === "A" && dragOverSlot?.index === i}
+                onClick={() => onSlotTap?.(courtId, "A", i)}
+                onDragOver={(e) => handleRowDragOver(e, { side: "A", index: i })}
+                onDragLeave={handleRowDragLeave}
+                onDrop={(e) => handleRowDrop(e, { side: "A", index: i })}
+              />
             ))}
             <span className="text-[11px] text-muted leading-none py-0.5">vs</span>
-            {activeMatch.sideB.map((p) => (
-              <PlayerRow key={p.id} player={p} />
+            {activeMatch.sideB.map((p, i) => (
+              <PlayerRow
+                key={p.id}
+                player={p}
+                canSubstitute={canSubstitute}
+                isDragOver={dragOverSlot?.side === "B" && dragOverSlot?.index === i}
+                onClick={() => onSlotTap?.(courtId, "B", i)}
+                onDragOver={(e) => handleRowDragOver(e, { side: "B", index: i })}
+                onDragLeave={handleRowDragLeave}
+                onDrop={(e) => handleRowDrop(e, { side: "B", index: i })}
+              />
             ))}
           </div>
 

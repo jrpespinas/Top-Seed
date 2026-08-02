@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { CalendarDays, Plus } from "lucide-react";
 import { SessionHeader } from "@/components/dashboard/SessionHeader";
 import { DashboardClient } from "@/components/dashboard/DashboardClient";
+import { TutorialSpotlight } from "@/components/tutorial/TutorialSpotlight";
 import { getDefaultSessionName } from "@/lib/utils";
 import {
   useCurrentSession,
@@ -15,6 +16,7 @@ import {
   closeSession,
 } from "@/lib/session-store";
 import { useMatchLog, removeMatchRecordsForSessions } from "@/lib/match-log-store";
+import { useTutorialProgress } from "@/lib/tutorial-store";
 
 export default function DashboardPage() {
   const session = useCurrentSession();
@@ -22,6 +24,7 @@ export default function DashboardPage() {
   const queue = useQueueSnapshot();
   const bench = useBenchSnapshot();
   const matches = useMatchLog();
+  const tutorial = useTutorialProgress();
 
   // Every session-store hook above starts null/empty deterministically for
   // SSR-safe hydration (see session-store.ts), then syncs from localStorage
@@ -34,12 +37,69 @@ export default function DashboardPage() {
   const [hasHydrated, setHasHydrated] = useState(false);
   useEffect(() => setHasHydrated(true), []);
 
+  // Kicks off the very first tutorial for a browser that's never touched one
+  // before. Runs once, right alongside the same hydration gate above — both
+  // wait on the same "have we read real localStorage yet" moment.
+  useEffect(() => {
+    if (hasHydrated) tutorial.runAutoStart();
+  }, [hasHydrated]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Step 1 ("Start a session") is the only step live before DashboardClient
+  // mounts, so it's the only gate checked here — steps 2 onward check
+  // against DashboardClient's own live state instead.
+  useEffect(() => {
+    tutorial.checkAndAdvance({
+      hasSession: !!session,
+      queue: [],
+      bench: [],
+      planningCards: [],
+      courts: [],
+      matches: [],
+      relocateEventCount: 0,
+    });
+  }, [session]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const activeStep = tutorial.activeStep;
+  const spotlight = activeStep ? (
+    <TutorialSpotlight
+      targetSelector={activeStep.step.target}
+      title={activeStep.step.title}
+      body={activeStep.step.body}
+      progressLabel={
+        activeStep.mode === "manual"
+          ? `Step ${activeStep.stepIndex + 1} of ${activeStep.tutorial.steps.length}`
+          : undefined
+      }
+      primaryAction={
+        activeStep.mode === "manual"
+          ? {
+              label:
+                activeStep.stepIndex === activeStep.tutorial.steps.length - 1 ? "Done" : "Next",
+              onClick: tutorial.dismissStep,
+            }
+          : !activeStep.step.gate
+          ? { label: "Got it", onClick: tutorial.dismissStep }
+          : undefined
+      }
+      onBack={activeStep.mode === "manual" && activeStep.stepIndex > 0 ? tutorial.goBackStep : undefined}
+      onSkipStep={
+        activeStep.mode === "auto" && activeStep.step.gate ? tutorial.skipStep : undefined
+      }
+      onClose={tutorial.skipActiveTutorial}
+    />
+  ) : null;
+
   if (!hasHydrated) {
     return <div className="flex-1" />;
   }
 
   if (!session) {
-    return <NoSessionState onStart={(name) => startSession(name)} />;
+    return (
+      <>
+        <NoSessionState onStart={(name) => startSession(name)} />
+        {spotlight}
+      </>
+    );
   }
 
   const activeCourts = courts.filter((c) => c.status === "IN_USE").length;
@@ -56,8 +116,10 @@ export default function DashboardPage() {
           const result = closeSession(matches);
           if (result) removeMatchRecordsForSessions(result.evictedSessionIds);
         }}
+        onStartTutorial={(tutorialId) => tutorial.startTutorial(tutorialId, "manual")}
       />
-      <DashboardClient key={session.id} sessionId={session.id} />
+      <DashboardClient key={session.id} sessionId={session.id} onTutorialCheck={tutorial.checkAndAdvance} />
+      {spotlight}
     </div>
   );
 }
@@ -118,6 +180,7 @@ function NoSessionState({ onStart }: { onStart: (name: string) => void }) {
         </div>
 
         <button
+          data-tutorial-target="start-session-button"
           onClick={handleStart}
           className="w-full inline-flex items-center justify-center gap-2 bg-primary hover:bg-primary-hover text-bg text-sm font-semibold px-5 py-2.5 rounded-md transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 min-h-[44px]"
         >

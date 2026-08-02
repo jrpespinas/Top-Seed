@@ -19,6 +19,16 @@ export const DEFAULT_SMART_MATCHUP_SETTINGS: SmartMatchupSettings = {
   skipCapThreshold: 2,
 };
 
+// A card's current, possibly-partial placement — same shape as
+// MatchupSuggestion. Passing this in locks every non-null slot to its
+// current player and searches only for the remaining open slots, instead of
+// generating a fresh full group. Used by Resuggest on a `proposed` card and
+// by the bulk Suggest-All sweep.
+export interface LockedPlacement {
+  sideA: (Player | null)[];
+  sideB: (Player | null)[];
+}
+
 export interface SuggestMatchupInput {
   /** Full session queue, any order — sorted by arrival internally. */
   queue: QueueEntry[];
@@ -29,11 +39,15 @@ export interface SuggestMatchupInput {
   excludedPlayerIds?: string[];
   /** playerId -> consecutive times skipped, session-scoped. */
   skipCounts?: Record<string, number>;
+  /** playerId -> games played this session; 0/missing forces a first-game include. */
+  gamesPlayedMap?: Map<string, number>;
+  /** Present only when filling the open slots of an already-partial card. */
+  lockedPlacement?: LockedPlacement;
   settings?: Partial<SmartMatchupSettings>;
 }
 
 export interface SuggestMatchupResult {
-  /** null when the window can't meet the match-type minimum. */
+  /** null when the window can't meet the match-type minimum (or can't fill the remaining open slots for a locked placement). */
   suggestion: MatchupSuggestion | null;
   updatedSkipCounts: Record<string, number>;
 }
@@ -44,32 +58,62 @@ export function suggestMatchup(input: SuggestMatchupInput): SuggestMatchupResult
   const excluded = new Set(input.excludedPlayerIds ?? []);
   const groupSize = input.matchType === "DOUBLES" ? 4 : 2;
 
+  const lockedPlacement = input.lockedPlacement;
+  const lockedPlayers = lockedPlacement ? extractLockedPlayers(lockedPlacement) : [];
+  const lockedIds = new Set(lockedPlayers.map((p) => p.id));
+  const numToPick = groupSize - lockedPlayers.length;
+
   // Un-picked players are never added to `excluded`, so they naturally stay
   // at the front of this list — the "rolling window" falls out for free.
+  // Locked players are excluded here too since they're injected directly
+  // from lockedPlacement, never re-drawn from the pool.
   const window = input.queue
-    .filter((entry) => !entry.isInMatch && !excluded.has(entry.player.id))
+    .filter((entry) => !entry.isInMatch && !excluded.has(entry.player.id) && !lockedIds.has(entry.player.id))
     .sort((a, b) => Date.parse(a.sessionJoinedAt) - Date.parse(b.sessionJoinedAt))
     .slice(0, settings.windowSize)
     .map((entry) => entry.player);
 
-  if (window.length < groupSize) {
+  if (numToPick <= 0 || window.length < numToPick) {
     return { suggestion: null, updatedSkipCounts: skipCounts };
   }
 
   const winRates = computeSessionWinRates(input.matches);
   const pairingCounts = buildPairingCounts(input.matches, input.matchType);
-  const groups = combinations(window, groupSize);
-  const tier = pickGenderTier(groups, input.matchType);
 
-  const arrangements = buildArrangements(groups, input.matchType, tier).map((raw) =>
+  let rawArrangements: RawArrangement[];
+
+  if (lockedPlacement && lockedPlayers.length > 0) {
+    const newCombos = combinations(window, numToPick);
+    const fullGroups = newCombos.map((combo) => [...lockedPlayers, ...combo]);
+    const { levelTier, genderTier } = selectTiers(fullGroups, input.matchType);
+    rawArrangements = buildArrangementsLocked(lockedPlacement, newCombos, levelTier, genderTier);
+  } else {
+    const groups = combinations(window, groupSize);
+    const { levelTier, genderTier } = selectTiers(groups, input.matchType);
+    const levelFilteredGroups = groups.filter((g) => levelTierMatches(levelTier, g));
+    rawArrangements = buildArrangements(levelFilteredGroups, input.matchType, genderTier);
+  }
+
+  if (rawArrangements.length === 0) {
+    return { suggestion: null, updatedSkipCounts: skipCounts };
+  }
+
+  const arrangements = rawArrangements.map((raw) =>
     scoreArrangement(raw, input.matchType, winRates, pairingCounts, settings.balanceWeight)
   );
 
-  const forcedIds = window
+  // Zero-games players get fast-tracked into their first game ahead of
+  // skip-capped ones — deliberately not persisted past that first game, so
+  // early arrivals still naturally accumulate more total games from having
+  // more session time, with no separate fairness penalty needed.
+  const zeroGamesIds = window
+    .filter((p) => (input.gamesPlayedMap?.get(p.id) ?? 0) === 0)
+    .map((p) => p.id);
+  const skipCappedIds = window
     .filter((p) => (skipCounts[p.id] ?? 0) >= settings.skipCapThreshold)
     .sort((a, b) => (skipCounts[b.id] ?? 0) - (skipCounts[a.id] ?? 0))
-    .slice(0, groupSize)
     .map((p) => p.id);
+  const forcedIds = Array.from(new Set([...zeroGamesIds, ...skipCappedIds])).slice(0, numToPick);
 
   const best = pickBest(arrangements, forcedIds);
   // Fresh (never-paired) arrangements score novelty === 1; if none exist,
@@ -129,6 +173,54 @@ function pickGenderTier(groups: Player[][], matchType: MatchType): GenderTier {
 }
 
 // ---------------------------------------------------------------------------
+// Level gate — outer gate wrapping the gender gate above. Mixed-gender play
+// is a last resort tried only within a level tier that's already been
+// settled on, never traded off against it: "as much as possible, all
+// players the same level" ranks above gender matching entirely.
+
+type LevelTier = "EXACT_LEVEL" | "ADJACENT_LEVEL" | "UNRESTRICTED";
+
+function levelSpread(players: Player[]): number {
+  const ranks = players.map((p) => SKILL_RANK[p.skillLevel]);
+  return Math.max(...ranks) - Math.min(...ranks);
+}
+
+function isExactLevelCompatible(players: Player[]): boolean {
+  return levelSpread(players) === 0;
+}
+
+// Adjacent = at most one rank apart (e.g. B and A, but not B and S).
+function isAdjacentLevelCompatible(players: Player[]): boolean {
+  return levelSpread(players) <= 1;
+}
+
+function pickLevelTier(groups: Player[][]): LevelTier {
+  if (groups.some(isExactLevelCompatible)) return "EXACT_LEVEL";
+  if (groups.some(isAdjacentLevelCompatible)) return "ADJACENT_LEVEL";
+  return "UNRESTRICTED";
+}
+
+function levelTierMatches(tier: LevelTier, group: Player[]): boolean {
+  if (tier === "EXACT_LEVEL") return isExactLevelCompatible(group);
+  if (tier === "ADJACENT_LEVEL") return isAdjacentLevelCompatible(group);
+  return true;
+}
+
+// Settles the level tier first (over every candidate group), filters to it,
+// then re-runs the existing gender-tier pick within that filtered set — up
+// to 9 (level x gender) combinations attempted in priority order before
+// falling back to fully unrestricted.
+function selectTiers(
+  groups: Player[][],
+  matchType: MatchType
+): { levelTier: LevelTier; genderTier: GenderTier } {
+  const levelTier = pickLevelTier(groups);
+  const levelFiltered = groups.filter((g) => levelTierMatches(levelTier, g));
+  const genderTier = pickGenderTier(levelFiltered, matchType);
+  return { levelTier, genderTier };
+}
+
+// ---------------------------------------------------------------------------
 // Arrangement generation
 
 interface RawArrangement {
@@ -166,6 +258,57 @@ function buildArrangements(groups: Player[][], matchType: MatchType, tier: Gende
   return arrangements;
 }
 
+function extractLockedPlayers(placement: LockedPlacement): Player[] {
+  return [...placement.sideA, ...placement.sideB].filter((p): p is Player => p !== null);
+}
+
+// Fills each open (null) slot in array order from `newPlayers`, in the order
+// given — which specific open slot a given new player lands in never affects
+// scoring (only which side it's on does), so no need to try every ordering.
+function fillSide(locked: (Player | null)[], newPlayers: Player[]): Player[] {
+  const queue = [...newPlayers];
+  return locked.map((slot) => slot ?? queue.shift()!);
+}
+
+// Locked-slot counterpart to buildArrangements: for each combo of new
+// players, tries every way to split them across the open slots on each side
+// (a plain choose-k-for-side-A, not a full permutation — index position
+// within a side never affects scoring) and keeps the ones that satisfy the
+// already-chosen level/gender tiers.
+function buildArrangementsLocked(
+  lockedPlacement: LockedPlacement,
+  newCombos: Player[][],
+  levelTier: LevelTier,
+  genderTier: GenderTier
+): RawArrangement[] {
+  const lockedSideA = lockedPlacement.sideA;
+  const lockedSideB = lockedPlacement.sideB;
+  const openACount = lockedSideA.filter((v) => v === null).length;
+  const lockedPlayers = extractLockedPlayers(lockedPlacement);
+
+  const arrangements: RawArrangement[] = [];
+
+  for (const combo of newCombos) {
+    const fullGroup = [...lockedPlayers, ...combo];
+    if (!levelTierMatches(levelTier, fullGroup)) continue;
+    if (genderTier === "SAME_GENDER" && !isSameGenderCompatible(fullGroup)) continue;
+    if (genderTier === "MIXED_DOUBLES" && !isMixedDoublesFeasible(fullGroup)) continue;
+
+    for (const sideANew of combinations(combo, openACount)) {
+      const sideANewIds = new Set(sideANew.map((p) => p.id));
+      const sideBNew = combo.filter((p) => !sideANewIds.has(p.id));
+
+      const sideA = fillSide(lockedSideA, sideANew);
+      const sideB = fillSide(lockedSideB, sideBNew);
+
+      if (genderTier === "MIXED_DOUBLES" && !isMixedDoublesSplit(sideA, sideB)) continue;
+      arrangements.push({ sideA, sideB });
+    }
+  }
+
+  return arrangements;
+}
+
 // ---------------------------------------------------------------------------
 // Scoring
 
@@ -173,6 +316,7 @@ interface Arrangement extends RawArrangement {
   balance: number;
   novelty: number;
   challenge: number;
+  winRateBalance: number;
   final: number;
 }
 
@@ -190,14 +334,12 @@ function avgSkill(players: Player[]): number {
   return mean(players.map((p) => normalizedSkill(p.skillLevel)));
 }
 
-function sideStrength(players: Player[], winRates: Map<string, number>): number {
-  const avgWinRate = mean(players.map((p) => winRates.get(p.id) ?? 0.5));
-  return avgSkill(players) * 0.5 + avgWinRate * 0.5;
-}
-
-function balanceScore(sideA: Player[], sideB: Player[], winRates: Map<string, number>): number {
-  // sideStrength is in [0,1], so the max possible gap between two sides is 1.
-  const diff = Math.abs(sideStrength(sideA, winRates) - sideStrength(sideB, winRates));
+// Skill-only: the level gate above already keeps groups at the same or
+// adjacent tier whenever the queue allows it, so balance's job is just to
+// even out the two sides within whatever group got picked. Win rate is
+// still considered — as a tiebreak only, see winRateBalanceScore below.
+function balanceScore(sideA: Player[], sideB: Player[]): number {
+  const diff = Math.abs(avgSkill(sideA) - avgSkill(sideB));
   return 1 - diff;
 }
 
@@ -277,6 +419,14 @@ function computeSessionWinRates(matches: MatchRecord[]): Map<string, number> {
   return rates;
 }
 
+// Third-stage tiebreak only (see pickBest) — how even the two sides' session
+// win rates are, now that skill balance no longer folds it in directly.
+function winRateBalanceScore(sideA: Player[], sideB: Player[], winRates: Map<string, number>): number {
+  const avgA = mean(sideA.map((p) => winRates.get(p.id) ?? 0.5));
+  const avgB = mean(sideB.map((p) => winRates.get(p.id) ?? 0.5));
+  return 1 - Math.abs(avgA - avgB);
+}
+
 function scoreArrangement(
   raw: RawArrangement,
   matchType: MatchType,
@@ -284,23 +434,25 @@ function scoreArrangement(
   pairingCounts: Map<string, number>,
   balanceWeight: number
 ): Arrangement {
-  const balance = balanceScore(raw.sideA, raw.sideB, winRates);
+  const balance = balanceScore(raw.sideA, raw.sideB);
   const novelty = noveltyScore(raw.sideA, raw.sideB, matchType, pairingCounts);
   const challenge = challengeCount(raw.sideA, raw.sideB);
+  const winRateBalance = winRateBalanceScore(raw.sideA, raw.sideB, winRates);
   const final = balanceWeight * balance + (1 - balanceWeight) * novelty;
-  return { ...raw, balance, novelty, challenge, final };
+  return { ...raw, balance, novelty, challenge, winRateBalance, final };
 }
 
-// Near-equal finalScores are broken by Challenge, not by whichever arrangement
-// happened to be enumerated first.
+// Near-equal finalScores are broken by Challenge, then by win-rate balance —
+// not by whichever arrangement happened to be enumerated first.
 const CHALLENGE_TIEBREAK_EPSILON = 0.02;
 
 function pickBest(arrangements: Arrangement[], forcedIdsByPriority: string[]): Arrangement {
   let candidates = arrangements;
   let forced = forcedIdsByPriority;
 
-  // Force in as many skip-capped players as the window can actually seat,
-  // dropping the lowest-priority one until a valid arrangement exists.
+  // Force in as many zero-games/skip-capped players as the window can
+  // actually seat, dropping the lowest-priority one until a valid
+  // arrangement exists.
   while (forced.length > 0) {
     const restricted = candidates.filter((a) => {
       const ids = new Set([...a.sideA, ...a.sideB].map((p) => p.id));
@@ -315,8 +467,12 @@ function pickBest(arrangements: Arrangement[], forcedIdsByPriority: string[]): A
 
   const maxFinal = Math.max(...candidates.map((a) => a.final));
   const nearBest = candidates.filter((a) => maxFinal - a.final <= CHALLENGE_TIEBREAK_EPSILON);
-  nearBest.sort((a, b) => b.challenge - a.challenge);
-  return nearBest[0];
+
+  const maxChallenge = Math.max(...nearBest.map((a) => a.challenge));
+  const nearBestChallenge = nearBest.filter((a) => a.challenge === maxChallenge);
+
+  nearBestChallenge.sort((a, b) => b.winRateBalance - a.winRateBalance);
+  return nearBestChallenge[0];
 }
 
 // ---------------------------------------------------------------------------

@@ -350,6 +350,7 @@ export function PlayerPoolColumn({
             </span>
           </h2>
           <button
+            data-tutorial-target="add-players-button"
             onClick={() => setIsAddModalOpen(true)}
             className="flex items-center gap-1 text-xs text-muted hover:text-ink hover:bg-surface-elevated px-2 py-1.5 rounded-sm border border-border/60 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-border"
             aria-label="Add players"
@@ -372,7 +373,7 @@ export function PlayerPoolColumn({
                   {waitingCount}
                 </span>
               </div>
-              <ul role="list" aria-label="Queue">
+              <ul role="list" aria-label="Queue" data-tutorial-target="queue-list">
                 <AnimatePresence initial={false}>
                   {queue.filter((e) => !e.isInMatch).map((entry, idx) => (
                     <motion.li

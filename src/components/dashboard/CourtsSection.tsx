@@ -1,4 +1,5 @@
-import type { Court, MatchResult } from "@/types";
+import type { Court, MatchResult, Player } from "@/types";
+import type { SlotAddress } from "./DashboardClient";
 import { CourtCard } from "./CourtCard";
 import { cn } from "@/lib/utils";
 import { Grid3X3, Plus } from "lucide-react";
@@ -13,6 +14,11 @@ interface Props {
   onDelete?: (id: string) => void;
   onEndMatch?: (courtId: string, result: MatchResult) => void;
   onVoidMatch?: (courtId: string) => void;
+  selectedPlayer?: Player | null;
+  selectedChip?: SlotAddress | null;
+  onSubstituteFromQueue?: (courtId: string, side: "A" | "B", index: number, player: Player) => void;
+  onSubstituteFromChip?: (courtId: string, side: "A" | "B", index: number, from: SlotAddress) => void;
+  onCourtSlotTap?: (courtId: string, side: "A" | "B", index: number) => void;
 }
 
 export function CourtsSection({
@@ -25,6 +31,11 @@ export function CourtsSection({
   onDelete,
   onEndMatch,
   onVoidMatch,
+  selectedPlayer,
+  selectedChip,
+  onSubstituteFromQueue,
+  onSubstituteFromChip,
+  onCourtSlotTap,
 }: Props) {
   return (
     <section
@@ -78,6 +89,11 @@ export function CourtsSection({
                     onDelete={onDelete}
                     onEndMatch={onEndMatch}
                     onVoidMatch={onVoidMatch}
+                    selectedPlayer={selectedPlayer}
+                    selectedChip={selectedChip}
+                    onSubstituteFromQueue={onSubstituteFromQueue}
+                    onSubstituteFromChip={onSubstituteFromChip}
+                    onSlotTap={onCourtSlotTap}
                   />
                 </div>
               ))}
@@ -98,6 +114,11 @@ export function CourtsSection({
                 onDelete={onDelete}
                 onEndMatch={onEndMatch}
                 onVoidMatch={onVoidMatch}
+                selectedPlayer={selectedPlayer}
+                selectedChip={selectedChip}
+                onSubstituteFromQueue={onSubstituteFromQueue}
+                onSubstituteFromChip={onSubstituteFromChip}
+                onSlotTap={onCourtSlotTap}
               />
             ))}
           </div>

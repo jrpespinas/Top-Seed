@@ -138,6 +138,40 @@ body {
   }
 }
 
+/* Tutorial spotlight ring — pulses continuously (not just twice, unlike the
+   suggest-pulse above) for as long as a step stays on screen, since it's the
+   only affordance calling attention to the target (no dimming backdrop).
+   Deliberately accent (steel slate), not primary (copper): primary-colored
+   rings already mean three different real interactive states elsewhere
+   (CourtCard's confirm-pending and drop-target/drag-over rings, PlayerChip's
+   drag-over ring, the Suggest button's click-pulse) — several of which can
+   render on the exact element a tutorial step is spotlighting at the same
+   moment (e.g. relocating a chip, or substituting into a live match, while
+   that step's own ring is still showing). Reusing primary there would read
+   as "this needs a decision," not "here's a tip." The ring is also a dashed
+   border rather than a solid box-shadow ring (see TutorialSpotlight.tsx) so
+   the distinction doesn't rely on hue alone. */
+@keyframes tutorial-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 oklch(var(--color-accent-raw) / 0);
+  }
+  50% {
+    box-shadow: 0 0 0 4px oklch(var(--color-accent-raw) / 0.35);
+  }
+}
+
+@keyframes tutorial-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
 @layer utilities {
   .animate-toast {
     animation: toast-in 200ms ease-out forwards;
@@ -149,6 +183,14 @@ body {
 
   .animate-suggest-pulse {
     animation: card-suggest-pulse 1s ease-in-out 2;
+  }
+
+  .animate-tutorial-pulse {
+    animation: tutorial-pulse 1.6s ease-in-out infinite;
+  }
+
+  .animate-tutorial-in {
+    animation: tutorial-in 200ms ease-out forwards;
   }
 }
 
@@ -217,5 +259,12 @@ html.theme-switching *::after {
   .animate-suggest-pulse {
     animation: none !important;
     box-shadow: 0 0 16px 2px oklch(var(--color-primary-raw) / 0.45) !important;
+  }
+
+  /* Same reasoning as suggest-pulse above — hold a steady ring instead of
+     losing the highlight entirely. */
+  .animate-tutorial-pulse {
+    animation: none !important;
+    box-shadow: 0 0 0 4px oklch(var(--color-accent-raw) / 0.35) !important;
   }
 }
