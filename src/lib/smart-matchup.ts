@@ -9,15 +9,37 @@ import type { MatchRecord, MatchType, MatchupSuggestion, Player, QueueEntry, Ski
 
 export interface SmartMatchupSettings {
   balanceWeight: number; // novelty weight = 1 - this
+  /** Floor of the candidate window — also today's flat size for any session with <20 waiting. */
   windowSize: number;
+  /** Ceiling the window scales up to as the waiting queue grows. A fairness dial, not a performance one. */
+  maxWindowSize: number;
   skipCapThreshold: number;
 }
 
 export const DEFAULT_SMART_MATCHUP_SETTINGS: SmartMatchupSettings = {
   balanceWeight: 0.6,
   windowSize: 10,
+  maxWindowSize: 24,
   skipCapThreshold: 2,
 };
+
+function clamp(value: number, min: number, max: number): number {
+  return Math.min(Math.max(value, min), max);
+}
+
+// A flat window starves skill-tier variety once a session gets big enough
+// that same-level players outnumber the window — the same handful of
+// Advanced players end up matched against each other every round, even
+// though others at that level are waiting just past position 10. Scaling
+// with the actual waiting queue keeps small sessions unchanged (the floor
+// is today's constant) while giving larger ones enough visibility to
+// rediscover that variety. The ceiling is a deliberate fairness cap, not a
+// performance one — even a window well past 24 is trivial to score
+// client-side; a bigger window just means early arrivals compete against an
+// ever-larger field, which is exactly what the original flat cap prevented.
+function effectiveWindowSize(waitingCount: number, settings: SmartMatchupSettings): number {
+  return clamp(Math.floor(waitingCount / 2), settings.windowSize, settings.maxWindowSize);
+}
 
 // A card's current, possibly-partial placement — same shape as
 // MatchupSuggestion. Passing this in locks every non-null slot to its
@@ -63,6 +85,13 @@ export function suggestMatchup(input: SuggestMatchupInput): SuggestMatchupResult
   const lockedIds = new Set(lockedPlayers.map((p) => p.id));
   const numToPick = groupSize - lockedPlayers.length;
 
+  // Sized off the full waiting pool (not the narrower excluded/locked set
+  // this particular call happens to carry) — the question is "how much
+  // skill-tier variety exists in the room right now," which doesn't shrink
+  // just because earlier cards this round already claimed a few players.
+  const waitingCount = input.queue.filter((entry) => !entry.isInMatch).length;
+  const windowSize = effectiveWindowSize(waitingCount, settings);
+
   // Un-picked players are never added to `excluded`, so they naturally stay
   // at the front of this list — the "rolling window" falls out for free.
   // Locked players are excluded here too since they're injected directly
@@ -70,7 +99,7 @@ export function suggestMatchup(input: SuggestMatchupInput): SuggestMatchupResult
   const window = input.queue
     .filter((entry) => !entry.isInMatch && !excluded.has(entry.player.id) && !lockedIds.has(entry.player.id))
     .sort((a, b) => Date.parse(a.sessionJoinedAt) - Date.parse(b.sessionJoinedAt))
-    .slice(0, settings.windowSize)
+    .slice(0, windowSize)
     .map((entry) => entry.player);
 
   if (numToPick <= 0 || window.length < numToPick) {
