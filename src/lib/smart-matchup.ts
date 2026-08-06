@@ -9,9 +9,9 @@ import type { MatchRecord, MatchType, MatchupSuggestion, Player, QueueEntry, Ski
 
 export interface SmartMatchupSettings {
   balanceWeight: number; // novelty weight = 1 - this
-  /** Floor of the candidate window — also today's flat size for any session with <20 waiting. */
+  /** Floor of the Unrestricted-tier window — also today's flat size for any session with <20 waiting. */
   windowSize: number;
-  /** Ceiling the window scales up to as the waiting queue grows. A fairness dial, not a performance one. */
+  /** Ceiling both the Unrestricted window and any single level-tier pool scale up to. A defensive/fairness cap, not a performance one. */
   maxWindowSize: number;
   skipCapThreshold: number;
 }
@@ -27,16 +27,10 @@ function clamp(value: number, min: number, max: number): number {
   return Math.min(Math.max(value, min), max);
 }
 
-// A flat window starves skill-tier variety once a session gets big enough
-// that same-level players outnumber the window — the same handful of
-// Advanced players end up matched against each other every round, even
-// though others at that level are waiting just past position 10. Scaling
-// with the actual waiting queue keeps small sessions unchanged (the floor
-// is today's constant) while giving larger ones enough visibility to
-// rediscover that variety. The ceiling is a deliberate fairness cap, not a
-// performance one — even a window well past 24 is trivial to score
-// client-side; a bigger window just means early arrivals compete against an
-// ever-larger field, which is exactly what the original flat cap prevented.
+// Governs only the Unrestricted tier's window today (see resolveFreshTier) —
+// the true last resort once level has been fully given up on for this
+// round. Small sessions are unaffected (the floor is today's constant); the
+// ceiling is a deliberate fairness cap, not a performance one.
 function effectiveWindowSize(waitingCount: number, settings: SmartMatchupSettings): number {
   return clamp(Math.floor(waitingCount / 2), settings.windowSize, settings.maxWindowSize);
 }
@@ -69,7 +63,7 @@ export interface SuggestMatchupInput {
 }
 
 export interface SuggestMatchupResult {
-  /** null when the window can't meet the match-type minimum (or can't fill the remaining open slots for a locked placement). */
+  /** null when there aren't enough eligible players at all (or to fill the remaining open slots for a locked placement). */
   suggestion: MatchupSuggestion | null;
   updatedSkipCounts: Record<string, number>;
 }
@@ -85,73 +79,82 @@ export function suggestMatchup(input: SuggestMatchupInput): SuggestMatchupResult
   const lockedIds = new Set(lockedPlayers.map((p) => p.id));
   const numToPick = groupSize - lockedPlayers.length;
 
-  // Sized off the full waiting pool (not the narrower excluded/locked set
-  // this particular call happens to carry) — the question is "how much
-  // skill-tier variety exists in the room right now," which doesn't shrink
-  // just because earlier cards this round already claimed a few players.
-  const waitingCount = input.queue.filter((entry) => !entry.isInMatch).length;
-  const windowSize = effectiveWindowSize(waitingCount, settings);
-
-  // Un-picked players are never added to `excluded`, so they naturally stay
-  // at the front of this list — the "rolling window" falls out for free.
-  // Locked players are excluded here too since they're injected directly
-  // from lockedPlacement, never re-drawn from the pool.
-  const window = input.queue
-    .filter((entry) => !entry.isInMatch && !excluded.has(entry.player.id) && !lockedIds.has(entry.player.id))
-    .sort((a, b) => Date.parse(a.sessionJoinedAt) - Date.parse(b.sessionJoinedAt))
-    .slice(0, windowSize)
-    .map((entry) => entry.player);
-
-  if (numToPick <= 0 || window.length < numToPick) {
+  if (numToPick <= 0) {
     return { suggestion: null, updatedSkipCounts: skipCounts };
   }
+
+  // Every not-mid-match, not-yet-claimed-this-round entry — the full pool
+  // this call can draw from, before any per-tier pool/window slicing.
+  const eligible = input.queue.filter(
+    (entry) => !entry.isInMatch && !excluded.has(entry.player.id) && !lockedIds.has(entry.player.id)
+  );
+
+  if (eligible.length < numToPick) {
+    return { suggestion: null, updatedSkipCounts: skipCounts };
+  }
+
+  // Session-wide waiting count (not scoped to this card's own exclusions) —
+  // drives the Unrestricted tier's window scaling only. "How much variety
+  // exists in the room right now" doesn't shrink just because earlier cards
+  // this round already claimed a few players.
+  const waitingCount = input.queue.filter((entry) => !entry.isInMatch).length;
 
   const winRates = computeSessionWinRates(input.matches);
   const pairingCounts = buildPairingCounts(input.matches, input.matchType);
 
-  let rawArrangements: RawArrangement[];
+  let candidatePool: Player[];
+  let arrangements: Arrangement[];
 
   if (lockedPlacement && lockedPlayers.length > 0) {
-    const newCombos = combinations(window, numToPick);
-    const fullGroups = newCombos.map((combo) => [...lockedPlayers, ...combo]);
-    const { levelTier, genderTier } = selectTiers(fullGroups, input.matchType);
-    rawArrangements = buildArrangementsLocked(lockedPlacement, newCombos, levelTier, genderTier);
+    const pool = sortByArrival(eligible)
+      .slice(0, effectiveWindowSize(waitingCount, settings))
+      .map((entry) => entry.player);
+    const resolved = resolveLockedTier(
+      pool,
+      lockedPlacement,
+      lockedPlayers,
+      numToPick,
+      input.matchType,
+      winRates,
+      pairingCounts,
+      settings.balanceWeight
+    );
+    candidatePool = pool;
+    arrangements = resolved.arrangements;
   } else {
-    const groups = combinations(window, groupSize);
-    const { levelTier, genderTier } = selectTiers(groups, input.matchType);
-    const levelFilteredGroups = groups.filter((g) => levelTierMatches(levelTier, g));
-    rawArrangements = buildArrangements(levelFilteredGroups, input.matchType, genderTier);
+    const resolved = resolveFreshTier(eligible, waitingCount, groupSize, input.matchType, winRates, pairingCounts, settings);
+    candidatePool = resolved.pool;
+    arrangements = resolved.arrangements;
   }
 
-  if (rawArrangements.length === 0) {
+  if (arrangements.length === 0) {
     return { suggestion: null, updatedSkipCounts: skipCounts };
   }
-
-  const arrangements = rawArrangements.map((raw) =>
-    scoreArrangement(raw, input.matchType, winRates, pairingCounts, settings.balanceWeight)
-  );
 
   // Zero-games players get fast-tracked into their first game ahead of
   // skip-capped ones — deliberately not persisted past that first game, so
   // early arrivals still naturally accumulate more total games from having
   // more session time, with no separate fairness penalty needed.
-  const zeroGamesIds = window
+  const zeroGamesIds = candidatePool
     .filter((p) => (input.gamesPlayedMap?.get(p.id) ?? 0) === 0)
     .map((p) => p.id);
-  const skipCappedIds = window
+  const skipCappedIds = candidatePool
     .filter((p) => (skipCounts[p.id] ?? 0) >= settings.skipCapThreshold)
     .sort((a, b) => (skipCounts[b.id] ?? 0) - (skipCounts[a.id] ?? 0))
     .map((p) => p.id);
   const forcedIds = Array.from(new Set([...zeroGamesIds, ...skipCappedIds])).slice(0, numToPick);
 
   const best = pickBest(arrangements, forcedIds);
-  // Fresh (never-paired) arrangements score novelty === 1; if none exist,
-  // every option available this round has been played before.
+  // Fresh (never-paired) arrangements score novelty === 1. Exact/Adjacent
+  // are only ever chosen when a fresh arrangement already exists (see
+  // resolveFreshTier / resolveLockedTier below), so seeing this true here
+  // really means the search fell all the way to Unrestricted and even that
+  // was exhausted — drives the existing "least recently repeated" UI note.
   const pairsExhausted = !arrangements.some((a) => a.novelty === 1);
 
   const chosenIds = new Set([...best.sideA, ...best.sideB].map((p) => p.id));
   const updatedSkipCounts = { ...skipCounts };
-  for (const p of window) {
+  for (const p of candidatePool) {
     updatedSkipCounts[p.id] = chosenIds.has(p.id) ? 0 : (skipCounts[p.id] ?? 0) + 1;
   }
 
@@ -159,6 +162,10 @@ export function suggestMatchup(input: SuggestMatchupInput): SuggestMatchupResult
     suggestion: { sideA: best.sideA, sideB: best.sideB, pairsExhausted },
     updatedSkipCounts,
   };
+}
+
+function sortByArrival(entries: QueueEntry[]): QueueEntry[] {
+  return entries.slice().sort((a, b) => Date.parse(a.sessionJoinedAt) - Date.parse(b.sessionJoinedAt));
 }
 
 // ---------------------------------------------------------------------------
@@ -209,6 +216,8 @@ function pickGenderTier(groups: Player[][], matchType: MatchType): GenderTier {
 
 type LevelTier = "EXACT_LEVEL" | "ADJACENT_LEVEL" | "UNRESTRICTED";
 
+const SKILL_RANK: Record<SkillLevel, number> = { S: 1, A: 2, B: 3, C: 4, D: 5, E: 6, F: 7 };
+
 function levelSpread(players: Player[]): number {
   const ranks = players.map((p) => SKILL_RANK[p.skillLevel]);
   return Math.max(...ranks) - Math.min(...ranks);
@@ -223,30 +232,14 @@ function isAdjacentLevelCompatible(players: Player[]): boolean {
   return levelSpread(players) <= 1;
 }
 
-function pickLevelTier(groups: Player[][]): LevelTier {
-  if (groups.some(isExactLevelCompatible)) return "EXACT_LEVEL";
-  if (groups.some(isAdjacentLevelCompatible)) return "ADJACENT_LEVEL";
-  return "UNRESTRICTED";
+function isWithinOneRank(level: SkillLevel, targetLevel: SkillLevel): boolean {
+  return Math.abs(SKILL_RANK[level] - SKILL_RANK[targetLevel]) <= 1;
 }
 
 function levelTierMatches(tier: LevelTier, group: Player[]): boolean {
   if (tier === "EXACT_LEVEL") return isExactLevelCompatible(group);
   if (tier === "ADJACENT_LEVEL") return isAdjacentLevelCompatible(group);
   return true;
-}
-
-// Settles the level tier first (over every candidate group), filters to it,
-// then re-runs the existing gender-tier pick within that filtered set — up
-// to 9 (level x gender) combinations attempted in priority order before
-// falling back to fully unrestricted.
-function selectTiers(
-  groups: Player[][],
-  matchType: MatchType
-): { levelTier: LevelTier; genderTier: GenderTier } {
-  const levelTier = pickLevelTier(groups);
-  const levelFiltered = groups.filter((g) => levelTierMatches(levelTier, g));
-  const genderTier = pickGenderTier(levelFiltered, matchType);
-  return { levelTier, genderTier };
 }
 
 // ---------------------------------------------------------------------------
@@ -348,8 +341,6 @@ interface Arrangement extends RawArrangement {
   winRateBalance: number;
   final: number;
 }
-
-const SKILL_RANK: Record<SkillLevel, number> = { S: 1, A: 2, B: 3, C: 4, D: 5, E: 6, F: 7 };
 
 function normalizedSkill(level: SkillLevel): number {
   return (8 - SKILL_RANK[level]) / 7; // 1 = strongest (S), 0 = weakest (F)
@@ -502,6 +493,170 @@ function pickBest(arrangements: Arrangement[], forcedIdsByPriority: string[]): A
 
   nearBestChallenge.sort((a, b) => b.winRateBalance - a.winRateBalance);
   return nearBestChallenge[0];
+}
+
+// ---------------------------------------------------------------------------
+// Tier resolution — turns a candidate pool into a level tier + scored
+// arrangements. Two flavors: resolveFreshTier (full-group generation, one
+// dedicated pool per skill level) and resolveLockedTier (filling the open
+// slots of an already-partial card, one shared general pool re-filtered per
+// tier — the locked players already pin down most of the level context, so
+// a per-level pool doesn't add much there).
+
+interface TierResolution {
+  levelTier: LevelTier;
+  pool: Player[];
+  arrangements: Arrangement[];
+}
+
+function hasFreshArrangement(arrangements: Arrangement[]): boolean {
+  return arrangements.some((a) => a.novelty === 1);
+}
+
+// The single oldest eligible player's own level IS, by construction, the
+// level whose oldest member is earliest among every level's oldest member —
+// no need to compute per-level minimums and compare them.
+function mostOverdueLevel(eligible: QueueEntry[]): SkillLevel | null {
+  if (eligible.length === 0) return null;
+  let oldest = eligible[0];
+  for (const entry of eligible) {
+    if (Date.parse(entry.sessionJoinedAt) < Date.parse(oldest.sessionJoinedAt)) oldest = entry;
+  }
+  return oldest.player.skillLevel;
+}
+
+function poolForLevel(eligible: QueueEntry[], predicate: (level: SkillLevel) => boolean, cap: number): Player[] {
+  return sortByArrival(eligible.filter((entry) => predicate(entry.player.skillLevel)))
+    .slice(0, cap)
+    .map((entry) => entry.player);
+}
+
+function attemptLevelTier(
+  pool: Player[],
+  tier: LevelTier,
+  groupSize: number,
+  matchType: MatchType,
+  winRates: Map<string, number>,
+  pairingCounts: Map<string, number>,
+  balanceWeight: number
+): Arrangement[] | null {
+  if (pool.length < groupSize) return null;
+
+  const groups = combinations(pool, groupSize).filter((g) => levelTierMatches(tier, g));
+  if (groups.length === 0) return null;
+
+  const genderTier = pickGenderTier(groups, matchType);
+  const raw = buildArrangements(groups, matchType, genderTier);
+  if (raw.length === 0) return null;
+
+  return raw.map((r) => scoreArrangement(r, matchType, winRates, pairingCounts, balanceWeight));
+}
+
+// A single skill level is naturally a small slice of a big session, so it
+// doesn't need the shared window's fairness cap the way a mixed pool does —
+// every waiting player at that level (up to maxWindowSize, a defensive
+// ceiling only) is visible, always. Escalates by FRESHNESS, not just
+// existence: a level whose players have already played every combination of
+// each other doesn't win just because a same-level group technically
+// exists — that's what let a small Advanced pool get stuck replaying itself
+// every round. Only the single most-overdue level is tried before falling
+// through to Unrestricted; it doesn't hunt across every other level first.
+function resolveFreshTier(
+  eligible: QueueEntry[],
+  waitingCount: number,
+  groupSize: number,
+  matchType: MatchType,
+  winRates: Map<string, number>,
+  pairingCounts: Map<string, number>,
+  settings: SmartMatchupSettings
+): TierResolution {
+  const targetLevel = mostOverdueLevel(eligible);
+
+  if (targetLevel) {
+    const exactPool = poolForLevel(eligible, (level) => level === targetLevel, settings.maxWindowSize);
+    const exactAttempt = attemptLevelTier(
+      exactPool,
+      "EXACT_LEVEL",
+      groupSize,
+      matchType,
+      winRates,
+      pairingCounts,
+      settings.balanceWeight
+    );
+    if (exactAttempt && hasFreshArrangement(exactAttempt)) {
+      return { levelTier: "EXACT_LEVEL", pool: exactPool, arrangements: exactAttempt };
+    }
+
+    const adjacentPool = poolForLevel(
+      eligible,
+      (level) => isWithinOneRank(level, targetLevel),
+      settings.maxWindowSize
+    );
+    const adjacentAttempt = attemptLevelTier(
+      adjacentPool,
+      "ADJACENT_LEVEL",
+      groupSize,
+      matchType,
+      winRates,
+      pairingCounts,
+      settings.balanceWeight
+    );
+    if (adjacentAttempt && hasFreshArrangement(adjacentAttempt)) {
+      return { levelTier: "ADJACENT_LEVEL", pool: adjacentPool, arrangements: adjacentAttempt };
+    }
+  }
+
+  const pool = sortByArrival(eligible)
+    .slice(0, effectiveWindowSize(waitingCount, settings))
+    .map((entry) => entry.player);
+
+  if (pool.length < groupSize) {
+    return { levelTier: "UNRESTRICTED", pool, arrangements: [] };
+  }
+
+  const groups = combinations(pool, groupSize);
+  const genderTier = pickGenderTier(groups, matchType);
+  const raw = buildArrangements(groups, matchType, genderTier);
+  const arrangements = raw.map((r) => scoreArrangement(r, matchType, winRates, pairingCounts, settings.balanceWeight));
+  return { levelTier: "UNRESTRICTED", pool, arrangements };
+}
+
+function resolveLockedTier(
+  pool: Player[],
+  lockedPlacement: LockedPlacement,
+  lockedPlayers: Player[],
+  numToPick: number,
+  matchType: MatchType,
+  winRates: Map<string, number>,
+  pairingCounts: Map<string, number>,
+  balanceWeight: number
+): { levelTier: LevelTier; arrangements: Arrangement[] } {
+  if (pool.length < numToPick) {
+    return { levelTier: "UNRESTRICTED", arrangements: [] };
+  }
+
+  const newCombos = combinations(pool, numToPick);
+  const tiers: LevelTier[] = ["EXACT_LEVEL", "ADJACENT_LEVEL", "UNRESTRICTED"];
+
+  for (const tier of tiers) {
+    const filteredCombos =
+      tier === "UNRESTRICTED"
+        ? newCombos
+        : newCombos.filter((combo) => levelTierMatches(tier, [...lockedPlayers, ...combo]));
+    if (filteredCombos.length === 0) continue;
+
+    const fullGroups = filteredCombos.map((combo) => [...lockedPlayers, ...combo]);
+    const genderTier = pickGenderTier(fullGroups, matchType);
+    const raw = buildArrangementsLocked(lockedPlacement, filteredCombos, tier, genderTier);
+    if (raw.length === 0) continue;
+
+    const scored = raw.map((r) => scoreArrangement(r, matchType, winRates, pairingCounts, balanceWeight));
+    if (tier !== "UNRESTRICTED" && !hasFreshArrangement(scored)) continue;
+
+    return { levelTier: tier, arrangements: scored };
+  }
+
+  return { levelTier: "UNRESTRICTED", arrangements: [] };
 }
 
 // ---------------------------------------------------------------------------

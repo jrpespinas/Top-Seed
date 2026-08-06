@@ -7,67 +7,65 @@ Algorithm-driven matchup suggestion that balances competitive fairness, game int
 
 ## What Changed From Basic Suggestion
 Basic suggestion: take the next N players in queue order.
-Smart suggestion: draw a small rolling window of eligible players, score all valid arrangements within it, and return the best one.
+Smart suggestion: draw candidates from per-skill-level pools, score all valid arrangements within whichever pool is active, and return the best one.
 
 ---
 
 ## Candidate Pool
 
 ### Eligibility
-A player is eligible to appear in the window if they are:
+A player is eligible to appear in any candidate pool if they are:
 - In the **queue** for the current session (bench players are excluded)
 - Not currently in an `IN_PROGRESS` match
 
 Arrival order is determined by `sessionJoinedAt` on `QueueEntry` — the timestamp when the player first entered the session, which never resets on re-queue. This ensures players who checked in earlier retain their seniority even after returning from a match.
 
-### The Rolling Window
-Each planning card evaluates a **window of eligible players**, drawn in arrival order. The window is not a fixed slice — it's a rolling buffer that stays at a constant size across the whole planning-card sequence for a round:
+### Per-Level Candidate Pools
+Earlier versions of this algorithm drew every candidate from one shared, arrival-ordered window regardless of skill level — workable in small sessions, but in a large one (many courts, dozens of players) a single skill level can easily be scattered wider through the queue than any reasonably-sized shared window could see, so the same handful of same-level players nearby in arrival order keep getting matched against each other while others at that level, waiting just a bit further back, never become candidates.
 
-1. **Card 1** opens with the earliest *N* eligible players in the queue, where *N* is the effective window size (see below).
-2. It selects the best-scoring group (4 for doubles, 2 for singles) out of that window. The players **not** selected remain in the window.
-3. **Card 2's** window is topped back up to *N* by pulling in exactly as many *new* players from further down the queue as were just selected out — e.g. 4 leftover + 4 fresh arrivals for doubles.
-4. This repeats for every additional card/court opened in the same round: leftovers always carry forward, new arrivals only backfill the difference.
+Instead, for a **fresh, full-group suggestion** (an `empty` card, or the header Suggest button's full-generate case), candidates are drawn from a **dedicated pool for one specific skill level**, not a shared window:
 
-This keeps every card's decision scoped to the same constant field of *N* within a round, rather than a pool that grows with each additional court. A player who scores poorly against one window's competition isn't compared against an ever-larger field in the next round — they reappear in a same-sized window, which keeps their odds of eventually being picked from silently shrinking round over round.
-
-**Scaling the window with the waiting queue:** *N* is not always 10. A flat window starves skill-tier variety once a session gets large enough that same-level players outnumber the window — a small pool of Advanced players can end up matched against each other every single round, even when other Advanced players are waiting just past position 10 and never become candidates. To fix that without reopening the exact problem the fixed window solved (early arrivals buried under an ever-larger field), the effective window size scales with the *total number of players currently waiting* (queue entries not mid-match, session-wide — not scoped to this card's own exclusions):
+1. **Pick a level to serve.** Look at every eligible waiting player's skill level, and find the single player who's been waiting the longest overall (earliest `sessionJoinedAt`) — their level is the one this card tries to serve. (This is equivalent to, but simpler than, computing each level's own oldest member and comparing across levels: the single globally-oldest player's level *is* the level whose oldest member is earliest, by definition.)
+2. **Exact-level pool**: every eligible waiting player at that exact level, in arrival order, capped at `maxWindowSize` (24 — a defensive ceiling on the combinatorics, not a fairness dial, since a single level is already a naturally small slice of the session).
+3. **Adjacent-level pool**, tried only if the exact pool doesn't yield a fresh result (see "Freshness-Gated Escalation" below): every eligible waiting player at that level *or* its immediate neighbor rank, arrival-ordered, same cap. Individual groups drawn from this pool still must independently satisfy the adjacent-level spread rule (see Level Preference below) — the pool itself is just the union of who's allowed to appear.
+4. **Unrestricted pool**, tried only if both of the above fail: the full eligible queue, arrival-ordered, sized by the same scaled-window formula used previously:
 
 ```typescript
 function effectiveWindowSize(waitingCount: number): number {
   return clamp(Math.floor(waitingCount / 2), windowSize, maxWindowSize) // 10, 24
 }
 ```
+   Sessions under ~20 waiting see window 10 (unchanged); it scales up gradually past that, capping at 24 once ~48+ are waiting. `waitingCount` here is the full session-wide waiting count, not scoped to this card's own exclusions — "how much variety exists in the room" doesn't shrink just because earlier cards this round already claimed a few players.
 
-- **Sessions with under ~20 players waiting see no change at all** — the floor is today's constant (10).
-- Past that, the window grows roughly half as fast as the queue: 30 waiting → window 15, 40 waiting → window 20.
-- It caps at **24** once ~48+ players are waiting — a deliberate fairness ceiling, not a performance one (a window well past 24 is trivial to score client-side; the cap exists purely so early arrivals can't be diluted into an unbounded field).
-- Recomputed fresh on every `suggestMatchup` call from the live queue — never cached or persisted, and needs no new plumbing from callers since the function already receives the full queue.
+A **lock-and-fill** call (Resuggest or header Suggest touching a `proposed` card) works differently: the already-placed players already pin down most of the level context, so there's no "which level to serve" decision to make. It draws new candidates from one shared pool (the Unrestricted-sized window above) and tries the same Exact → Adjacent → Unrestricted progression by filtering *that* pool's combinations against the locked players, rather than building three separate per-level pools.
 
 **Minimum thresholds:**
-- Doubles needs at least 4 eligible players in the window; singles needs at least 2.
-- If the queue can't fill the window to that minimum (including all remaining eligible players), Smart Suggest is disabled for that card — no button rendered.
+- Doubles needs at least 4 eligible players in total; singles needs at least 2.
+- If there aren't enough eligible players anywhere in the queue to meet that minimum, Smart Suggest is disabled for that card — no button rendered.
 
 ---
 
 ## Scoring a Matchup
 
-For a given window, every valid group of players (a group of 4 for doubles, 2 for singles) drawn from that window, and every way to split that group into two sides, is a candidate arrangement. Each is scored; the highest-scoring one is suggested — subject to two gates applied before scoring narrows the candidate set: Level Preference first, Gender Preference second, nested inside it.
+Within whichever pool is currently being tried (Exact, Adjacent, or Unrestricted — see Per-Level Candidate Pools above), every valid group of players (a group of 4 for doubles, 2 for singles), and every way to split that group into two sides, is a candidate arrangement. Each is scored; the highest-scoring one is suggested — subject to two gates applied before scoring narrows the candidate set: Level Preference first, Gender Preference second, nested inside it.
 
-### 0a. Level Preference (outer gate, applied before scoring)
-"As much as possible, all players the same level" outranks everything else, including gender — a same-level mixed group is preferred over a same-gender group spanning several levels. In priority order:
+### 0a. Level Preference (outer gate) — Freshness-Gated Escalation
+"As much as possible, all players the same level" outranks everything else, including gender — a same-level mixed group is preferred over a same-gender group spanning several levels. But existence alone isn't enough to win a tier anymore: a level whose players have already played every combination of each other doesn't get to keep winning just because a same-level group is technically still possible — that let a small pool of Advanced players get stuck replaying each other every single round, which is exactly the bug this fixes. Tried in order, **escalating only when the current tier has no *fresh* (never-played-this-session) arrangement available**, not merely when a group exists:
 
-1. **Exact level** — every player in the group shares one skill level. If at least one exact-level group exists in the window, only exact-level groups continue to the gender gate.
-2. **Adjacent level** — the group's skill levels span at most one rank (e.g. B and A, but not B and S). Tried only if no exact-level group exists.
-3. **Unrestricted** — if neither tier is possible, level is dropped for this round.
+1. **Exact level** — every player shares one skill level, drawn from the Exact-level pool. Used only if at least one **fresh** exact-level arrangement exists there.
+2. **Adjacent level** — the group's skill levels span at most one rank (e.g. B and A, but not B and S), drawn from the Adjacent-level pool (the served level plus its immediate neighbor). Tried only once Exact has no fresh option left (either not enough same-level players, or every same-level arrangement has already been played) — used only if at least one **fresh** adjacent-level arrangement exists there.
+3. **Unrestricted** — tried only once Adjacent also has no fresh option. Level is dropped entirely for this round; the best-scoring arrangement is used regardless of freshness (this is the one tier where "best available" wins even if every option has already been played — see Repeat Pair Exhaustion below).
+
+A level with too few waiting players to form even one group behaves the same as a level whose groups are all stale: no fresh (or any) arrangement, escalate.
 
 ### 0b. Gender Preference (inner gate, applied within the chosen level tier)
-Real badminton has same-gender and mixed-gender formats; the suggestion prefers the more specific one when the window (already filtered to the chosen level tier) supports it, in this order:
+Real badminton has same-gender and mixed-gender formats; within whichever pool the level gate settled on, the suggestion prefers the more specific gender arrangement when that pool supports it, in this order:
 
 1. **Same-gender** — all 4 players (doubles) or both players (singles) share a gender. If at least one same-gender group exists, only same-gender groups are scored.
-2. **Mixed Doubles convention** (doubles only) — if no same-gender group exists but the level-filtered window has at least 2 men and 2 women, only groups of exactly 2-and-2 are considered, and only splits where each side has one of each gender (true mixed doubles, not an arbitrary split). This is the deliberate last resort: mixed gender is only ever reached after level compatibility has already been settled.
+2. **Mixed Doubles convention** (doubles only) — if no same-gender group exists but the pool has at least 2 men and 2 women, only groups of exactly 2-and-2 are considered, and only splits where each side has one of each gender (true mixed doubles, not an arbitrary split). This is the deliberate last resort: mixed gender is only ever reached after level compatibility has already been settled.
 3. **Unrestricted** — if neither tier is possible, gender is dropped for this round and all groups/splits (within the chosen level tier) are scored normally.
 
-Players with `gender` unset act as wildcards: they don't block a same-gender or mixed-doubles arrangement, and they aren't the reason one gets chosen either — they're simply excluded from the gender check itself. Between the two gates, up to 9 (level × gender) tier combinations are attempted in priority order before falling back to fully unrestricted.
+Players with `gender` unset act as wildcards: they don't block a same-gender or mixed-doubles arrangement, and they aren't the reason one gets chosen either — they're simply excluded from the gender check itself. Gender constraints can themselves eat into a level tier's freshness: with an odd gender split, some skill-valid splits may be gender-invalid, so a level's arrangements can run out of fresh *gender-valid* options sooner than its raw player count would suggest — which is a legitimate, expected reason to escalate, not a bug.
 
 ### 1. Balance Score (weight: 60%)
 Measures how evenly matched the two sides are using skill level only. Win rate no longer feeds this score directly — it only breaks ties, see the Win-Rate Balance tiebreak below.
@@ -159,16 +157,17 @@ When every possible arrangement available in the current window (after the gende
 - Falls back to the least-recently-paired arrangement among them
 - UI shows a subtle note: "All unique pairs used — suggesting least recently repeated"
 
-With a window of 10+ (scaling higher in larger sessions, see above) this is now a much rarer fallback than under a fixed 4-player pool, since the number of valid arrangements is far larger — but it can still happen in a small or long-running session.
+In practice this now almost always means the Exact and Adjacent pools were both exhausted and the search fell all the way to Unrestricted — with dedicated per-level pools doing most of the work of keeping arrangements fresh, actually reaching this fallback is rarer than it was even under the previous shared-window design, but it can still happen in a small or long-running session, or a level with very few players relative to how many rounds it's played.
 
 ---
 
 ## Multi-Court Handling
 
 When multiple planning cards are open at once (multiple courts to fill in the same round):
-- Card 1 draws the first window (sized per the effective-window formula above) and selects its group.
-- Card 2's window tops back up to that same size using leftovers from Card 1's window plus fresh arrivals (see "The Rolling Window" above), and so on for each additional card. The effective size stays constant across every card in one Suggest-All pass, since it's derived from the queue snapshot the whole batch shares — it only changes between separate suggestion actions, once the queue itself has actually moved (a court assignment, a new arrival, etc.).
-- Selected players are excluded from all subsequent cards' windows in the same round — nobody is suggested for two courts at once.
+- Card 1 looks at every eligible waiting player, finds whoever's been waiting longest overall, and serves *their* skill level first (see "Per-Level Candidate Pools" above) — ties fall back to raw arrival order, which is already how the "longest waiting" comparison is computed, so no separate tiebreak logic is needed.
+- Its picked players are excluded from every subsequent card's pools in the same round — nobody is suggested for two courts at once, and a level that just lost its available players to Card 1 won't be servable again until the round changes.
+- Card 2 repeats the same "who's waited longest now" search against the reduced pool, and so on for each additional card. This means the level served can change from card to card within one round — e.g. Card 1 serves Beginner (the longest-waiting player happened to be a Beginner), Card 2 then serves Advanced (now the longest-waiting *remaining* player is Advanced) — there's no fixed rotation order beyond "whoever's waited longest, right now."
+- The Unrestricted tier's window (used only once a card's chosen level is fully exhausted) stays sized consistently across one Suggest-All pass, since `waitingCount` is computed from the same queue snapshot the whole batch shares; it only changes between separate suggestion actions, once the queue itself has actually moved (a court assignment, a new arrival, etc.).
 
 ---
 
@@ -178,7 +177,7 @@ When multiple planning cards are open at once (multiple courts to fill in the sa
 Each planning card on the Dashboard is independently powered by the Smart Suggest algorithm:
 - Cards are auto-generated on session load (default 3); the `↺ Resuggest` button re-runs the algorithm for a single card
 - No scores or percentages are shown — just the suggested players on each side
-- Cards draw from the rolling window described above (10+, scaling with session size), in card order
+- Cards draw from per-level candidate pools described above, serving whichever skill level has waited longest at the time each card is filled
 - If fewer eligible candidates exist than the match type requires, the card shows an **Empty** state with a "Not enough players" note — no button rendered
 
 ### The Suggest Button (header, fills every open card)
@@ -234,8 +233,8 @@ type MatchupSuggestion = {
 
 | Constant | Default | Description |
 |---|---|---|
-| `windowSize` | 10 | Floor of the candidate window — the flat size any session under ~20 waiting still sees |
-| `maxWindowSize` | 24 | Ceiling the window scales up to as the waiting queue grows (see "Scaling the window" above) |
+| `windowSize` | 10 | Floor of the Unrestricted-tier window — the flat size any session under ~20 waiting still sees |
+| `maxWindowSize` | 24 | Ceiling both the Unrestricted window and any single Exact/Adjacent level pool scale up to — defensive on the combinatorics, not a fairness dial for the level pools (see "Per-Level Candidate Pools" above) |
 | `skipCapThreshold` | 2 | Consecutive skips before a player is force-included |
 
 ---
@@ -276,11 +275,14 @@ async function getSessionSkipCount(playerId: string, sessionId: string): Promise
 - **Bench player manually dragged into a planning card**: allowed — the drag-to-card flow is a manual override, not algorithm-driven
 - **`balanceWeight` set to 1.0**: novelty ignored entirely; pure skill balance
 - **`balanceWeight` set to 0.0**: novelty only; ignores skill balance
-- **Window can't support any exact-level or adjacent-level group**: level preference silently drops to unrestricted for that card; no UI note needed
-- **Window can't support any same-gender or mixed-doubles group within the chosen level tier**: gender preference silently drops to unrestricted within that tier; no UI note needed
-- **Fewer than 10 eligible players remain in the queue**: window is simply capped at whatever's available; falls through to the standard "not enough players" disable if it drops below the match-type minimum
-- **A player hits the skip cap or is on their first game, while also being the only option for a same-gender/mixed-doubles or same/adjacent-level slot**: force-inclusion still respects the active level and gender tiers — they're forced into a valid arrangement within those tiers, not into a tier the window doesn't support
-- **Lock-and-fill (Resuggest or header Suggest on a `proposed` card) can't cover the remaining open slots**: the card's existing placement is left exactly as it was — never wiped back to empty just because a fill attempt came up short
+- **The served level's Exact and Adjacent pools both fail to produce a fresh arrangement**: level preference drops to Unrestricted for that card; no UI note needed
+- **The chosen level pool can't support any same-gender or mixed-doubles group**: gender preference silently drops to unrestricted within that tier; no UI note needed
+- **An odd gender split eliminates some skill-valid arrangements** (e.g. 3 men and 1 woman among 4 same-level players — no valid mixed-doubles split exists, only one specific same-gender-per-side split does): the level's fresh-arrangement count can run out sooner than raw player count would suggest, since gender-invalid splits never count toward freshness in the first place — a legitimate, expected trigger for escalation, not a bug. Verified directly: a 4-player Advanced-only pool with a 2M/2F split only has 2 of its 3 possible doubles splits pass the mixed-doubles gender check, so it escalates to Adjacent after 2 rounds, not 3.
+- **A skill level has too few waiting players to form even one group** (e.g. only 2 Advanced players waiting, doubles needs 4): behaves identically to a level whose groups are all stale — no fresh (or any) arrangement, escalate to Adjacent.
+- **Fewer than 10 eligible players remain in the queue overall**: the Unrestricted-tier window is simply capped at whatever's available; falls through to the standard "not enough players" disable if it drops below the match-type minimum
+- **A player hits the skip cap or is on their first game, while also being the only option for a same-gender/mixed-doubles or same/adjacent-level slot**: force-inclusion still respects the active level and gender tiers — they're forced into a valid arrangement within whichever pool is active, not into a tier that pool doesn't support
+- **Lock-and-fill (Resuggest or header Suggest on a `proposed` card) can't cover the remaining open slots at any tier**: the card's existing placement is left exactly as it was — never wiped back to empty just because a fill attempt came up short
 - **Header Suggest clicked with no `empty` or `proposed` cards**: behaves like the old single-card Suggest — adds one new card and fills it
-- **Header Suggest with multiple `proposed` cards contending for the same small pool of remaining queue players**: cards are filled in on-screen order; a card later in the list may end up left as-is (or only partially improved) if earlier cards in the same pass already claimed the available candidates — same "first come, first filled" principle as the existing round-robin multi-card exclusion
-- **A player checks in or gets assigned to a court mid-round, changing the waiting count right at a scaling threshold (e.g. 19 → 20)**: harmless — the next `suggestMatchup` call simply recomputes the effective window size from the current queue; there's no stored "locked-in" window size to go stale
+- **Header Suggest filling multiple cards in one pass**: each card independently re-evaluates "who's waited longest now" against the pool already reduced by earlier cards in the same pass (see Multi-Court Handling) — the level served can change from card to card, and a card later in the list may end up left as-is if earlier cards already claimed the only players who could've filled it.
+- **A player checks in or gets assigned to a court mid-round, changing the waiting count right at the Unrestricted tier's scaling threshold (e.g. 19 → 20)**: harmless — the next `suggestMatchup` call simply recomputes it from the current queue; there's no stored "locked-in" window size to go stale
+- **Two levels tie for "longest waiting" exactly**: can't actually happen — the comparison is a strict less-than over parsed timestamps, so the first one encountered in queue order wins deterministically; no separate tiebreak rule was needed.
