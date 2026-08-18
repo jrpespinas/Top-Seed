@@ -56,7 +56,7 @@ export function CourtsSection({
 
         <button
           onClick={onAdd}
-          className="flex items-center gap-1 text-xs font-medium text-ink bg-surface-elevated hover:bg-surface-elevated/70 px-2 py-1.5 rounded-sm border border-border transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-border"
+          className="flex items-center gap-1 text-xs font-medium text-primary bg-surface-elevated hover:bg-primary/[0.07] px-2 py-1.5 rounded-sm border border-primary/25 hover:border-primary/40 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
           aria-label="Add a court"
         >
           Add

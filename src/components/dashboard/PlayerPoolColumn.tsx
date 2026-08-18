@@ -583,7 +583,6 @@ export function PlayerPoolColumn({
   const waitingQueue = allWaiting.filter((e) => !slottedPlayerIds.has(e.player.id));
   const matchedQueue = allWaiting.filter((e) => slottedPlayerIds.has(e.player.id));
   const waitingCount = waitingQueue.length;
-  const isPanelEmpty = queue.length === 0 && bench.length === 0;
   const displayQueue = useMemo(() => {
     const filtered =
       skillFilter.size > 0 ? waitingQueue.filter((e) => skillFilter.has(e.player.skillLevel)) : waitingQueue;
@@ -697,12 +696,7 @@ export function PlayerPoolColumn({
             <button
               data-tutorial-target="add-players-button"
               onClick={() => setIsAddModalOpen(true)}
-              className={cn(
-                "flex items-center gap-1 text-xs font-medium px-2 py-1.5 rounded-sm border transition-colors focus-visible:outline-none focus-visible:ring-2",
-                isPanelEmpty
-                  ? "text-primary bg-primary/10 border-primary/30 hover:bg-primary/15 focus-visible:ring-primary/50"
-                  : "text-ink bg-surface-elevated hover:bg-surface-elevated/70 border-border focus-visible:ring-border"
-              )}
+              className="flex items-center gap-1 text-xs font-medium text-primary bg-surface-elevated hover:bg-primary/[0.07] px-2 py-1.5 rounded-sm border border-primary/25 hover:border-primary/40 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
               aria-label="Add players"
             >
               Add

@@ -67,7 +67,7 @@ export function MatchupColumn({
             <button
               data-tutorial-target="suggest-button"
               onClick={onSuggestCard}
-              className="flex items-center gap-1 text-xs font-semibold bg-primary/10 hover:bg-primary text-primary hover:text-bg px-2.5 py-1.5 rounded-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
+              className="flex items-center gap-1 text-xs font-semibold bg-primary hover:bg-primary-hover text-bg px-2.5 py-1.5 rounded-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
               aria-label="Fill every open and partial matchup card from the queue"
               title="Fill every open and partial matchup card"
             >
@@ -75,7 +75,7 @@ export function MatchupColumn({
             </button>
             <button
               onClick={onAddCard}
-              className="flex items-center gap-1 text-xs font-medium text-ink bg-surface-elevated hover:bg-surface-elevated/70 px-2 py-1.5 rounded-sm border border-border transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-border"
+              className="flex items-center gap-1 text-xs font-medium text-primary bg-surface-elevated hover:bg-primary/[0.07] px-2 py-1.5 rounded-sm border border-primary/25 hover:border-primary/40 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
               aria-label="Add matchup card"
             >
               Add
