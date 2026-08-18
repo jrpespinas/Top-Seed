@@ -21,7 +21,7 @@ function makeRow(name: string): DraftRow {
   return {
     id: `draft-${Math.random().toString(36).slice(2)}`,
     name,
-    skillLevel: "C",
+    skillLevel: "INTERMEDIATE",
     gender: undefined,
   };
 }
@@ -90,7 +90,7 @@ export function AddPlayersModal({ isOpen, onClose, onSubmit, existingPlayerNames
   // row is hand-edited it can drift from this without the bulk control trying
   // to reflect or fight that. Matches the per-row default ("C") so its
   // initial state isn't a lie about what's already applied.
-  const [bulkLevel, setBulkLevel] = useState<SkillLevel>("C");
+  const [bulkLevel, setBulkLevel] = useState<SkillLevel>("INTERMEDIATE");
   // Same "set everyone to X" trigger as bulkLevel, but starts unset — unlike
   // skill level, no row has a real default gender, so a starting value here
   // would claim a choice nobody made.
@@ -104,7 +104,7 @@ export function AddPlayersModal({ isOpen, onClose, onSubmit, existingPlayerNames
   const dialogRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const nameInputRefs = useRef<Map<string, HTMLInputElement>>(new Map());
-  const rowCardRefs = useRef<Map<string, HTMLDivElement>>(new Map());
+  const rowCardRefs = useRef<Map<string, HTMLTableRowElement>>(new Map());
   // GenderToggle doesn't forward a ref itself — this wraps each row's
   // instance so a failed submit can focus its first pill directly, not just
   // scroll the row into view (a keyboard/screen-reader user needs the former).
@@ -129,7 +129,7 @@ export function AddPlayersModal({ isOpen, onClose, onSubmit, existingPlayerNames
     setStep("paste");
     setPasteText("");
     setRows([]);
-    setBulkLevel("C");
+    setBulkLevel("INTERMEDIATE");
     setBulkGender(undefined);
     setError("");
     setDiscardConfirm(false);
@@ -504,114 +504,54 @@ export function AddPlayersModal({ isOpen, onClose, onSubmit, existingPlayerNames
                 </div>
               )}
 
-              {isSingle ? (
-                // Centered and generously spaced rather than stretched to
-                // fill — this is the one player the organizer is looking at,
-                // not a grid cell that happened to end up alone.
-                <div className="flex-1 flex items-center justify-center">
-                  {rows.map((row, idx) => (
-                    <div
-                      key={row.id}
-                      ref={(el) => {
-                        if (el) rowCardRefs.current.set(row.id, el);
-                        else rowCardRefs.current.delete(row.id);
-                      }}
-                      className={cn(
-                        "w-full border rounded-lg p-6 space-y-5",
-                        duplicateNameRowIds.has(row.id) ? "border-error/50" : "border-border"
-                      )}
-                    >
-                      <div className="flex items-start gap-2">
-                        <div className="flex-1 min-w-0 space-y-1.5">
-                          <label
-                            htmlFor={`player-name-${row.id}`}
-                            className="block text-xs font-medium text-muted"
-                          >
-                            Player name
-                          </label>
-                          <input
-                            id={`player-name-${row.id}`}
-                            ref={(el) => {
-                              if (el) nameInputRefs.current.set(row.id, el);
-                              else nameInputRefs.current.delete(row.id);
-                            }}
-                            type="text"
-                            value={row.name}
-                            onChange={(e) => updateRow(row.id, { name: e.target.value })}
-                            onKeyDown={(e) => handleNameKeyDown(e, idx)}
-                            aria-invalid={duplicateNameRowIds.has(row.id) ? true : undefined}
-                            autoComplete="off"
-                            className={cn(
-                              "w-full bg-bg border rounded-md px-3.5 py-3 text-base text-ink",
-                              "focus:outline-none focus:ring-2 focus:border-primary/50",
-                              "transition-colors duration-150",
-                              duplicateNameRowIds.has(row.id)
-                                ? "border-error/50 focus:ring-error/40"
-                                : "border-border focus:ring-primary/50"
-                            )}
-                          />
-                          {duplicateNameRowIds.has(row.id) && (
-                            <p className="text-xs text-error">
-                              {duplicateNameRowIds.get(row.id) === "existing"
-                                ? "Already in this session"
-                                : "Matches another row"}
-                            </p>
-                          )}
-                        </div>
-                        <button
-                          type="button"
-                          onClick={() => removeRow(row.id)}
-                          className="text-muted hover:text-error hover:bg-error/10 rounded-md transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-error/40 min-h-[44px] min-w-[44px] flex items-center justify-center flex-shrink-0 mt-5"
-                          aria-label={`Remove ${row.name.trim() || "player"}`}
-                        >
-                          <X size={16} strokeWidth={2} aria-hidden />
-                        </button>
-                      </div>
-                      <div className="grid grid-cols-2 gap-4">
-                        <div className="space-y-1.5">
-                          <span className="block text-xs font-medium text-muted">Skill level</span>
-                          <SkillLevelSelect
-                            value={row.skillLevel}
-                            onChange={(level) => updateRow(row.id, { skillLevel: level })}
-                            className="w-full"
-                          />
-                        </div>
-                        <div className="space-y-1.5">
-                          <span className="block text-xs font-medium text-muted">Gender</span>
-                          <div
-                            ref={(el) => {
-                              if (el) genderToggleRefs.current.set(row.id, el);
-                              else genderToggleRefs.current.delete(row.id);
-                            }}
-                          >
-                            <GenderToggle
-                              value={row.gender}
-                              onChange={(gender) => updateRow(row.id, { gender })}
-                              variant="full"
-                              error={missingGenderRowIds.has(row.id)}
-                            />
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                  {rows.map((row, idx) => (
-                    <div
-                      key={row.id}
-                      ref={(el) => {
-                        if (el) rowCardRefs.current.set(row.id, el);
-                        else rowCardRefs.current.delete(row.id);
-                      }}
-                      className={cn(
-                        "border rounded-md p-3 space-y-2",
-                        duplicateNameRowIds.has(row.id) ? "border-error/50" : "border-border"
-                      )}
-                    >
-                      <div className="flex items-start gap-1.5">
-                        <div className="flex-1 min-w-0 space-y-1">
+              {/* A single real <table>, reflowed to a stacked flex "row-card"
+                  below `sm:` and a true table (sticky header, one <tr> per
+                  player) at `sm:`+ — not two parallel markups. Duplicating
+                  the interactive cells per breakpoint would register two
+                  DOM nodes per row.id in nameInputRefs/rowCardRefs/
+                  genderToggleRefs (focus-management, scroll-to-invalid-row,
+                  and Enter-to-next-row all key off those maps), and whichever
+                  copy mounts last — not whichever is actually visible —
+                  would silently win. CSS-only reflow keeps exactly one
+                  input, one row ref, and one GenderToggle per player. */}
+              <table className="w-full block sm:table sm:border-collapse" aria-label="Players to add">
+                <thead className="hidden sm:table-header-group">
+                  <tr className="sm:table-row">
+                    <th scope="col" className="sticky top-0 z-[1] bg-surface text-left text-xs font-medium text-muted pb-2 pr-2">
+                      Name
+                    </th>
+                    <th scope="col" className="sticky top-0 z-[1] bg-surface text-left text-xs font-medium text-muted pb-2 pr-2">
+                      Skill
+                    </th>
+                    <th scope="col" className="sticky top-0 z-[1] bg-surface text-left text-xs font-medium text-muted pb-2 pr-2">
+                      Gender
+                    </th>
+                    <th scope="col" className="sticky top-0 z-[1] bg-surface pb-2 w-9">
+                      <span className="sr-only">Remove</span>
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="block sm:table-row-group">
+                  {rows.map((row, idx) => {
+                    const isDuplicate = duplicateNameRowIds.has(row.id);
+                    return (
+                      <tr
+                        key={row.id}
+                        ref={(el) => {
+                          if (el) rowCardRefs.current.set(row.id, el);
+                          else rowCardRefs.current.delete(row.id);
+                        }}
+                        className={cn(
+                          "flex flex-wrap items-start gap-x-2 gap-y-2 border rounded-md p-3 mb-2.5 last:mb-0",
+                          "sm:table-row sm:flex-none sm:border-0 sm:rounded-none sm:p-0 sm:mb-0 sm:gap-0",
+                          "sm:border-b sm:border-border/60 sm:last:border-b-0",
+                          isDuplicate ? "border-error/50 sm:bg-error/5" : "border-border"
+                        )}
+                      >
+                        <td className="order-1 flex-1 min-w-0 sm:table-cell sm:py-2 sm:pr-2 sm:align-top">
+                          <span aria-hidden className="sm:hidden block text-[10px] font-medium text-muted mb-1">
+                            Name
+                          </span>
                           <input
                             ref={(el) => {
                               if (el) nameInputRefs.current.set(row.id, el);
@@ -622,59 +562,67 @@ export function AddPlayersModal({ isOpen, onClose, onSubmit, existingPlayerNames
                             onChange={(e) => updateRow(row.id, { name: e.target.value })}
                             onKeyDown={(e) => handleNameKeyDown(e, idx)}
                             aria-label={`Player ${idx + 1} name`}
-                            aria-invalid={duplicateNameRowIds.has(row.id) ? true : undefined}
+                            aria-invalid={isDuplicate ? true : undefined}
                             autoComplete="off"
                             className={cn(
-                              "w-full bg-bg border rounded-md px-2.5 py-2 text-base lg:text-sm text-ink",
+                              "w-full bg-bg border rounded-md px-2.5 py-2 text-base sm:text-sm text-ink",
                               "focus:outline-none focus:ring-2 focus:border-primary/50",
                               "transition-colors duration-150",
-                              duplicateNameRowIds.has(row.id)
-                                ? "border-error/50 focus:ring-error/40"
-                                : "border-border focus:ring-primary/50"
+                              isDuplicate ? "border-error/50 focus:ring-error/40" : "border-border focus:ring-primary/50"
                             )}
                           />
-                          {duplicateNameRowIds.has(row.id) && (
-                            <p className="text-xs text-error">
+                          {isDuplicate && (
+                            <p className="text-xs text-error mt-1">
                               {duplicateNameRowIds.get(row.id) === "existing"
                                 ? "Already in this session"
                                 : "Matches another row"}
                             </p>
                           )}
-                        </div>
-                        <button
-                          type="button"
-                          onClick={() => removeRow(row.id)}
-                          className="text-muted hover:text-error hover:bg-error/10 rounded-md transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-error/40 min-h-[36px] min-w-[36px] flex items-center justify-center flex-shrink-0"
-                          aria-label={`Remove ${row.name.trim() || `player ${idx + 1}`}`}
-                        >
-                          <X size={14} strokeWidth={2} aria-hidden />
-                        </button>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <SkillLevelSelect
-                          value={row.skillLevel}
-                          onChange={(level) => updateRow(row.id, { skillLevel: level })}
-                          className="flex-1"
-                          hideLabel
-                        />
-                        <div
-                          ref={(el) => {
-                            if (el) genderToggleRefs.current.set(row.id, el);
-                            else genderToggleRefs.current.delete(row.id);
-                          }}
-                        >
-                          <GenderToggle
-                            value={row.gender}
-                            onChange={(gender) => updateRow(row.id, { gender })}
-                            variant="compact"
-                            error={missingGenderRowIds.has(row.id)}
+                        </td>
+                        <td className="order-3 w-1/2 sm:table-cell sm:w-auto sm:py-2 sm:pr-2 sm:align-top">
+                          <span aria-hidden className="sm:hidden block text-[10px] font-medium text-muted mb-1">
+                            Skill
+                          </span>
+                          <SkillLevelSelect
+                            value={row.skillLevel}
+                            onChange={(level) => updateRow(row.id, { skillLevel: level })}
+                            className="w-full"
+                            hideLabel
                           />
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
+                        </td>
+                        <td className="order-4 w-1/2 sm:table-cell sm:w-auto sm:py-2 sm:pr-2 sm:align-top">
+                          <span aria-hidden className="sm:hidden block text-[10px] font-medium text-muted mb-1">
+                            Gender
+                          </span>
+                          <div
+                            ref={(el) => {
+                              if (el) genderToggleRefs.current.set(row.id, el);
+                              else genderToggleRefs.current.delete(row.id);
+                            }}
+                          >
+                            <GenderToggle
+                              value={row.gender}
+                              onChange={(gender) => updateRow(row.id, { gender })}
+                              variant="compact"
+                              error={missingGenderRowIds.has(row.id)}
+                            />
+                          </div>
+                        </td>
+                        <td className="order-2 flex-shrink-0 sm:table-cell sm:w-9 sm:py-2 sm:align-top">
+                          <button
+                            type="button"
+                            onClick={() => removeRow(row.id)}
+                            className="text-muted hover:text-error hover:bg-error/10 rounded-md transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-error/40 min-h-[36px] min-w-[36px] flex items-center justify-center flex-shrink-0"
+                            aria-label={`Remove ${row.name.trim() || `player ${idx + 1}`}`}
+                          >
+                            <X size={14} strokeWidth={2} aria-hidden />
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
 
               {error && (
                 <p className="text-xs text-error mt-3" role="alert">

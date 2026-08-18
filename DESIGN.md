@@ -204,21 +204,28 @@ Extracted to `useConfirmFocus(isConfirming, swapped?)` in `src/hooks/useConfirmF
 
 ### Skill Badge
 
-The most frequently rendered component — appears on every player row, chip, and picker. A compact badge (`h-5`, `rounded-sm` 4px, content-width) in JetBrains Mono Bold at 10px. Seven levels (S → F) map to a named-tier material ladder — Newbie → Bronze → Silver → Gold → Emerald → Platinum → Diamond — not an arbitrary rainbow. The ladder deliberately does **not** put warm copper at the top: copper reads as "bronze" in every familiar ranking vocabulary, a low tier, not the summit. "Professional" (S) is the coolest, brightest, most saturated step instead — Diamond, not Bronze.
+The most frequently rendered component — appears on every player row, chip, and picker. A compact badge (`h-5`, or `h-4` in `dense` contexts, `rounded-sm` 4px, content-width) in JetBrains Mono Bold at 10px / 9px.
 
-**Skill badge colors are identical in both themes** — the one deliberate exception to this system's usual dark/light color-pair convention. A skill badge is a fixed medal, not theme-adaptive body text; the `--color-skill-*` tokens are defined once in `:root` and intentionally not redefined under `[data-theme="light"]`. Label text is plain `text-black` (Tailwind's built-in, not a custom CSS-variable token) — fixed pure black needs no theme variant and no indirection to stay correct.
+Four levels map to a **rarity ladder**, not a materials one: Casual (slate) → Beginner (teal) → Intermediate (indigo) → Advanced (orchid).
 
-| Level | Tier | Background | Text | Border |
-|-------|------|-----------|------|--------|
-| S | Diamond | `bg-skill-s` (solid) | `text-black` | `border-skill-s/50` |
-| A | Platinum | `bg-skill-a` (solid) | `text-black` | `border-skill-a/50` |
-| B | Emerald | `bg-skill-b` (solid) | `text-black` | `border-skill-b/50` |
-| C | Gold | `bg-skill-c` (solid) | `text-black` | `border-skill-c/50` |
-| D | Silver | `bg-skill-d` (solid) | `text-black` | `border-skill-d/50` |
-| E | Bronze | `bg-skill-e` (solid) | `text-black` | `border-skill-e/50` |
-| F | Newbie | `bg-skill-f` (solid) | `text-black` | `border-skill-f/50` |
+**Why not bronze/silver/gold.** That was the first instinct and it's wrong for this palette, because the brand itself is a metal. Primary is copper at H38, which makes "bronze" (H40) indistinguishable from it; "gold" (H92) sits beside the amber warning (H75); "diamond/steel" (H235) sits beside the accent (H220). A metals ladder competes with the semantic palette for the same arc of the wheel — in the previous seven-tier ramp every tier landed within 17° of a semantic role, and two within 2°.
 
-**The Filled Tier Rule.** Every level is a solid fill, not just the top ones — a real medal at every rank, not a tinted chip that fades toward invisible at the bottom. An earlier version faded low tiers down to a 3-16% background tint; that read as "forgot to color this one," not "deliberately restrained." Rank now reads through hue temperature and chroma alone (warm/muted low tiers → cool/vivid high tiers), carried by a uniform fill treatment across all seven. Text is always plain `text-black`, never the theme-relative `text-bg` — since the fill color itself doesn't change between themes, the label color can't either, and a fixed value needs no custom token. Never use a color outside this table for skill levels — the gradation is the signal.
+The ladder therefore lives in the cool half, which the semantic palette leaves nearly empty, and borrows the rarity convention instead (common gray → rare → epic). **Chroma and lightness both climb monotonically with rank.** That redundancy is the point: it's what keeps the ordinal readable at 9px and under red-green colour-vision deficiency, where hue alone would carry neither. Casual sits deliberately close to neutral — "unranked" should read as the absence of a colour rather than a colour of its own.
+
+| Level | Tier | OKLCH | Background | Text | Border |
+|-------|------|-------|-----------|------|--------|
+| ADVANCED | Orchid | `0.790 0.165 312` | `bg-skill-advanced` (solid) | `text-black` | `border-skill-advanced/50` |
+| INTERMEDIATE | Indigo | `0.775 0.125 268` | `bg-skill-intermediate` (solid) | `text-black` | `border-skill-intermediate/50` |
+| BEGINNER | Teal | `0.760 0.105 185` | `bg-skill-beginner` (solid) | `text-black` | `border-skill-beginner/50` |
+| CASUAL | Slate | `0.680 0.015 250` | `bg-skill-casual` (solid) | `text-black` | `border-skill-casual/50` |
+
+Measured separations: adjacent tiers ΔE 0.12–0.15; closest approach to any semantic role ΔE 0.30; black label ≥7:1 on every fill.
+
+**Skill badge colors are identical in both themes** — the one deliberate exception to this system's usual dark/light color-pair convention. A skill badge is a fixed medal, not theme-adaptive body text; the `--color-skill-*` tokens are defined once in `:root` and intentionally not redefined under `[data-theme="light"]`. Label text is plain `text-black` — fixed pure black needs no theme variant and no indirection to stay correct against fills that all sit at L ≥ 0.68.
+
+The parallel `--color-skill-*-ink` tokens **are** theme-adaptive. They exist for anything that needs a tier colour as *text*: the fills would land around 1.5:1 on white, so the light theme darkens them into the L 0.45 band.
+
+**The Filled Tier Rule.** Every level is a solid fill, not just the top ones — a real medal at every rank, not a tinted chip that fades toward invisible at the bottom. This was briefly abandoned for an outlined treatment borrowed from a dark-themed reference app; it didn't survive a dense light-themed list. Outlining moves rank into a 1px border and 9px glyph strokes — roughly a quarter the coloured area of a fill, most of it thin strokes — and the badge's whole job is peripheral rank recognition down twenty rows. Area is what does that. Never use a color outside this table for skill levels; the gradation is the signal.
 
 ### Gender Icon
 

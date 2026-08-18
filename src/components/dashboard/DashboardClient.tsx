@@ -24,10 +24,18 @@ import {
   useSessionCourts,
   useSessionPlanningCards,
   useSmartMatchupSkipCounts,
+  useSmartMatchupRoundsSinceServed,
   appendSortedByCheckIn,
   buildDefaultPlanningCards,
 } from "@/lib/session-store";
 import { suggestMatchup, type LockedPlacement } from "@/lib/smart-matchup";
+import {
+  resolveSwap,
+  playerAt,
+  sameEndpoint,
+  type Endpoint,
+  type RosterState,
+} from "@/lib/roster-swap";
 import type { TutorialLiveState } from "@/lib/tutorial-store";
 import { useToast, ToastViewport } from "@/components/ui/Toast";
 
@@ -84,6 +92,47 @@ interface Props {
 }
 
 export type SlotAddress = { cardId: string; side: "A" | "B"; index: number };
+export type CourtSlotAddress = { courtId: string; side: "A" | "B"; index: number };
+
+// One dataTransfer type for every drag origin. Before court rows became a swap
+// source there were two (x-player for queue rows, x-slot for placed chips) and
+// each drop target parsed both; a third would have made every target a
+// three-branch parse. The payload is a roster-swap Endpoint, so a drop is just
+// `resolveSwap(dragged, target)` regardless of where the drag started.
+export const ENDPOINT_MIME = "application/x-endpoint";
+
+export function readEndpointPayload(e: React.DragEvent): Endpoint | null {
+  const raw = e.dataTransfer.getData(ENDPOINT_MIME);
+  if (!raw) return null;
+  try {
+    return JSON.parse(raw) as Endpoint;
+  } catch {
+    return null;
+  }
+}
+
+export function writeEndpointPayload(e: React.DragEvent, endpoint: Endpoint) {
+  e.dataTransfer.setData(ENDPOINT_MIME, JSON.stringify(endpoint));
+  // The payload itself is unreadable during dragover (getData is blocked until
+  // drop), but the *list of types* is readable — so the origin kind rides in a
+  // second, valueless type. That's what lets an empty planning-card slot stay
+  // visually inert for a court player instead of lighting up and then rejecting
+  // the drop it just advertised.
+  e.dataTransfer.setData(`${ENDPOINT_MIME}-${endpoint.kind}`, "1");
+  e.dataTransfer.effectAllowed = "move";
+}
+
+// Which kind of position a drag started from, readable during dragover (the
+// payload itself is not). Drop targets need this to decide whether to light up
+// at all: a target that highlights and then refuses the drop is worse than one
+// that never highlights.
+export function dragEndpointKind(e: React.DragEvent): Endpoint["kind"] | null {
+  const types = Array.from(e.dataTransfer.types);
+  for (const kind of ["queue", "bench", "card", "court"] as const) {
+    if (types.includes(`${ENDPOINT_MIME}-${kind}`)) return kind;
+  }
+  return null;
+}
 
 export function DashboardClient({ sessionId, onTutorialCheck }: Props) {
   const [courts, setCourts] = useSessionCourts([]);
@@ -91,11 +140,11 @@ export function DashboardClient({ sessionId, onTutorialCheck }: Props) {
   const [planningCards, setPlanningCards] = useSessionPlanningCards(buildDefaultPlanningCards());
   const [bench, setBench] = useSessionBench([]);
   const [draggingCardId, setDraggingCardId] = useState<string | null>(null);
-  const [selectedPlayer, setSelectedPlayer] = useState<Player | null>(null);
-  // Chip selection lives here, not inside PlanningCard, so a chip selected in
-  // one card can be relocated or swapped into a slot on a different card —
-  // the same reason selectedPlayer (queue tap-to-place) already lives here.
-  const [selectedChip, setSelectedChip] = useState<SlotAddress | null>(null);
+  // A single armed position, not one state per source kind. Selection lives
+  // here rather than inside any one panel because a swap can cross panels —
+  // a court row armed here can land on a chip in the Matchups column or a row
+  // in the Players column.
+  const [selection, setSelection] = useState<Endpoint | null>(null);
   // Counts genuine relocate/swap actions — not a proxy like "2+ players
   // placed" (which Suggest can satisfy in one click, letting the tutorial's
   // Relocate step advance without the organizer ever doing one). Only
@@ -125,6 +174,7 @@ export function DashboardClient({ sessionId, onTutorialCheck }: Props) {
   }, []);
   const matches = useMatchLog();
   const [skipCounts, setSkipCounts] = useSmartMatchupSkipCounts();
+  const [roundsSinceServed, setRoundsSinceServed] = useSmartMatchupRoundsSinceServed();
   const sessionMatches = useMemo(
     () => matches.filter((m) => m.sessionId === sessionId),
     [matches, sessionId]
@@ -174,11 +224,97 @@ export function DashboardClient({ sessionId, onTutorialCheck }: Props) {
     return ids;
   }, [planningCards]);
 
+  const rosterState = useMemo<RosterState>(
+    () => ({ queue, bench, cards: planningCards, courts }),
+    [queue, bench, planningCards, courts]
+  );
+
+  const selectedChip: SlotAddress | null =
+    selection?.kind === "card"
+      ? { cardId: selection.cardId, side: selection.side, index: selection.index }
+      : null;
+  const selectedCourtSlot: CourtSlotAddress | null =
+    selection?.kind === "court"
+      ? { courtId: selection.courtId, side: selection.side, index: selection.index }
+      : null;
+  const selectedPoolPlayerId =
+    selection?.kind === "queue" || selection?.kind === "bench" ? selection.playerId : null;
+  // Deliberately NOT `selectedPlayer` — an empty planning-card slot may only
+  // light up as a drop target for a pool player. A court player armed for a
+  // swap can't land there (a live match can't be left short), so treating any
+  // armed player as placeable would advertise a move that gets rejected.
+  const selectedPoolPlayer = useMemo(
+    () => (selectedPoolPlayerId ? playerAt(rosterState, selection!) : null),
+    [rosterState, selection, selectedPoolPlayerId]
+  );
+
+  // Every move in the three panels funnels through here: resolve against the
+  // current roster, apply the result wholesale, and offer a single undo that
+  // restores the exact prior state. The old per-handler undos each rebuilt
+  // their own inverse by hand, which is where the queue-entry bookkeeping was
+  // easiest to get subtly wrong.
+  const applySwap = useCallback(
+    (from: Endpoint, to: Endpoint) => {
+      const before = rosterState;
+      const result = resolveSwap(before, from, to);
+      if (!result.ok) {
+        if (result.message) showToast(result.message);
+        setSelection(null);
+        return;
+      }
+      const { next } = result;
+      if (next.queue !== before.queue) setQueue(next.queue);
+      if (next.bench !== before.bench) setBench(next.bench);
+      if (next.cards !== before.cards) setPlanningCards(next.cards);
+      if (next.courts !== before.courts) setCourts(next.courts);
+      // Only card-to-card moves count as the tutorial's "relocate" gesture —
+      // the same restriction the old handleRelocatePlacedPlayer enforced.
+      if (from.kind === "card" && to.kind === "card") setRelocateEventCount((c) => c + 1);
+      if (result.message) {
+        showToast(
+          result.message,
+          () => {
+            setQueue(before.queue);
+            setBench(before.bench);
+            setPlanningCards(before.cards);
+            setCourts(before.courts);
+          },
+          result.undoLabel ?? undefined
+        );
+      }
+      setSelection(null);
+    },
+    [rosterState, showToast, setQueue, setBench, setPlanningCards, setCourts]
+  );
+
   // Tap-to-place: touch-friendly alternative to dragging a player onto a card.
-  const handleSelectPlayer = useCallback((player: Player) => {
-    setSelectedChip(null);
-    setSelectedPlayer((prev) => (prev?.id === player.id ? null : player));
-  }, []);
+  const handleSelectPlayer = useCallback(
+    (player: Player) => {
+      const onBench = bench.some((e) => e.player.id === player.id);
+      const next: Endpoint = onBench
+        ? { kind: "bench", playerId: player.id }
+        : { kind: "queue", playerId: player.id };
+      setSelection((prev) => (prev && sameEndpoint(prev, next) ? null : next));
+    },
+    [bench]
+  );
+
+  // A queue/bench row is a swap target too now, not just a drag source: an
+  // armed court player dropped here takes this row's position.
+  const handlePoolRowActivate = useCallback(
+    (player: Player) => {
+      const onBench = bench.some((e) => e.player.id === player.id);
+      const target: Endpoint = onBench
+        ? { kind: "bench", playerId: player.id }
+        : { kind: "queue", playerId: player.id };
+      if (selection && selection.kind === "court") {
+        applySwap(selection, target);
+        return;
+      }
+      handleSelectPlayer(player);
+    },
+    [bench, selection, applySwap, handleSelectPlayer]
+  );
 
   const handleQueueRemove = useCallback(
     (id: string) => {
@@ -326,216 +462,31 @@ export function DashboardClient({ sessionId, onTutorialCheck }: Props) {
     [planningCards, showToast, setPlanningCards]
   );
 
-  // Moves an already-placed player from one slot to another — same card or a
-  // different one. An empty target relocates them; an occupied target swaps
-  // the two. Both cards' arrays are mutated in one state update so there's
-  // never a transient frame where the mover exists in neither (or both).
-  const handleRelocatePlacedPlayer = useCallback(
-    (from: SlotAddress, to: SlotAddress) => {
-      if (from.cardId === to.cardId && from.side === to.side && from.index === to.index) {
-        setSelectedChip(null);
-        return;
-      }
-
-      // Validated against the current snapshot, not the updater's `prev`
-      // below — purely to decide whether this counts as a genuine relocate
-      // for the tutorial engine. A state setter can't safely run inside a
-      // setPlanningCards updater (React may invoke it more than once to
-      // verify purity), so this mirrors — and must stay in sync with — the
-      // same guard conditions the updater checks just below.
-      const fromCardSnapshot = planningCards.find((c) => c.id === from.cardId);
-      const toCardSnapshot = planningCards.find((c) => c.id === to.cardId);
-      const fromMaxSnapshot = fromCardSnapshot?.matchType === "DOUBLES" ? 2 : 1;
-      const toMaxSnapshot = toCardSnapshot?.matchType === "DOUBLES" ? 2 : 1;
-      const movingPlayerSnapshot =
-        fromCardSnapshot?.suggestion && from.index < fromMaxSnapshot
-          ? from.side === "A"
-            ? fromCardSnapshot.suggestion.sideA[from.index]
-            : fromCardSnapshot.suggestion.sideB[from.index]
-          : null;
-      const willSucceed =
-        !!fromCardSnapshot?.suggestion &&
-        !!toCardSnapshot &&
-        from.index < fromMaxSnapshot &&
-        to.index < toMaxSnapshot &&
-        !!movingPlayerSnapshot;
-      if (willSucceed) setRelocateEventCount((c) => c + 1);
-
-      setPlanningCards((prev) => {
-        const fromCard = prev.find((c) => c.id === from.cardId);
-        const toCard = prev.find((c) => c.id === to.cardId);
-        if (!fromCard?.suggestion || !toCard) return prev;
-        const fromMax = fromCard.matchType === "DOUBLES" ? 2 : 1;
-        const toMax = toCard.matchType === "DOUBLES" ? 2 : 1;
-        if (from.index >= fromMax || to.index >= toMax) return prev;
-        const movingPlayer =
-          from.side === "A" ? fromCard.suggestion.sideA[from.index] : fromCard.suggestion.sideB[from.index];
-        if (!movingPlayer) return prev;
-
-        if (from.cardId === to.cardId) {
-          const sideA = [...fromCard.suggestion.sideA];
-          const sideB = [...fromCard.suggestion.sideB];
-          const toPlayer = to.side === "A" ? sideA[to.index] : sideB[to.index];
-          if (from.side === "A") sideA[from.index] = toPlayer ?? null;
-          else sideB[from.index] = toPlayer ?? null;
-          if (to.side === "A") sideA[to.index] = movingPlayer;
-          else sideB[to.index] = movingPlayer;
-          const isFull = sideA.slice(0, fromMax).every(Boolean) && sideB.slice(0, fromMax).every(Boolean);
-          return prev.map((c) =>
-            c.id === from.cardId
-              ? {
-                  ...c,
-                  state: isFull ? ("ready" as const) : ("proposed" as const),
-                  suggestion: { ...c.suggestion!, sideA, sideB },
-                }
-              : c
-          );
-        }
-
-        const fromSideA = [...fromCard.suggestion.sideA];
-        const fromSideB = [...fromCard.suggestion.sideB];
-        const toSideA = toCard.suggestion ? [...toCard.suggestion.sideA] : Array(toMax).fill(null);
-        const toSideB = toCard.suggestion ? [...toCard.suggestion.sideB] : Array(toMax).fill(null);
-        const displacedPlayer = to.side === "A" ? toSideA[to.index] : toSideB[to.index];
-
-        if (from.side === "A") fromSideA[from.index] = displacedPlayer;
-        else fromSideB[from.index] = displacedPlayer;
-        if (to.side === "A") toSideA[to.index] = movingPlayer;
-        else toSideB[to.index] = movingPlayer;
-
-        const fromHasAny = [...fromSideA, ...fromSideB].some(Boolean);
-        const fromFull = fromSideA.slice(0, fromMax).every(Boolean) && fromSideB.slice(0, fromMax).every(Boolean);
-        const toFull = toSideA.slice(0, toMax).every(Boolean) && toSideB.slice(0, toMax).every(Boolean);
-
-        return prev.map((c) => {
-          if (c.id === from.cardId) {
-            return {
-              ...c,
-              state: fromFull ? ("ready" as const) : fromHasAny ? ("proposed" as const) : ("empty" as const),
-              suggestion: fromHasAny ? { ...c.suggestion!, sideA: fromSideA, sideB: fromSideB } : null,
-            };
-          }
-          if (c.id === to.cardId) {
-            return {
-              ...c,
-              state: toFull ? ("ready" as const) : ("proposed" as const),
-              suggestion: {
-                pairsExhausted: c.suggestion?.pairsExhausted ?? false,
-                sideA: toSideA,
-                sideB: toSideB,
-              },
-            };
-          }
-          return c;
-        });
-      });
-      setSelectedChip(null);
-    },
-    [planningCards, setPlanningCards]
-  );
-
-  const handlePlayerDropOnCard = useCallback(
-    (cardId: string, player: Player, target: { side: "A" | "B"; index: number }) => {
-      const isDuplicate = planningCards.some(
-        (card) =>
-          card.suggestion &&
-          [...card.suggestion.sideA, ...card.suggestion.sideB].some((p) => p?.id === player.id)
-      );
-      if (isDuplicate) {
-        showToast(`${player.name} is already in a card`);
-        return;
-      }
-
-      // Promote bench player to the queue, sorted by check-in time, on drop
-      const benchEntry = bench.find((e) => e.player.id === player.id);
-      if (benchEntry) {
-        setBench((prev) => prev.filter((e) => e.player.id !== player.id));
-        setQueue((prev) =>
-          appendSortedByCheckIn(prev, [
-            {
-              id: `q-${Date.now()}`,
-              player,
-              position: 0,
-              isInMatch: false,
-              sessionJoinedAt: benchEntry.sessionJoinedAt,
-              enteredQueueAt: new Date().toISOString(),
-            },
-          ])
-        );
-      }
-
-      setPlanningCards((prev) =>
-        prev.map((card) => {
-          if (card.id !== cardId) return card;
-          const max = card.matchType === "DOUBLES" ? 2 : 1;
-          const sideA: (Player | null)[] = card.suggestion
-            ? [...card.suggestion.sideA]
-            : Array(max).fill(null);
-          const sideB: (Player | null)[] = card.suggestion
-            ? [...card.suggestion.sideB]
-            : Array(max).fill(null);
-
-          const targetSide = target.side === "A" ? sideA : sideB;
-          if (target.index < 0 || target.index >= max || targetSide[target.index]) return card;
-          targetSide[target.index] = player;
-
-          const allFull =
-            sideA.slice(0, max).every(Boolean) && sideB.slice(0, max).every(Boolean);
-          return {
-            ...card,
-            state: allFull ? ("ready" as const) : ("proposed" as const),
-            suggestion: { sideA, sideB, pairsExhausted: false },
-          };
-        })
-      );
-      setSelectedPlayer(null);
-    },
-    [planningCards, showToast, bench, setBench, setQueue, setPlanningCards]
-  );
-
-  // Single decision point for every slot tap (empty or filled, any card):
-  // resolves against whichever selection — a queue player or a placed chip —
-  // is currently active, so PlanningCard itself doesn't need to know the
-  // difference between "start a selection" and "act on one".
+  // Single decision point for every planning-card slot tap: an occupied slot
+  // with nothing armed *starts* a selection, with something armed it resolves
+  // one. Empty slots are destination-only.
   const handleSlotTap = useCallback(
     (cardId: string, side: "A" | "B", index: number) => {
-      const card = planningCards.find((c) => c.id === cardId);
-      const occupant = card?.suggestion
-        ? side === "A"
-          ? card.suggestion.sideA[index]
-          : card.suggestion.sideB[index]
-        : null;
+      const target: Endpoint = { kind: "card", cardId, side, index };
+      const occupant = playerAt(rosterState, target);
 
       if (occupant) {
-        if (
-          selectedChip &&
-          selectedChip.cardId === cardId &&
-          selectedChip.side === side &&
-          selectedChip.index === index
-        ) {
-          setSelectedChip(null);
+        if (selection && sameEndpoint(selection, target)) {
+          setSelection(null);
           return;
         }
-        if (selectedChip) {
-          handleRelocatePlacedPlayer(selectedChip, { cardId, side, index });
+        if (selection) {
+          applySwap(selection, target);
           return;
         }
-        setSelectedPlayer(null);
-        setSelectedChip({ cardId, side, index });
+        setSelection(target);
         return;
       }
 
-      if (selectedPlayer) {
-        handlePlayerDropOnCard(cardId, selectedPlayer, { side, index });
-        return;
-      }
-      if (selectedChip) {
-        handleRelocatePlacedPlayer(selectedChip, { cardId, side, index });
-      }
+      if (selection) applySwap(selection, target);
     },
-    [planningCards, selectedChip, selectedPlayer, handleRelocatePlacedPlayer, handlePlayerDropOnCard]
+    [rosterState, selection, applySwap]
   );
-
   const handleRemovePlayerFromCard = useCallback(
     (cardId: string, side: "A" | "B", index: number) => {
       setPlanningCards((prev) =>
@@ -720,11 +671,13 @@ export function DashboardClient({ sessionId, onTutorialCheck }: Props) {
         skipCounts,
         gamesPlayedMap,
         lockedPlacement,
+        roundsSinceServed,
       });
       setSkipCounts(result.updatedSkipCounts);
+      setRoundsSinceServed(result.updatedRoundsSinceServed);
       return result.suggestion;
     },
-    [queue, sessionMatches, skipCounts, setSkipCounts, gamesPlayedMap]
+    [queue, sessionMatches, skipCounts, setSkipCounts, gamesPlayedMap, roundsSinceServed, setRoundsSinceServed]
   );
 
   // The header's single Suggest control: one click fills every card that
@@ -932,229 +885,37 @@ export function DashboardClient({ sessionId, onTutorialCheck }: Props) {
     [courts, returnMatchPlayersToQueue, sessionId]
   );
 
-  // Substitutes a player into an already-live court match, from the queue or
-  // bench. The match's identity is untouched (same startedAt, same elapsed
-  // clock) — this only mutates the roster, so gamesPlayed crediting at
-  // End/Void time (which reads the ActiveMatch's current sideA/sideB) falls
-  // out for free: whoever's in the lineup then gets credit, the player who
-  // left early doesn't. The outgoing player goes to bench, not the queue —
-  // leaving a live match means resting, not re-queueing for another game.
-  const handleSubstituteFromQueue = useCallback(
-    (courtId: string, side: "A" | "B", index: number, player: Player) => {
-      const court = courts.find((c) => c.id === courtId);
-      if (!court?.activeMatch) return;
-      const { activeMatch } = court;
-      const outgoing = side === "A" ? activeMatch.sideA[index] : activeMatch.sideB[index];
-      if (!outgoing || outgoing.id === player.id) return;
-      const alreadyInMatch = [...activeMatch.sideA, ...activeMatch.sideB].some((p) => p.id === player.id);
-      if (alreadyInMatch) {
-        showToast(`${player.name} is already in this match`);
-        return;
-      }
-      // A queue row can represent a "matched" player already placed in a
-      // planning card (placement doesn't remove them from the queue) —
-      // substituting them here without checking would double-book them.
-      // Mirrors handlePlayerDropOnCard's own cross-card duplicate guard.
-      const alreadyInCard = planningCards.some(
-        (card) =>
-          card.suggestion &&
-          [...card.suggestion.sideA, ...card.suggestion.sideB].some((p) => p?.id === player.id)
-      );
-      if (alreadyInCard) {
-        showToast(`${player.name} is already in a matchup card`);
-        return;
-      }
 
-      const originalQueueEntry = queue.find((e) => e.player.id === player.id) ?? null;
-      const originalBenchEntry = bench.find((e) => e.player.id === player.id) ?? null;
-      const incomingSessionJoinedAt =
-        originalQueueEntry?.sessionJoinedAt ?? originalBenchEntry?.sessionJoinedAt ?? new Date().toISOString();
-
-      if (originalQueueEntry) {
-        setQueue((prev) =>
-          prev.filter((e) => e.id !== originalQueueEntry.id).map((e, i) => ({ ...e, position: i + 1 }))
-        );
-      }
-      setBench((prev) => {
-        const withoutIncoming = originalBenchEntry ? prev.filter((e) => e.id !== originalBenchEntry.id) : prev;
-        return [
-          ...withoutIncoming,
-          {
-            id: `b-${Date.now()}`,
-            player: outgoing,
-            sessionJoinedAt: activeMatch.sessionJoinedAtByPlayer[outgoing.id] ?? new Date().toISOString(),
-          },
-        ];
-      });
-      setCourts((prev) =>
-        prev.map((c) => {
-          if (c.id !== courtId || !c.activeMatch) return c;
-          const sideA = [...c.activeMatch.sideA];
-          const sideB = [...c.activeMatch.sideB];
-          if (side === "A") sideA[index] = player;
-          else sideB[index] = player;
-          return {
-            ...c,
-            activeMatch: {
-              ...c.activeMatch,
-              sideA,
-              sideB,
-              sessionJoinedAtByPlayer: {
-                ...c.activeMatch.sessionJoinedAtByPlayer,
-                [player.id]: incomingSessionJoinedAt,
-              },
-            },
-          };
-        })
-      );
-
-      showToast(
-        `${player.name} subbed in for ${outgoing.name}`,
-        () => {
-          setCourts((prev) => prev.map((c) => (c.id === courtId ? court : c)));
-          setBench((prev) => {
-            const withoutOutgoing = prev.filter((e) => e.player.id !== outgoing.id);
-            return originalBenchEntry ? [...withoutOutgoing, originalBenchEntry] : withoutOutgoing;
-          });
-          if (originalQueueEntry) {
-            setQueue((prev) =>
-              appendSortedByCheckIn(prev, [{ ...originalQueueEntry, enteredQueueAt: new Date().toISOString() }])
-            );
-          }
-        },
-        "Undo substitution"
-      );
-      setSelectedPlayer(null);
-      setSelectedChip(null);
-    },
-    [courts, queue, bench, planningCards, showToast, setQueue, setBench, setCourts]
-  );
-
-  // Same substitution, sourced from a player already placed in a planning
-  // card instead of the live queue. A player sitting in a planning-card slot
-  // still has a real QueueEntry underneath it (placement doesn't remove them
-  // from the queue — only court assignment does), so this has to clear both
-  // the card slot and the queue entry, and restore both on undo.
-  const handleSubstituteFromChip = useCallback(
-    (courtId: string, side: "A" | "B", index: number, from: SlotAddress) => {
-      const court = courts.find((c) => c.id === courtId);
-      const fromCard = planningCards.find((c) => c.id === from.cardId);
-      if (!court?.activeMatch || !fromCard?.suggestion) return;
-      const { activeMatch } = court;
-      const outgoing = side === "A" ? activeMatch.sideA[index] : activeMatch.sideB[index];
-      const incoming =
-        from.side === "A" ? fromCard.suggestion.sideA[from.index] : fromCard.suggestion.sideB[from.index];
-      if (!outgoing || !incoming) return;
-      if (outgoing.id === incoming.id) return;
-      const alreadyInMatch = [...activeMatch.sideA, ...activeMatch.sideB].some((p) => p.id === incoming.id);
-      if (alreadyInMatch) {
-        showToast(`${incoming.name} is already in this match`);
-        return;
-      }
-
-      const incomingQueueEntry = queue.find((e) => e.player.id === incoming.id) ?? null;
-      const incomingSessionJoinedAt = incomingQueueEntry?.sessionJoinedAt ?? new Date().toISOString();
-
-      const fromMax = fromCard.matchType === "DOUBLES" ? 2 : 1;
-      const fromSideA = [...fromCard.suggestion.sideA];
-      const fromSideB = [...fromCard.suggestion.sideB];
-      if (from.side === "A") fromSideA[from.index] = null;
-      else fromSideB[from.index] = null;
-      const fromHasAny = [...fromSideA, ...fromSideB].some(Boolean);
-      const fromFull = fromSideA.slice(0, fromMax).every(Boolean) && fromSideB.slice(0, fromMax).every(Boolean);
-
-      setPlanningCards((prev) =>
-        prev.map((c) =>
-          c.id === from.cardId
-            ? {
-                ...c,
-                state: fromFull ? ("ready" as const) : fromHasAny ? ("proposed" as const) : ("empty" as const),
-                suggestion: fromHasAny ? { ...c.suggestion!, sideA: fromSideA, sideB: fromSideB } : null,
-              }
-            : c
-        )
-      );
-      if (incomingQueueEntry) {
-        setQueue((prev) =>
-          prev.filter((e) => e.id !== incomingQueueEntry.id).map((e, i) => ({ ...e, position: i + 1 }))
-        );
-      }
-      setBench((prev) => [
-        ...prev,
-        {
-          id: `b-${Date.now()}`,
-          player: outgoing,
-          sessionJoinedAt: activeMatch.sessionJoinedAtByPlayer[outgoing.id] ?? new Date().toISOString(),
-        },
-      ]);
-      setCourts((prev) =>
-        prev.map((c) => {
-          if (c.id !== courtId || !c.activeMatch) return c;
-          const sideA = [...c.activeMatch.sideA];
-          const sideB = [...c.activeMatch.sideB];
-          if (side === "A") sideA[index] = incoming;
-          else sideB[index] = incoming;
-          return {
-            ...c,
-            activeMatch: {
-              ...c.activeMatch,
-              sideA,
-              sideB,
-              sessionJoinedAtByPlayer: {
-                ...c.activeMatch.sessionJoinedAtByPlayer,
-                [incoming.id]: incomingSessionJoinedAt,
-              },
-            },
-          };
-        })
-      );
-
-      showToast(
-        `${incoming.name} subbed in for ${outgoing.name}`,
-        () => {
-          setCourts((prev) => prev.map((c) => (c.id === courtId ? court : c)));
-          setBench((prev) => prev.filter((e) => e.player.id !== outgoing.id));
-          setPlanningCards((prev) => prev.map((c) => (c.id === from.cardId ? fromCard : c)));
-          if (incomingQueueEntry) {
-            setQueue((prev) =>
-              appendSortedByCheckIn(prev, [{ ...incomingQueueEntry, enteredQueueAt: new Date().toISOString() }])
-            );
-          }
-        },
-        "Undo substitution"
-      );
-      setSelectedChip(null);
-      setSelectedPlayer(null);
-    },
-    [courts, planningCards, queue, showToast, setPlanningCards, setQueue, setBench, setCourts]
-  );
-
-  // Single decision point for tapping a live court match's player slot,
-  // mirroring handleSlotTap's role for planning cards — court slots are
-  // destination-only (never a selection source; pulling a player out with no
-  // replacement is still Void/End's job), so this only ever resolves an
-  // already-armed selection.
+  // Court rows are both source and target now. Nothing armed → this tap picks
+  // the player up; something armed → it resolves the swap; tapping the armed
+  // row itself puts them back down.
   const handleCourtSlotTap = useCallback(
     (courtId: string, side: "A" | "B", index: number) => {
-      if (selectedPlayer) {
-        handleSubstituteFromQueue(courtId, side, index, selectedPlayer);
+      const target: Endpoint = { kind: "court", courtId, side, index };
+      if (selection && sameEndpoint(selection, target)) {
+        setSelection(null);
         return;
       }
-      if (selectedChip) {
-        handleSubstituteFromChip(courtId, side, index, selectedChip);
+      if (selection) {
+        applySwap(selection, target);
+        return;
       }
+      if (playerAt(rosterState, target)) setSelection(target);
     },
-    [selectedPlayer, selectedChip, handleSubstituteFromQueue, handleSubstituteFromChip]
+    [rosterState, selection, applySwap]
   );
 
   return (
     <>
       {/*
-        3-column grid:
         mobile  → single column, Courts shown FIRST (live timers + end/void are the most
                   time-urgent controls courtside), then Players, then Matchups
         tablet  → courts strip full-width row 1 [md:col-span-2], then Players [4fr] | Matchups [3fr] in row 2
-        desktop → Players [4fr col-1] | Matchups [3fr col-2] | Courts [3fr col-3] — all in row 1
+        desktop → Players [21%] | Matchups [21%] | Courts [58%] — all in row 1, courts
+                  two-up inside their own panel from `xl:`. Courts still lead, but 70% was
+                  more than the split-sides card can use: it bought 447px cards at 1388px
+                  while both left panels sat on their ~200px floor. 58% still yields ~368px
+                  per card two-up, and hands the difference to the panels that needed it.
 
         The mobile/desktop Courts block is placed FIRST in the DOM so mobile's single-column
         flow shows it first (both visually and in reading/tab order — using DOM order here
@@ -1162,23 +923,23 @@ export function DashboardClient({ sessionId, onTutorialCheck }: Props) {
         At md/lg this block relies on explicit lg:col-start-3 placement (or is hidden at md),
         so moving it earlier in the DOM does not affect tablet or desktop layout.
       */}
-      <div className="flex-1 grid grid-cols-1 md:grid-cols-[4fr_3fr] lg:grid-cols-[4fr_3fr_3fr] gap-4 p-4 items-start">
+      <div className="flex-1 grid grid-cols-1 md:grid-cols-[4fr_3fr] lg:grid-cols-[21fr_21fr_58fr] gap-4 p-4 items-start">
         {/* Courts — mobile (shown first) and desktop (explicit col 3, row 1) */}
         <div className="md:hidden lg:block lg:col-start-3 lg:row-start-1 lg:h-[calc(100vh-3.5rem)] lg:sticky lg:top-14">
           <CourtsSection
             courts={courts}
-            cols={1}
+            cols={2}
             isDragging={draggingCardId !== null}
             onCourtDrop={handleCourtDrop}
             onAdd={handleAddCourt}
             onDelete={handleDeleteCourt}
             onEndMatch={handleEndMatch}
             onVoidMatch={handleVoidMatch}
-            selectedPlayer={selectedPlayer}
-            selectedChip={selectedChip}
-            onSubstituteFromQueue={handleSubstituteFromQueue}
-            onSubstituteFromChip={handleSubstituteFromChip}
+            hasArmedSelection={!!selection}
+            armedCourtSlot={selectedCourtSlot}
+            onEndpointDrop={applySwap}
             onCourtSlotTap={handleCourtSlotTap}
+            onCancelSelection={() => setSelection(null)}
           />
         </div>
 
@@ -1193,16 +954,18 @@ export function DashboardClient({ sessionId, onTutorialCheck }: Props) {
             onDelete={handleDeleteCourt}
             onEndMatch={handleEndMatch}
             onVoidMatch={handleVoidMatch}
-            selectedPlayer={selectedPlayer}
-            selectedChip={selectedChip}
-            onSubstituteFromQueue={handleSubstituteFromQueue}
-            onSubstituteFromChip={handleSubstituteFromChip}
+            hasArmedSelection={!!selection}
+            armedCourtSlot={selectedCourtSlot}
+            onEndpointDrop={applySwap}
             onCourtSlotTap={handleCourtSlotTap}
+            onCancelSelection={() => setSelection(null)}
           />
         </div>
 
         {/* Player pool — auto col 1 at md:, explicit col 1 at lg: */}
-        <div className="md:h-[calc(100vh-3.5rem)] md:sticky md:top-14 lg:col-start-1 lg:row-start-1">
+        <div
+          className="md:h-[calc(100vh-3.5rem)] md:sticky md:top-14 lg:col-start-1 lg:row-start-1"
+        >
           <PlayerPoolColumn
             queue={queue}
             bench={bench}
@@ -1216,14 +979,18 @@ export function DashboardClient({ sessionId, onTutorialCheck }: Props) {
             onPlayerDragEnd={() => {}}
             onAddPlayers={handleAddPlayers}
             existingPlayerNames={existingPlayerNames}
-            selectedPlayerId={selectedPlayer?.id ?? null}
-            onSelectPlayer={handleSelectPlayer}
+            selectedPlayerId={selectedPoolPlayerId}
+            onSelectPlayer={handlePoolRowActivate}
+            armedCourtSlot={selectedCourtSlot}
+            onEndpointDrop={applySwap}
             showToast={showToast}
           />
         </div>
 
         {/* Matchup column — auto col 2 at md:, explicit col 2 at lg: */}
-        <div className="md:h-[calc(100vh-3.5rem)] md:sticky md:top-14 lg:col-start-2 lg:row-start-1">
+        <div
+          className="md:h-[calc(100vh-3.5rem)] md:sticky md:top-14 lg:col-start-2 lg:row-start-1"
+        >
           <MatchupColumn
             planningCards={planningCards}
             courts={courts}
@@ -1233,17 +1000,16 @@ export function DashboardClient({ sessionId, onTutorialCheck }: Props) {
             onCardAssign={handleCardAssign}
             onCardDragStart={setDraggingCardId}
             onCardDragEnd={() => setDraggingCardId(null)}
-            onPlayerDropOnCard={handlePlayerDropOnCard}
             onRemovePlayerFromCard={handleRemovePlayerFromCard}
             onAddCard={handleAddCard}
             onSuggestCard={handleSuggestCard}
             onResuggestCard={handleResuggestCard}
             justSuggestedCardIds={justSuggestedCardIds}
-            selectedPlayer={selectedPlayer}
+            selectedPlayer={selectedPoolPlayer}
             selectedChip={selectedChip}
             onSlotTap={handleSlotTap}
-            onChipRelocateDrop={handleRelocatePlacedPlayer}
-            onCancelChipSelection={() => setSelectedChip(null)}
+            onEndpointDrop={applySwap}
+            onCancelChipSelection={() => setSelection(null)}
           />
         </div>
       </div>

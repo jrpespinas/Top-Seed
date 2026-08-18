@@ -39,21 +39,15 @@ export function getDefaultSessionName(date: Date = new Date()): string {
 }
 
 export const SKILL_LABELS: Record<string, string> = {
-  S: "Professional",
-  A: "Advanced",
-  B: "Upper Intermediate",
-  C: "Intermediate",
-  D: "Upper Beginner",
-  E: "Beginner",
-  F: "Newbie",
+  ADVANCED: "Advanced",
+  INTERMEDIATE: "Intermediate",
+  BEGINNER: "Beginner",
+  CASUAL: "Casual",
 };
 
 export const SKILL_LABELS_SHORT: Record<string, string> = {
-  S: "Pro",
-  A: "Adv",
-  B: "Int+",
-  C: "Int",
-  D: "Beg+",
-  E: "Beg",
-  F: "New",
+  ADVANCED: "Adv",
+  INTERMEDIATE: "Int",
+  BEGINNER: "Beg",
+  CASUAL: "Cas",
 };

@@ -87,13 +87,20 @@ Standard dialog behaviors: discard-confirmation when closing with unsaved change
 ### Dashboard bulk-add (`AddPlayersModal.tsx`, opened from `PlayerPoolColumn.tsx`'s "Add" button)
 The Dashboard's own multi-player creation entry point, writing into the same session queue `/players` reads from `session-store.ts`.
 
-Repeatable-row form: each row is Name (required) + Skill Level (`SkillLevelSelect`) + Gender (`GenderToggle`, `variant="compact"`, optional). Supports:
-- **Multiple rows** via "+ Add another player" — newly added rows auto-focus their name field.
-- **Enter-to-advance**: pressing Enter in a name field moves to the next row's name field, or creates and focuses a new row if on the last one.
-- **Paste-splitting**: pasting multi-line text into a name field splits it into one row per non-empty line, inserted immediately after the current row.
-- **Row removal with undo**: removing a row with a non-empty name shows a 6-second inline "Removed 'X' · Undo" affordance before it's gone for good; empty rows delete with no undo prompt.
-- **Partial-row transparency**: blank rows are silently excluded from submission, but the UI states this explicitly (an inline per-row caption plus a footer count like "4 of 6 rows will be added") instead of surfacing it only after the fact.
-- Submit button label is dynamic ("Add Player" / "Add N Players").
+**Two steps: paste, then review.** Not a repeatable-row form — the common case is an organizer with a list of names already sitting in a group chat, so the flow leads with a bulk paste and only then asks for per-player detail.
+
+**Step 1 — paste.** A single textarea, one name per line. Splitting is newline-only on purpose: a comma inside a pasted name ("Smith, John") must not become two players. `Cmd/Ctrl+Enter` continues. Empty input is rejected inline.
+
+**Step 2 — review.** Every parsed name becomes a row carrying Name (editable), Skill Level (`SkillLevelSelect`), and Gender (`GenderToggle`, required).
+
+- **One responsive `<table>`, not two markups.** A real table at `sm:`+ (sticky header, one `<tr>` per player); below that the same table reflows via CSS to stacked row-cards. Duplicating the interactive cells per breakpoint would register two DOM nodes per row id in the name-input / row / gender-toggle ref maps that drive focus management and scroll-to-invalid-row, and whichever copy mounted last — not whichever was visible — would win.
+- **"Set for all"** applies a skill level and/or gender to every row at once. It is a one-shot trigger, not a bound value: rows hand-edited afterward keep their own values until "Set for all" is used again, and the caption says so. Hidden for a single row, which has no "all" to act on. Each application is undoable via toast.
+- **Duplicate names are flagged live** — against both the existing session roster and other rows in the same batch (both colliding rows are marked, not just the second). Comparison is case-sensitive on purpose: "Alex" and "alex" are different people, not a normalisation problem to solve. Submission is blocked until resolved, focusing the first offender.
+- **Missing gender is gated behind a submit attempt.** Every row starts with no gender, so validating live would ring every row red the instant the grid renders — a wall of errors on an untouched form. On a failed submit the first offending row is scrolled into view and its toggle focused.
+- **Back preserves work.** Returning to the paste step and continuing again reconciles against the existing rows by name, so a name that survives the round-trip keeps the skill and gender already set on it. Names are matched through per-name queues rather than a single map, so two rows sharing a name (already flagged as duplicates) each keep their own values instead of collapsing onto one.
+- **Row removal** shows a toast with undo, restoring the row at its original index.
+- **Blank rows are silently excluded** from submission; the submit label counts only valid rows.
+- Submit is re-entrancy guarded by a ref, not just `disabled` — a fast double-tap on a tablet can beat React's re-render and submit the batch twice.
 
 On submit, each valid row becomes a new `QueueEntry` with a client-generated player id (`p-{timestamp}-{i}`) and a `sessionJoinedAt`/`enteredQueueAt` staggered by `i` milliseconds so multiple players typed in the same batch preserve their row order when the FIFO queue later sorts by check-in time (see `05-queue-matchup.md`). These are immediately visible on `/players`.
 

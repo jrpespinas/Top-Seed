@@ -7,7 +7,7 @@ import { cn, SKILL_LABELS } from "@/lib/utils";
 import { SkillBadge } from "./SkillBadge";
 import type { SkillLevel } from "@/types";
 
-const SKILL_LEVELS: SkillLevel[] = ["S", "A", "B", "C", "D", "E", "F"];
+const SKILL_LEVELS: SkillLevel[] = ["ADVANCED", "INTERMEDIATE", "BEGINNER", "CASUAL"];
 
 export function SkillLevelSelect({
   value,
@@ -143,7 +143,7 @@ export function SkillLevelSelect({
               position: "fixed",
               top: position.top,
               left: position.left,
-              // 220px comfortably fits "Upper Intermediate," the longest
+              // 220px comfortably fits "Intermediate," the longest
               // label, without wrapping — this list shows full labels on
               // purpose (unlike the trigger, which truncates by design).
               width: Math.max(position.width, 220),

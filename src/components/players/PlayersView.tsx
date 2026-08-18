@@ -30,7 +30,7 @@ type Source = "queue" | "bench";
 type SortKey = "name" | "skillLevel" | "gender" | "state" | "paymentStatus" | "gamesPlayed" | "sessionJoinedAt";
 type SortDir = "asc" | "desc";
 
-const SKILL_LEVELS: SkillLevel[] = ["S", "A", "B", "C", "D", "E", "F"];
+const SKILL_LEVELS: SkillLevel[] = ["ADVANCED", "INTERMEDIATE", "BEGINNER", "CASUAL"];
 const GENDERS: Gender[] = ["M", "F"];
 // Below `lg:`, the table (and its clickable SortHeader cells) is replaced by
 // a card list with no column headers — this label set drives a compact
@@ -45,7 +45,7 @@ const SORT_KEY_LABELS: Record<SortKey, string> = {
   sessionJoinedAt: "Check-in",
 };
 const SORT_KEYS: SortKey[] = ["name", "skillLevel", "paymentStatus", "gender", "state", "gamesPlayed", "sessionJoinedAt"];
-const SKILL_ORDER: Record<SkillLevel, number> = { S: 0, A: 1, B: 2, C: 3, D: 4, E: 5, F: 6 };
+const SKILL_ORDER: Record<SkillLevel, number> = { ADVANCED: 0, INTERMEDIATE: 1, BEGINNER: 2, CASUAL: 3 };
 const STATE_ORDER: Record<Source, number> = { queue: 0, bench: 1 };
 // Ascending surfaces who still owes money first — the organizer's most useful default.
 const PAYMENT_ORDER: Record<PaymentStatus, number> = { UNPAID: 0, WAIVED: 1, PAID: 2 };

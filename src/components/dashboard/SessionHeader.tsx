@@ -107,10 +107,15 @@ export function SessionHeader({
         <StatusBadge status={session.status === "OPEN" ? "open" : "closed"} />
         <div className="hidden sm:flex items-center gap-1.5 text-muted">
           <Users size={12} strokeWidth={1.75} className="flex-shrink-0" aria-hidden />
-          <span className="font-mono text-xs tabular-nums">{session.playerCount}</span>
+          <span className="text-xs whitespace-nowrap">
+            <span className="font-mono tabular-nums">{session.playerCount}</span>{" "}
+            {session.playerCount === 1 ? "player" : "players"}
+          </span>
           <span className="select-none text-muted/40">·</span>
-          <span className="font-mono text-xs tabular-nums">
-            {activeCourts}/{totalCourts} courts
+          <span className="text-xs whitespace-nowrap">
+            <span className="font-mono tabular-nums">{activeCourts}</span> of{" "}
+            <span className="font-mono tabular-nums">{totalCourts}</span>{" "}
+            {totalCourts === 1 ? "court" : "courts"} in use
           </span>
         </div>
       </div>

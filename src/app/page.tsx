@@ -18,6 +18,32 @@ import {
 import { useMatchLog, removeMatchRecordsForSessions } from "@/lib/match-log-store";
 import { useTutorialProgress } from "@/lib/tutorial-store";
 
+/**
+ * Everyone present in the session, wherever they're standing.
+ *
+ * Court assignment *removes* a player's queue entry (see DashboardClient's
+ * handleCardAssign), so `queue + bench` silently omitted everyone currently
+ * playing — the header read "5" while two doubles matches had 8 people on court.
+ * Players sitting in a matchup card keep their queue entry, so they were never
+ * missing. Deduped by id: a player occupies exactly one of queue/bench/court,
+ * and the Set enforces that rather than trusting it.
+ */
+function countSessionPlayers(
+  queue: { player: { id: string } }[],
+  bench: { player: { id: string } }[],
+  courts: { activeMatch?: { sideA: { id: string }[]; sideB: { id: string }[] } }[]
+): number {
+  const ids = new Set<string>();
+  for (const e of queue) ids.add(e.player.id);
+  for (const e of bench) ids.add(e.player.id);
+  for (const c of courts) {
+    if (!c.activeMatch) continue;
+    for (const p of c.activeMatch.sideA) ids.add(p.id);
+    for (const p of c.activeMatch.sideB) ids.add(p.id);
+  }
+  return ids.size;
+}
+
 export default function DashboardPage() {
   const session = useCurrentSession();
   const courts = useCourtsSnapshot();
@@ -103,7 +129,8 @@ export default function DashboardPage() {
   }
 
   const activeCourts = courts.filter((c) => c.status === "IN_USE").length;
-  const playerCount = queue.length + bench.length;
+
+  const playerCount = countSessionPlayers(queue, bench, courts);
 
   return (
     <div className="flex flex-col min-h-full">

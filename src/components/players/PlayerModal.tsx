@@ -18,7 +18,7 @@ interface PlayerFormData {
 
 const defaultForm: PlayerFormData = {
   name: "",
-  skillLevel: "C",
+  skillLevel: "INTERMEDIATE",
   gender: undefined,
   notes: "",
 };

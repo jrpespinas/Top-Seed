@@ -1,45 +1,57 @@
 import type { SkillLevel } from "@/types";
 import { cn, SKILL_LABELS, SKILL_LABELS_SHORT } from "@/lib/utils";
 
-// A named-tier material ladder (see the --color-skill-* tokens in
-// globals.css): Newbie → Bronze → Silver → Gold → Emerald → Platinum →
-// Diamond. Rank reads through color identity alone — hue temperature and
-// chroma climb from muted/warm at the bottom to vivid/cool at the top —
-// since every tier now shares the same fill treatment.
+// A rarity ladder, not a materials one (see the --color-skill-* tokens in
+// globals.css): slate → teal → indigo → orchid. Chroma AND lightness both
+// climb with rank, which is what keeps the ordinal readable at 9px and under
+// red-green colour-vision deficiency — hue alone would carry neither. Metals
+// were tried first and collide with this palette: the brand is copper (H38),
+// so bronze is the same hue, gold neighbours the amber warning, and diamond
+// neighbours the steel accent.
 //
-// The Filled Tier Rule: every level is a solid fill, not just the top ones —
-// a real medal, not a tinted chip, at every rank. Fading a low tier down to
-// a near-invisible tint read as "forgot to color this one" rather than
-// "deliberately restrained," so all seven are equally filled and let hue/
-// chroma alone carry the ladder. Text is plain `text-black` — not the
-// theme-relative `text-bg`, and not a custom CSS-variable token either
-// (a prior version used one; a newly-added Tailwind theme key needs a dev
-// server restart to take effect, and without it the class silently produced
-// no rule at all) — since the fill itself is fixed across both themes (see
-// the globals.css comment), pure black needs no indirection to stay correct.
+// The Filled Tier Rule: every level is a solid fill, not just the top ones — a
+// real medal, not a tinted chip. Text is plain `text-black` (not the
+// theme-relative `text-bg`, and not a CSS-variable token either — a newly-added
+// Tailwind theme key needs a dev-server restart to take effect, and without it
+// the class silently produces no rule at all), since the fill is fixed across
+// both themes and pure black needs no indirection to stay correct.
+//
+// This was briefly outlined instead, to match a dark-themed reference app. It
+// didn't survive contact with a dense light-themed list: outlining moves rank
+// into a 1px border and 9px glyph strokes, roughly a quarter of the colored
+// area of a fill and most of that in thin strokes. The badge's whole job is
+// peripheral rank recognition down twenty rows, and area is what does that.
+//
+// --color-skill-*-ink still exists for anything that needs the tier color as
+// *text* — the fills sit at OKLCH L 0.60–0.84, fine under black but ~1.5:1 as
+// text on white, so that token darkens them under [data-theme="light"].
 const variants: Record<SkillLevel, string> = {
-  S: "bg-skill-s text-black border border-skill-s/50",
-  A: "bg-skill-a text-black border border-skill-a/50",
-  B: "bg-skill-b text-black border border-skill-b/50",
-  C: "bg-skill-c text-black border border-skill-c/50",
-  D: "bg-skill-d text-black border border-skill-d/50",
-  E: "bg-skill-e text-black border border-skill-e/50",
-  F: "bg-skill-f text-black border border-skill-f/50",
+  ADVANCED: "bg-skill-advanced text-black border border-skill-advanced/50",
+  INTERMEDIATE: "bg-skill-intermediate text-black border border-skill-intermediate/50",
+  BEGINNER: "bg-skill-beginner text-black border border-skill-beginner/50",
+  CASUAL: "bg-skill-casual text-black border border-skill-casual/50",
 };
 
 export function SkillBadge({
   level,
   compact = false,
+  dense = false,
   className,
 }: {
   level: SkillLevel;
   compact?: boolean;
+  /** Smaller box for dense contexts (a court card's stacked name-over-badge).
+   * A real prop rather than a className override, because `cn` is a plain join
+   * with no tailwind-merge — a passed-in `h-4` would lose to the base `h-5`
+   * depending on Tailwind's own stylesheet order, not the attribute order. */
+  dense?: boolean;
   className?: string;
 }) {
   return (
     <span
       className={cn(
-        "inline-flex items-center h-5 px-1.5 rounded-sm text-[10px] font-semibold whitespace-nowrap flex-shrink-0",
+        "inline-flex items-center rounded-sm font-semibold whitespace-nowrap flex-shrink-0",
+        dense ? "h-4 px-1 text-[9px]" : "h-5 px-1.5 text-[10px]",
         variants[level],
         className
       )}

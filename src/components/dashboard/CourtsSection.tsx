@@ -1,8 +1,8 @@
-import type { Court, MatchResult, Player } from "@/types";
-import type { SlotAddress } from "./DashboardClient";
+import type { Court, MatchResult } from "@/types";
+import type { CourtSlotAddress } from "./DashboardClient";
+import type { Endpoint } from "@/lib/roster-swap";
 import { CourtCard } from "./CourtCard";
 import { cn } from "@/lib/utils";
-import { Grid3X3, Plus } from "lucide-react";
 
 interface Props {
   courts: Court[];
@@ -14,11 +14,11 @@ interface Props {
   onDelete?: (id: string) => void;
   onEndMatch?: (courtId: string, result: MatchResult) => void;
   onVoidMatch?: (courtId: string) => void;
-  selectedPlayer?: Player | null;
-  selectedChip?: SlotAddress | null;
-  onSubstituteFromQueue?: (courtId: string, side: "A" | "B", index: number, player: Player) => void;
-  onSubstituteFromChip?: (courtId: string, side: "A" | "B", index: number, from: SlotAddress) => void;
+  hasArmedSelection?: boolean;
+  armedCourtSlot?: CourtSlotAddress | null;
+  onEndpointDrop?: (from: Endpoint, to: Endpoint) => void;
   onCourtSlotTap?: (courtId: string, side: "A" | "B", index: number) => void;
+  onCancelSelection?: () => void;
 }
 
 export function CourtsSection({
@@ -31,11 +31,11 @@ export function CourtsSection({
   onDelete,
   onEndMatch,
   onVoidMatch,
-  selectedPlayer,
-  selectedChip,
-  onSubstituteFromQueue,
-  onSubstituteFromChip,
+  hasArmedSelection,
+  armedCourtSlot,
+  onEndpointDrop,
   onCourtSlotTap,
+  onCancelSelection,
 }: Props) {
   return (
     <section
@@ -46,9 +46,8 @@ export function CourtsSection({
       )}
     >
       {/* Header */}
-      <div className="flex items-center justify-between px-3 pt-3 pb-2.5 flex-shrink-0 border-b border-border">
-        <h2 className="flex items-center gap-2 text-sm font-semibold text-ink">
-          <Grid3X3 size={14} strokeWidth={2} className="text-muted" aria-hidden />
+      <div className="flex items-center justify-between px-3 pt-2.5 pb-2 flex-shrink-0 border-b border-border">
+        <h2 className="flex items-baseline gap-1.5 text-sm font-semibold text-ink">
           Courts
           <span className="font-mono text-xs text-muted font-normal tabular-nums">
             ({courts.length})
@@ -57,10 +56,9 @@ export function CourtsSection({
 
         <button
           onClick={onAdd}
-          className="flex items-center gap-1 text-xs text-muted hover:text-ink hover:bg-surface-elevated transition-colors px-2 py-1.5 rounded-sm border border-border/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-border"
+          className="flex items-center gap-1 text-xs font-medium text-ink bg-surface-elevated hover:bg-surface-elevated/70 px-2 py-1.5 rounded-sm border border-border transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-border"
           aria-label="Add a court"
         >
-          <Plus size={11} strokeWidth={2.5} aria-hidden />
           Add
         </button>
       </div>
@@ -89,11 +87,11 @@ export function CourtsSection({
                     onDelete={onDelete}
                     onEndMatch={onEndMatch}
                     onVoidMatch={onVoidMatch}
-                    selectedPlayer={selectedPlayer}
-                    selectedChip={selectedChip}
-                    onSubstituteFromQueue={onSubstituteFromQueue}
-                    onSubstituteFromChip={onSubstituteFromChip}
+                    hasArmedSelection={hasArmedSelection}
+                    armedCourtSlot={armedCourtSlot}
+                    onEndpointDrop={onEndpointDrop}
                     onSlotTap={onCourtSlotTap}
+                    onCancelSelection={onCancelSelection}
                   />
                 </div>
               ))}
@@ -103,8 +101,18 @@ export function CourtsSection({
           <div className="absolute right-0 top-0 bottom-0 w-10 bg-gradient-to-l from-surface to-transparent pointer-events-none" aria-hidden />
         </div>
       ) : (
-        <div className="flex-1 min-h-0 overflow-y-auto p-3">
-          <div className={`grid gap-3 ${cols === 1 ? "grid-cols-1" : "grid-cols-2"}`}>
+        <div className="flex-1 min-h-0 overflow-y-auto p-2.5">
+          <div
+            className={cn(
+              "grid gap-3",
+              // `cols={2}` means "two-up once there's room", not always two. The
+              // second column starts at `xl:`, not `lg:`: at a 1024px viewport the
+              // courts panel is ~557px, and splitting that gives 262px cards — too
+              // narrow for the wide card's two halves. One 537px card reads far
+              // better there. This same instance also renders the mobile list.
+              cols === 1 ? "grid-cols-1" : "grid-cols-1 xl:grid-cols-2"
+            )}
+          >
             {courts.map((court) => (
               <CourtCard
                 key={court.id}
@@ -114,11 +122,12 @@ export function CourtsSection({
                 onDelete={onDelete}
                 onEndMatch={onEndMatch}
                 onVoidMatch={onVoidMatch}
-                selectedPlayer={selectedPlayer}
-                selectedChip={selectedChip}
-                onSubstituteFromQueue={onSubstituteFromQueue}
-                onSubstituteFromChip={onSubstituteFromChip}
+                hasArmedSelection={hasArmedSelection}
+                armedCourtSlot={armedCourtSlot}
+                onEndpointDrop={onEndpointDrop}
                 onSlotTap={onCourtSlotTap}
+                onCancelSelection={onCancelSelection}
+                variant="wide"
               />
             ))}
           </div>

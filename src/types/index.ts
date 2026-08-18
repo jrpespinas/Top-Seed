@@ -1,4 +1,4 @@
-export type SkillLevel = "F" | "E" | "D" | "C" | "B" | "A" | "S";
+export type SkillLevel = "ADVANCED" | "INTERMEDIATE" | "BEGINNER" | "CASUAL";
 export type MatchType = "SINGLES" | "DOUBLES";
 export type MatchStatus = "IN_PROGRESS" | "COMPLETED" | "VOIDED";
 export type MatchResult = "SIDE_A" | "SIDE_B" | "DRAW";

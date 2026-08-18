@@ -43,7 +43,7 @@ model Player {
   name        String
   contact     String?       // PRD-required (see docs/PRD.md); no UI form field exists for this yet
   gender      Gender?       // built and in use in the UI; not in the original PRD
-  skillLevel  SkillLevel    @default(C)
+  skillLevel  SkillLevel    @default(INTERMEDIATE)
   status      PlayerStatus  @default(ACTIVE)
   notes       String?       // private organizer notes; never shown to players
   createdAt   DateTime      @default(now())
@@ -168,8 +168,9 @@ model Payment {
   @@unique([sessionId, playerId])
 }
 
-// F=Novice, E=Beginner, D=Upper Beginner, C=Intermediate, B=High-Intermediate, A=Advanced, S=Pro
-enum SkillLevel    { F E D C B A S }
+// Strongest first. Four tiers, not seven — see docs/specs/07-smart-matchup.md
+// on why a finer ladder forced a separate band layer in the matchup algorithm.
+enum SkillLevel    { ADVANCED INTERMEDIATE BEGINNER CASUAL }
 enum Gender        { M F }
 enum PlayerStatus  { ACTIVE INACTIVE }
 enum SessionStatus { OPEN CLOSED }

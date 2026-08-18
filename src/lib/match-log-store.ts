@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import type { MatchRecord } from "@/types";
+import { migrateSkillLevelsDeep } from "./skill-level";
 
 const STORAGE_KEY = "top-seed:match-log";
 
@@ -9,7 +10,7 @@ function readStoredMatches(): MatchRecord[] {
   if (typeof window === "undefined") return [];
   try {
     const raw = window.localStorage.getItem(STORAGE_KEY);
-    return raw ? (JSON.parse(raw) as MatchRecord[]) : [];
+    return raw ? migrateSkillLevelsDeep(JSON.parse(raw) as MatchRecord[]) : [];
   } catch {
     return [];
   }

@@ -15,6 +15,7 @@ import type {
   SessionPlayerSnapshot,
 } from "@/types";
 import { getDefaultSessionName } from "@/lib/utils";
+import { migrateSkillLevelsDeep } from "./skill-level";
 
 const QUEUE_KEY = "top-seed:session-queue";
 const BENCH_KEY = "top-seed:session-bench";
@@ -28,12 +29,17 @@ const SESSION_ARCHIVE_KEY = "top-seed:sessions";
 // same decoupled-stores handoff this file already uses for `matches`.
 const MAX_ARCHIVED_SESSIONS = 50;
 const SKIP_COUNTS_KEY = "top-seed:smart-matchup-skip-counts";
+const ROUNDS_SINCE_SERVED_KEY = "top-seed:smart-matchup-rounds-since-served";
 
 function readListOrNull<T>(key: string): T[] | null {
   if (typeof window === "undefined") return null;
   try {
     const raw = window.localStorage.getItem(key);
-    return raw ? (JSON.parse(raw) as T[]) : null;
+    // Every read funnels through here, which is why the skill-level migration
+    // lives at this boundary — parsed blobs are cast straight to their types,
+    // so a stale level would otherwise reach the badge and the matchup scorer
+    // without TypeScript ever seeing it.
+    return raw ? migrateSkillLevelsDeep(JSON.parse(raw) as T[]) : null;
   } catch {
     return null;
   }
@@ -52,7 +58,7 @@ function readOrNull<T>(key: string): T | null {
   if (typeof window === "undefined") return null;
   try {
     const raw = window.localStorage.getItem(key);
-    return raw ? (JSON.parse(raw) as T) : null;
+    return raw ? migrateSkillLevelsDeep(JSON.parse(raw) as T) : null;
   } catch {
     return null;
   }
@@ -76,6 +82,7 @@ const planningCardsListeners = new Set<Listener>();
 const currentSessionListeners = new Set<Listener>();
 const sessionArchiveListeners = new Set<Listener>();
 const skipCountsListeners = new Set<Listener>();
+const roundsSinceServedListeners = new Set<Listener>();
 const selectedSessionListeners = new Set<Listener>();
 
 // Deliberately in-memory only, not localStorage-backed like the stores above
@@ -358,6 +365,56 @@ export function useSmartMatchupSkipCounts(): [
   }, []);
 
   return [skipCounts, setSkipCounts];
+}
+
+/**
+ * Owner hook — Smart Suggest's level anti-starvation backstop
+ * (docs/specs/07-smart-matchup.md). SkillLevel -> consecutive successful
+ * suggestions since that band was last served, session-scoped. Same
+ * shape/pattern as useSmartMatchupSkipCounts above, just a different key.
+ */
+export function useSmartMatchupRoundsSinceServed(): [
+  Record<string, number>,
+  (updater: Updater<Record<string, number>>) => void
+] {
+  const [roundsSinceServed, setRoundsSinceServedState] = useState<Record<string, number>>({});
+  const roundsSinceServedRef = useRef<Record<string, number>>({});
+
+  useEffect(() => {
+    const stored = readOrNull<Record<string, number>>(ROUNDS_SINCE_SERVED_KEY);
+    if (stored) {
+      roundsSinceServedRef.current = stored;
+      setRoundsSinceServedState(stored);
+    } else {
+      writeOrNull(ROUNDS_SINCE_SERVED_KEY, {});
+    }
+
+    const sync = () => {
+      const s = readOrNull<Record<string, number>>(ROUNDS_SINCE_SERVED_KEY);
+      if (s) {
+        roundsSinceServedRef.current = s;
+        setRoundsSinceServedState(s);
+      }
+    };
+    roundsSinceServedListeners.add(sync);
+    window.addEventListener("storage", sync);
+    return () => {
+      roundsSinceServedListeners.delete(sync);
+      window.removeEventListener("storage", sync);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // See setQueue's comment above — same StrictMode-double-invoke hazard, same fix.
+  const setRoundsSinceServed = useCallback((updater: Updater<Record<string, number>>) => {
+    const next = resolve(updater, roundsSinceServedRef.current);
+    roundsSinceServedRef.current = next;
+    writeOrNull(ROUNDS_SINCE_SERVED_KEY, next);
+    setRoundsSinceServedState(next);
+    roundsSinceServedListeners.forEach((l) => l());
+  }, []);
+
+  return [roundsSinceServed, setRoundsSinceServed];
 }
 
 // PRD default: every fresh session starts with 3 blank matchup cards; the
@@ -646,6 +703,7 @@ export function startSession(name: string): CurrentSession {
   writeList(COURTS_KEY, []);
   writeList(PLANNING_CARDS_KEY, buildDefaultPlanningCards());
   writeOrNull(SKIP_COUNTS_KEY, {});
+  writeOrNull(ROUNDS_SINCE_SERVED_KEY, {});
 
   currentSessionListeners.forEach((l) => l());
   queueListeners.forEach((l) => l());
@@ -653,6 +711,7 @@ export function startSession(name: string): CurrentSession {
   courtsListeners.forEach((l) => l());
   planningCardsListeners.forEach((l) => l());
   skipCountsListeners.forEach((l) => l());
+  roundsSinceServedListeners.forEach((l) => l());
 
   return session;
 }
@@ -730,6 +789,7 @@ export function closeSession(matches: MatchRecord[]): CloseSessionResult | null 
   writeList(COURTS_KEY, []);
   writeList(PLANNING_CARDS_KEY, []);
   writeOrNull(SKIP_COUNTS_KEY, {});
+  writeOrNull(ROUNDS_SINCE_SERVED_KEY, {});
 
   sessionArchiveListeners.forEach((l) => l());
   currentSessionListeners.forEach((l) => l());
@@ -738,6 +798,7 @@ export function closeSession(matches: MatchRecord[]): CloseSessionResult | null 
   courtsListeners.forEach((l) => l());
   planningCardsListeners.forEach((l) => l());
   skipCountsListeners.forEach((l) => l());
+  roundsSinceServedListeners.forEach((l) => l());
 
   return { record, evictedSessionIds };
 }

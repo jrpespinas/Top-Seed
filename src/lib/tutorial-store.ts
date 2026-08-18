@@ -134,8 +134,8 @@ export const TUTORIALS: TutorialDef[] = [
       {
         id: "substitute",
         target: "court-player-row",
-        title: "Sub someone mid-match",
-        body: "The same drag works here — pull a player from the queue or another matchup straight onto a live match to substitute them in.",
+        title: "Swap someone mid-match",
+        body: "The same drag works here — pull a player from the queue or another matchup onto a live match to sub them in. It works in reverse too: drag someone off a court to trade them with any other player, no need to void the game.",
       },
     ],
   },

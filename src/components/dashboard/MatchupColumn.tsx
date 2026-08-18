@@ -4,8 +4,8 @@ import { motion, AnimatePresence, MotionConfig } from "motion/react";
 import type { Court, PlanningCard, MatchType, Player } from "@/types";
 import { PlanningCard as PlanningCardComponent } from "./PlanningCard";
 import type { SlotAddress } from "./DashboardClient";
+import type { Endpoint } from "@/lib/roster-swap";
 import { cn } from "@/lib/utils";
-import { Swords, Plus, Shuffle } from "lucide-react";
 
 interface Props {
   planningCards: PlanningCard[];
@@ -16,11 +16,6 @@ interface Props {
   onCardAssign: (cardId: string, courtId: string) => void;
   onCardDragStart: (cardId: string) => void;
   onCardDragEnd: () => void;
-  onPlayerDropOnCard: (
-    cardId: string,
-    player: Player,
-    target: { side: "A" | "B"; index: number }
-  ) => void;
   onRemovePlayerFromCard: (cardId: string, side: "A" | "B", index: number) => void;
   onAddCard: () => void;
   onSuggestCard: () => void;
@@ -29,7 +24,7 @@ interface Props {
   selectedPlayer?: Player | null;
   selectedChip: SlotAddress | null;
   onSlotTap: (cardId: string, side: "A" | "B", index: number) => void;
-  onChipRelocateDrop: (from: SlotAddress, to: SlotAddress) => void;
+  onEndpointDrop: (from: Endpoint, to: Endpoint) => void;
   onCancelChipSelection: () => void;
 }
 
@@ -44,7 +39,6 @@ export function MatchupColumn({
   onCardAssign,
   onCardDragStart,
   onCardDragEnd,
-  onPlayerDropOnCard,
   onRemovePlayerFromCard,
   onAddCard,
   onSuggestCard,
@@ -53,7 +47,7 @@ export function MatchupColumn({
   selectedPlayer,
   selectedChip,
   onSlotTap,
-  onChipRelocateDrop,
+  onEndpointDrop,
   onCancelChipSelection,
 }: Props) {
   const availableCourts = courts.filter((c) => c.status === "AVAILABLE");
@@ -62,9 +56,8 @@ export function MatchupColumn({
     <MotionConfig reducedMotion="user">
       <div className="h-full flex flex-col rounded-lg border border-border bg-surface overflow-hidden">
         {/* Header */}
-        <div className="flex items-center justify-between px-3 pt-3 pb-2.5 flex-shrink-0 border-b border-border">
-          <h2 className="flex items-center gap-2 text-sm font-semibold text-ink">
-            <Swords size={14} strokeWidth={2} className="text-muted" aria-hidden />
+        <div className="flex items-center justify-between px-3 pt-2.5 pb-2 flex-shrink-0 border-b border-border">
+          <h2 className="flex items-baseline gap-1.5 text-sm font-semibold text-ink">
             Queue
             <span className="font-mono text-xs text-muted font-normal tabular-nums">
               ({planningCards.length})
@@ -78,15 +71,13 @@ export function MatchupColumn({
               aria-label="Fill every open and partial matchup card from the queue"
               title="Fill every open and partial matchup card"
             >
-              <Shuffle size={11} strokeWidth={2.5} aria-hidden />
               Suggest
             </button>
             <button
               onClick={onAddCard}
-              className="flex items-center gap-1 text-xs text-muted hover:text-ink hover:bg-surface-elevated px-2 py-1.5 rounded-sm border border-border/60 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-border"
+              className="flex items-center gap-1 text-xs font-medium text-ink bg-surface-elevated hover:bg-surface-elevated/70 px-2 py-1.5 rounded-sm border border-border transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-border"
               aria-label="Add matchup card"
             >
-              <Plus size={11} strokeWidth={2.5} aria-hidden />
               Add
             </button>
           </div>
@@ -134,7 +125,6 @@ export function MatchupColumn({
                       justSuggested={justSuggestedCardIds?.has(card.id) ?? false}
                       onMatchTypeChange={(type) => onCardMatchTypeChange(card.id, type)}
                       onCourtsAssign={(courtId) => onCardAssign(card.id, courtId)}
-                      onPlayerDrop={(player, target) => onPlayerDropOnCard(card.id, player, target)}
                       onRemovePlayer={(side, index) =>
                         onRemovePlayerFromCard(card.id, side, index)
                       }
@@ -144,9 +134,7 @@ export function MatchupColumn({
                       selectedPlayer={selectedPlayer}
                       selectedChip={selectedChip}
                       onSlotTap={(side, index) => onSlotTap(card.id, side, index)}
-                      onChipDrop={(from, to) =>
-                        onChipRelocateDrop(from, { cardId: card.id, side: to.side, index: to.index })
-                      }
+                      onEndpointDrop={onEndpointDrop}
                       onCancelChipSelection={onCancelChipSelection}
                     />
                   </motion.li>

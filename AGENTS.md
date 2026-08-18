@@ -39,8 +39,6 @@ npm run db:studio    # Open Prisma Studio
 npm run db:seed      # Seed database with test data
 npm run typecheck    # tsc --noEmit
 npm run lint         # ESLint
-npm test             # Vitest (pure-logic suites: roster-swap, skill-level)
-npm run test:watch   # Vitest in watch mode
 ```
 
 ## Conventions
@@ -78,8 +76,6 @@ Core entities: `Player`, `Court`, `Match`, `MatchPlayer`, `QueueEntry`, `BenchEn
 - `Court` — hard delete always permitted (no match-history restriction); auto-numbered sequentially (`Court 1`, `Court 2`, …); numbers resequence on add/delete; no custom names; `Match.courtName` snapshots the name at creation so history survives deletion
 - `Match.courtId` — nullable FK (`onDelete: SetNull`)
 - `Payment` — manual ledger; one record per player per session; created by organizer only
-- `SkillLevel` — four tiers, strongest first: `ADVANCED | INTERMEDIATE | BEGINNER | CASUAL`. Semantic codes, not letters, so a value stored under the old seven-tier ladder (`S`–`F`) is unambiguously stale; `migrateSkillLevel` in `src/lib/skill-level.ts` maps it at every deserialize boundary
-- Skill adjacency: two levels may be matched when at most one rung apart, symmetric. Advanced never reaches Beginner or Casual
 - Smart matchup candidates: **queue only** (bench excluded); not in an active match; ordered by `sessionJoinedAt` ASC
 - `QueueEntry.sessionJoinedAt` — set once when a player first enters the session (queue or bench); never reset on re-queue; used to sort players returning from a match back into the queue in original check-in order
 - `BenchEntry` — unordered holding area for players present but not ready to queue; also carries `sessionJoinedAt`; draggable into planning cards manually but excluded from auto-suggest

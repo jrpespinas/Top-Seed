@@ -33,8 +33,8 @@ Maintain a roster of players across sessions.
 - As an organizer, I can view a player's match history and payment status from their profile.
 
 **Acceptance Criteria**
-- Player fields: name (required), contact (optional), skill level (F / E / D / C / B / A / S), status (Active / Inactive)
-- Skill level tiers: F=Novice, E=Beginner, D=Upper Beginner, C=Intermediate, B=High-Intermediate, A=Advanced, S=Pro Player
+- Player fields: name (required), contact (optional), skill level (Advanced / Intermediate / Beginner / Casual), status (Active / Inactive)
+- Skill level tiers, strongest first: `ADVANCED`, `INTERMEDIATE`, `BEGINNER`, `CASUAL`. Four rather than seven — a finer ladder made exact-level matching almost never succeed, which forced the matchup algorithm to carry a separate band layer to group interchangeable neighbours. Codes are words, not letters, so values stored under the old seven-tier ladder are unambiguously stale and get migrated on read.
 - Default level: C (Intermediate)
 - Soft-delete only — no hard deletes
 - Search is instant (client-side filter on loaded list)

@@ -2,7 +2,9 @@
 
 import { useState } from "react";
 import type { Court, Player, MatchResult } from "@/types";
-import type { SlotAddress } from "./DashboardClient";
+import type { CourtSlotAddress } from "./DashboardClient";
+import { dragEndpointKind, readEndpointPayload, writeEndpointPayload } from "./DashboardClient";
+import { canDrop, type Endpoint } from "@/lib/roster-swap";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { SkillBadge } from "@/components/ui/SkillBadge";
 import { GenderIcon } from "@/components/ui/GenderIcon";
@@ -17,25 +19,33 @@ function sideLabel(players: Player[]) {
   return players.map((p) => p.name).join("/");
 }
 
-// A live match's player row is a substitution target only — it never starts
-// a selection of its own (removing someone with no replacement ready is
-// still Void/End's job), so it's clickable exactly when something else
-// (a queue player or a placed chip) is already armed. Accepts either drag
-// origin used elsewhere: a queue/bench row (application/x-player) or a
-// placed chip from a planning card (application/x-slot).
+// A live match's player row is both a swap source and a swap target. It used
+// to be target-only, which meant reshuffling a live match required voiding it —
+// and voiding credits gamesPlayed to everyone, so the roster edit cost the
+// organizer real data. Picking a player up here is deliberate (arm, then pick a
+// destination) rather than a one-tap action, because the destination decides
+// where the player standing here ends up.
 function PlayerRow({
   player,
-  canSubstitute,
+  isArmed,
+  isTarget,
   isDragOver,
+  wide = false,
   onClick,
+  onDragStart,
   onDragOver,
   onDragLeave,
   onDrop,
 }: {
   player: Player;
-  canSubstitute: boolean;
+  isArmed: boolean;
+  isTarget: boolean;
   isDragOver: boolean;
+  // Stacked name-over-badge instead of a single inline row — legible from
+  // across a gym, and it fills the width a full-span court card actually has.
+  wide?: boolean;
   onClick?: () => void;
+  onDragStart: (e: React.DragEvent) => void;
   onDragOver: (e: React.DragEvent) => void;
   onDragLeave: (e: React.DragEvent) => void;
   onDrop: (e: React.DragEvent) => void;
@@ -43,26 +53,61 @@ function PlayerRow({
   return (
     <span
       data-tutorial-target="court-player-row"
-      onClick={canSubstitute ? onClick : undefined}
+      draggable
+      onClick={onClick}
+      onDragStart={onDragStart}
       onDragOver={onDragOver}
       onDragLeave={onDragLeave}
       onDrop={onDrop}
-      role={canSubstitute ? "button" : undefined}
-      aria-label={canSubstitute ? `Substitute in for ${player.name}` : undefined}
+      role="button"
+      tabIndex={0}
+      onKeyDown={(e) => {
+        if (e.key !== "Enter" && e.key !== " ") return;
+        e.preventDefault();
+        onClick?.();
+      }}
+      aria-pressed={isArmed}
+      aria-label={
+        isArmed
+          ? `${player.name} selected — pick someone to swap with`
+          : isTarget
+          ? `Swap with ${player.name}`
+          : `Select ${player.name} to swap`
+      }
       className={cn(
-        "flex items-center gap-1.5 min-w-0 rounded-sm px-1 -mx-1 py-0.5 transition-colors",
+        "min-w-0 rounded-sm transition-colors cursor-grab active:cursor-grabbing",
+        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50",
+        wide
+          ? "flex flex-col items-center gap-0.5 px-1.5 py-1 text-center"
+          : "flex items-center gap-1.5 px-1 -mx-1 py-0.5",
         isDragOver
           ? "ring-1 ring-primary/60 bg-primary/15"
-          : canSubstitute
-          ? "cursor-pointer hover:bg-surface-elevated"
-          : undefined
+          : isArmed
+          ? "bg-primary/12 ring-1 ring-primary/40"
+          : isTarget
+          ? "ring-1 ring-primary/25 hover:bg-surface-elevated"
+          : "hover:bg-surface-elevated"
       )}
     >
-      <span className="text-xs text-ink truncate leading-none min-w-[44px]">
-        {player.name}
-      </span>
-      <SkillBadge level={player.skillLevel} compact />
-      {player.gender && <GenderIcon gender={player.gender} size={14} />}
+      {wide ? (
+        <>
+          <span className="flex items-center gap-1.5 min-w-0 max-w-full">
+            <span className="text-[13px] font-medium text-ink truncate leading-tight">
+              {player.name}
+            </span>
+            {player.gender && <GenderIcon gender={player.gender} />}
+          </span>
+          <SkillBadge level={player.skillLevel} dense />
+        </>
+      ) : (
+        <>
+          <span className="text-xs text-ink truncate leading-none min-w-[44px]">
+            {player.name}
+          </span>
+          <SkillBadge level={player.skillLevel} compact />
+          {player.gender && <GenderIcon gender={player.gender} size={14} />}
+        </>
+      )}
     </span>
   );
 }
@@ -74,11 +119,17 @@ interface CourtCardProps {
   onDelete?: (id: string) => void;
   onEndMatch?: (courtId: string, result: MatchResult) => void;
   onVoidMatch?: (courtId: string) => void;
-  selectedPlayer?: Player | null;
-  selectedChip?: SlotAddress | null;
-  onSubstituteFromQueue?: (courtId: string, side: "A" | "B", index: number, player: Player) => void;
-  onSubstituteFromChip?: (courtId: string, side: "A" | "B", index: number, from: SlotAddress) => void;
+  hasArmedSelection?: boolean;
+  armedCourtSlot?: CourtSlotAddress | null;
+  onEndpointDrop?: (from: Endpoint, to: Endpoint) => void;
   onSlotTap?: (courtId: string, side: "A" | "B", index: number) => void;
+  onCancelSelection?: () => void;
+  // "wide" sets the two sides as half-columns either side of a VS divider
+  // instead of stacking them — the default everywhere the card gets at least
+  // ~300px. "compact" survives only for the tablet strip, whose cards are
+  // 176px wide (w-44): too narrow to split in half without the full-label
+  // skill badges wrapping. Interaction is byte-identical in both.
+  variant?: "compact" | "wide";
 }
 
 export function CourtCard({
@@ -88,11 +139,12 @@ export function CourtCard({
   onDelete,
   onEndMatch,
   onVoidMatch,
-  selectedPlayer,
-  selectedChip,
-  onSubstituteFromQueue,
-  onSubstituteFromChip,
+  hasArmedSelection = false,
+  armedCourtSlot,
+  onEndpointDrop,
   onSlotTap,
+  onCancelSelection,
+  variant = "compact",
 }: CourtCardProps) {
   const { id: courtId, number, status, activeMatch } = court;
   const [confirmMode, setConfirmMode] = useState<ConfirmMode>(null);
@@ -101,11 +153,12 @@ export function CourtCard({
 
   const isDropTarget = isDragging && status === "AVAILABLE";
   const isBlocked = isDragging && status === "IN_USE";
-  const canSubstitute = status === "IN_USE" && (!!selectedPlayer || !!selectedChip);
+  const isArmedHere = (side: "A" | "B", index: number) =>
+    armedCourtSlot?.courtId === courtId && armedCourtSlot.side === side && armedCourtSlot.index === index;
 
   function handleRowDragOver(e: React.DragEvent, slot: Slot) {
-    const types = Array.from(e.dataTransfer.types);
-    if (!types.includes("application/x-player") && !types.includes("application/x-slot")) return;
+    const kind = dragEndpointKind(e);
+    if (kind === null || !canDrop(kind, "court")) return;
     e.preventDefault();
     e.dataTransfer.dropEffect = "move";
     setDragOverSlot(slot);
@@ -119,31 +172,11 @@ export function CourtCard({
 
   function handleRowDrop(e: React.DragEvent, slot: Slot) {
     setDragOverSlot(null);
-    const rawPlayer = e.dataTransfer.getData("application/x-player");
-    if (rawPlayer && onSubstituteFromQueue) {
-      try {
-        const player = JSON.parse(rawPlayer) as Player;
-        e.preventDefault();
-        onSubstituteFromQueue(courtId, slot.side, slot.index, player);
-      } catch {
-        // malformed data — ignore
-      }
-      return;
-    }
-    const rawSlot = e.dataTransfer.getData("application/x-slot");
-    if (rawSlot && onSubstituteFromChip) {
-      try {
-        const from = JSON.parse(rawSlot) as { fromCardId: string; fromSide: "A" | "B"; fromIndex: number };
-        e.preventDefault();
-        onSubstituteFromChip(courtId, slot.side, slot.index, {
-          cardId: from.fromCardId,
-          side: from.fromSide,
-          index: from.fromIndex,
-        });
-      } catch {
-        // malformed data — ignore
-      }
-    }
+    if (!onEndpointDrop) return;
+    const from = readEndpointPayload(e);
+    if (!from) return;
+    e.preventDefault();
+    onEndpointDrop(from, { kind: "court", courtId, side: slot.side, index: slot.index });
   }
 
   return (
@@ -177,11 +210,11 @@ export function CourtCard({
       )}
     >
       {/* Header */}
-      <div className="flex items-center justify-between px-3 pt-3 pb-2">
+      <div className="flex items-center justify-between px-2.5 pt-2.5 pb-1.5">
         <div>
-          <span className="text-sm font-semibold text-ink">Court {number}</span>
+          <span className="text-[13px] font-semibold text-ink">Court {number}</span>
           {status === "IN_USE" && activeMatch && (
-            <span className="block text-xs text-muted mt-0.5">
+            <span className="block text-[11px] text-muted leading-tight">
               {activeMatch.matchType === "DOUBLES" ? "Doubles" : "Singles"}
             </span>
           )}
@@ -217,7 +250,7 @@ export function CourtCard({
 
       {/* Body */}
       {status === "AVAILABLE" ? (
-        <div className="flex-1 flex flex-col justify-end p-3 pt-1">
+        <div className="flex-1 flex flex-col justify-end p-2.5 pt-1">
           {confirmMode === "delete" ? (
             <div className="flex flex-col gap-2">
               <span className="text-xs text-muted">Delete Court {number}?</span>
@@ -227,14 +260,14 @@ export function CourtCard({
                     setConfirmMode(null);
                     onDelete?.(court.id);
                   }}
-                  className="flex-1 text-xs font-semibold bg-error/15 text-error hover:bg-error/25 transition-colors py-2 rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-error/40 min-h-[44px]"
+                  className="flex-1 text-xs font-semibold bg-error/15 text-error hover:bg-error/25 transition-colors py-2 rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-error/40 min-h-[38px]"
                   aria-label={`Confirm delete Court ${number}`}
                 >
                   Delete
                 </button>
                 <button
                   onClick={() => setConfirmMode(null)}
-                  className="px-3 text-xs text-muted hover:text-ink hover:bg-surface-elevated transition-colors rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-border min-h-[44px]"
+                  className="px-3 text-xs text-muted hover:text-ink hover:bg-surface-elevated transition-colors rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-border min-h-[38px]"
                   aria-label="Cancel delete"
                 >
                   Cancel
@@ -245,7 +278,7 @@ export function CourtCard({
             <button
               disabled
               title="Build a matchup in the Matchups panel, then assign it to this court"
-              className="w-full flex items-center justify-center gap-1.5 bg-surface-elevated text-muted text-sm font-semibold py-2 rounded-md cursor-not-allowed opacity-60 min-h-[44px]"
+              className="w-full flex items-center justify-center gap-1.5 bg-surface-elevated text-muted text-[13px] font-semibold py-1.5 rounded-md cursor-not-allowed opacity-60 min-h-[38px]"
               aria-label={`Start a new match on Court ${number} — build a matchup in the Matchups panel first`}
             >
               <Plus size={14} strokeWidth={2.5} aria-hidden />
@@ -254,54 +287,92 @@ export function CourtCard({
           )}
         </div>
       ) : activeMatch ? (
-        <div className="flex-1 flex flex-col px-3 pb-3 gap-2">
-          {/* Players */}
-          <div className="flex flex-col gap-0.5">
-            {activeMatch.sideA.map((p, i) => (
+        <div className="flex-1 flex flex-col px-2.5 pb-2.5 gap-1.5">
+          {/* Players. Compact stacks both sides with a "vs" between; wide sets
+              them as half-columns across a centre divider, which is what makes
+              a match readable at a glance from a few metres away. */}
+          {(() => {
+            const row = (p: Player, side: "A" | "B", i: number) => (
               <PlayerRow
                 key={p.id}
                 player={p}
-                canSubstitute={canSubstitute}
-                isDragOver={dragOverSlot?.side === "A" && dragOverSlot?.index === i}
-                onClick={() => onSlotTap?.(courtId, "A", i)}
-                onDragOver={(e) => handleRowDragOver(e, { side: "A", index: i })}
+                isArmed={isArmedHere(side, i)}
+                isTarget={hasArmedSelection && !isArmedHere(side, i)}
+                isDragOver={dragOverSlot?.side === side && dragOverSlot?.index === i}
+                wide={variant === "wide"}
+                onClick={() => onSlotTap?.(courtId, side, i)}
+                onDragStart={(e) => writeEndpointPayload(e, { kind: "court", courtId, side, index: i })}
+                onDragOver={(e) => handleRowDragOver(e, { side, index: i })}
                 onDragLeave={handleRowDragLeave}
-                onDrop={(e) => handleRowDrop(e, { side: "A", index: i })}
+                onDrop={(e) => handleRowDrop(e, { side, index: i })}
               />
-            ))}
-            <span className="text-[11px] text-muted leading-none py-0.5">vs</span>
-            {activeMatch.sideB.map((p, i) => (
-              <PlayerRow
-                key={p.id}
-                player={p}
-                canSubstitute={canSubstitute}
-                isDragOver={dragOverSlot?.side === "B" && dragOverSlot?.index === i}
-                onClick={() => onSlotTap?.(courtId, "B", i)}
-                onDragOver={(e) => handleRowDragOver(e, { side: "B", index: i })}
-                onDragLeave={handleRowDragLeave}
-                onDrop={(e) => handleRowDrop(e, { side: "B", index: i })}
-              />
-            ))}
-          </div>
+            );
+
+            if (variant === "wide") {
+              return (
+                <div className="rounded-md border border-border/60 p-1.5">
+                  <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-1.5">
+                    <div className="flex flex-col gap-1 min-w-0">
+                      {activeMatch.sideA.map((p, i) => row(p, "A", i))}
+                    </div>
+                    <div className="flex flex-col items-center self-stretch gap-1">
+                      <span className="flex-1 w-px border-l border-dashed border-border" aria-hidden />
+                      <span className="text-[9px] font-semibold text-muted tracking-wide px-1 py-0.5 rounded-full border border-border">
+                        VS
+                      </span>
+                      <span className="flex-1 w-px border-l border-dashed border-border" aria-hidden />
+                    </div>
+                    <div className="flex flex-col gap-1 min-w-0">
+                      {activeMatch.sideB.map((p, i) => row(p, "B", i))}
+                    </div>
+                  </div>
+                </div>
+              );
+            }
+
+            return (
+              <div className="flex flex-col gap-0.5">
+                {activeMatch.sideA.map((p, i) => row(p, "A", i))}
+                <span className="text-[11px] text-muted leading-none py-0.5">vs</span>
+                {activeMatch.sideB.map((p, i) => row(p, "B", i))}
+              </div>
+            );
+          })()}
+
+
+          {/* Mirrors PlanningCard's chip-selection banner so the two panels read
+              as one system. Wording differs on purpose: a chip can relocate
+              into an empty slot, a court player can only ever trade places. */}
+          {armedCourtSlot?.courtId === courtId && (
+            <div className="flex items-center justify-between gap-2 -mt-1">
+              <p className="text-[10px] text-primary">Tap a player to swap</p>
+              <button
+                onClick={onCancelSelection}
+                className="text-[10px] text-muted hover:text-ink transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-border rounded-sm px-1"
+              >
+                Cancel
+              </button>
+            </div>
+          )}
 
           {/* Footer — normal or confirmation */}
           {confirmMode === null ? (
-            <div className="flex items-center justify-between pt-2 border-t border-border mt-auto gap-2">
+            <div className="flex items-center justify-between pt-1.5 border-t border-border mt-auto gap-2">
               <ElapsedTimer
                 startedAtISO={activeMatch.startedAt}
-                className="font-mono text-sm tabular-nums"
+                className="font-mono text-[13px] tabular-nums"
               />
               <div className="flex gap-1">
                 <button
                   onClick={() => setConfirmMode("end")}
-                  className="text-xs font-semibold text-bg bg-primary hover:bg-primary-hover transition-colors px-3 py-1.5 rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 min-h-[44px]"
+                  className="text-xs font-semibold text-bg bg-primary hover:bg-primary-hover transition-colors px-3 py-1.5 rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 min-h-[38px]"
                   aria-label={`End match on Court ${number} — record the result`}
                 >
                   End Match
                 </button>
                 <button
                   onClick={() => setConfirmMode("void")}
-                  className="text-xs text-muted hover:text-error hover:bg-error/10 transition-colors px-2.5 py-1.5 rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-error/40 min-h-[44px]"
+                  className="text-xs text-muted hover:text-error hover:bg-error/10 transition-colors px-2.5 py-1.5 rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-error/40 min-h-[38px]"
                   aria-label={`Void match on Court ${number}`}
                 >
                   Void

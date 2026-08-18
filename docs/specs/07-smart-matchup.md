@@ -27,8 +27,8 @@ Instead, for a **fresh, full-group suggestion** (an `empty` card, or the header 
 
 1. **Pick a level to serve.** Look at every eligible waiting player's skill level, and find the single player who's been waiting the longest overall (earliest `sessionJoinedAt`) — their level is the one this card tries to serve. (This is equivalent to, but simpler than, computing each level's own oldest member and comparing across levels: the single globally-oldest player's level *is* the level whose oldest member is earliest, by definition.)
 2. **Exact-level pool**: every eligible waiting player at that exact level, in arrival order, capped at `maxWindowSize` (24 — a defensive ceiling on the combinatorics, not a fairness dial, since a single level is already a naturally small slice of the session).
-3. **Adjacent-level pool**, tried only if the exact pool doesn't yield a fresh result (see "Freshness-Gated Escalation" below): every eligible waiting player at that level *or* its immediate neighbor rank, arrival-ordered, same cap. Individual groups drawn from this pool still must independently satisfy the adjacent-level spread rule (see Level Preference below) — the pool itself is just the union of who's allowed to appear.
-4. **Unrestricted pool**, tried only if both of the above fail: the full eligible queue, arrival-ordered, sized by the same scaled-window formula used previously:
+3. **Adjacent pool**, tried only if the exact pool doesn't yield a fresh result (see "Freshness-Gated Escalation" below): every eligible waiting player within one rung of the anchor's level, chosen and ordered per Win/Loss-Directed Escalation. Individual groups drawn from it still must independently satisfy the adjacency rule — the pool itself is just the union of who's allowed to appear.
+5. **Unrestricted pool**, tried only if all of the above fail: the full eligible queue, arrival-ordered, sized by the same scaled-window formula used previously:
 
 ```typescript
 function effectiveWindowSize(waitingCount: number): number {
@@ -53,10 +53,57 @@ Within whichever pool is currently being tried (Exact, Adjacent, or Unrestricted
 "As much as possible, all players the same level" outranks everything else, including gender — a same-level mixed group is preferred over a same-gender group spanning several levels. But existence alone isn't enough to win a tier anymore: a level whose players have already played every combination of each other doesn't get to keep winning just because a same-level group is technically still possible — that let a small pool of Advanced players get stuck replaying each other every single round, which is exactly the bug this fixes. Tried in order, **escalating only when the current tier has no *fresh* (never-played-this-session) arrangement available**, not merely when a group exists:
 
 1. **Exact level** — every player shares one skill level, drawn from the Exact-level pool. Used only if at least one **fresh** exact-level arrangement exists there.
-2. **Adjacent level** — the group's skill levels span at most one rank (e.g. B and A, but not B and S), drawn from the Adjacent-level pool (the served level plus its immediate neighbor). Tried only once Exact has no fresh option left (either not enough same-level players, or every same-level arrangement has already been played) — used only if at least one **fresh** adjacent-level arrangement exists there.
-3. **Unrestricted** — tried only once Adjacent also has no fresh option. Level is dropped entirely for this round; the best-scoring arrangement is used regardless of freshness (this is the one tier where "best available" wins even if every option has already been played — see Repeat Pair Exhaustion below).
+2. **Adjacent** — every player within one rung of the anchor's level. Tried only once Exact has no fresh option left. Which neighbour is reached, and in what order, is decided by session performance — see **Win/Loss-Directed Escalation** below. Used only if at least one **fresh** arrangement exists there.
+4. **Unrestricted** — tried only once step 3 also has no fresh option. Level is dropped entirely for this round; the best-scoring arrangement is used regardless of freshness (this is the one tier where "best available" wins even if every option has already been played — see Repeat Pair Exhaustion below).
 
-A level with too few waiting players to form even one group behaves the same as a level whose groups are all stale: no fresh (or any) arrangement, escalate.
+A level with too few waiting players to form even one group behaves the same as one whose groups are all stale: no fresh (or any) arrangement, escalate to the next step.
+
+Exact is always tried to exhaustion before Adjacent, so a player is never pulled onto a neighbouring level while fresh same-level options are still sitting unused.
+
+#### Skill Levels
+
+Four tiers, strongest first. Codes are words, not letters, so a value stored under the previous seven-tier ladder (`S`–`F`) is unambiguously stale and gets mapped on read — see `migrateSkillLevel` in `src/lib/skill-level.ts`.
+
+| Level | Rank | Badge colour |
+|---|---|---|
+| Advanced | 1 | Orchid |
+| Intermediate | 2 | Indigo |
+| Beginner | 3 | Teal |
+| Casual | 4 | Slate |
+
+The badge ramp is a rarity ladder (chroma and lightness climb with rank), not a metals one — see DESIGN.md's Skill Badge section for why metals collide with this app's copper brand.
+
+**Adjacent = at most one rung apart, and symmetric.**
+
+| Anchor | May be grouped with |
+|---|---|
+| Advanced | Advanced, Intermediate |
+| Intermediate | Advanced, Intermediate, Beginner |
+| Beginner | Intermediate, Beginner, Casual |
+| Casual | Beginner, Casual |
+
+Advanced never reaches Beginner or Casual — those are two and three rungs away, and only the Unrestricted tier (which ignores level entirely) can bridge them.
+
+Symmetry is deliberate: if an Intermediate short of peers may play down to a Beginner, that same pairing has to be reachable when the Beginner is the one waiting. Whether a player *actually* reaches up or down is decided by their own session record (below), not by the gate.
+
+**There is no separate band layer.** An earlier version grouped seven finer tiers into hand-tuned bands (Newbie / Intermediate / Upper / Pro), because seven tiers were too granular for exact-level matching to ever succeed. At four tiers each level is already about as wide as a band was, so "same band" and "same level" became the same statement, and the four-step ladder collapsed to three: **Exact → Adjacent → Unrestricted**.
+
+Levels only govern this gate — who's *allowed* to be grouped together. Balance Score and Challenge Preference still compare players on the rank ladder above (Advanced=1 … Casual=4).
+
+#### Win/Loss-Directed Escalation
+
+Reached only once the Exact-level pool has come up dry. Which neighbouring level gets tried isn't a blind either-direction search — it follows the session record of whichever player's wait triggered the escalation (the same longest-waiting player who decided *which* level to serve, so one consistent "who" drives both decisions).
+
+- **≥65% win rate over ≥3 completed games this session** → the level *above* (stronger) is tried first.
+- **≤35% win rate over ≥3 completed games** → the level *below* (weaker) is tried first.
+- **Anything else** (an even record, or fewer than 3 games) → no reliable signal; both neighbours combined, one attempt.
+
+With four levels this only presents a real choice for Intermediate and Beginner, the two with a neighbour on each side. Advanced and Casual have one neighbour apiece, so the direction is moot for them — the primary attempt simply targets the only level available.
+
+If the preferred direction has no fresh arrangement, the search tries the *other* neighbour as a fallback — but only admits candidates whose **own** record reciprocally points back toward the level being served. A player on a win streak who can't find a fresh opponent above never gets thrown against a struggling player below just to fill a slot; only a below-level player who is themselves overperforming and would want the tougher game.
+
+Edge levels need no special-casing: a query for "the level above Advanced" or "below Casual" yields nothing, that attempt fails its freshness check like any other empty pool, and the search falls through to the reciprocal fallback (or Unrestricted).
+
 
 ### 0b. Gender Preference (inner gate, applied within the chosen level tier)
 Real badminton has same-gender and mixed-gender formats; within whichever pool the level gate settled on, the suggestion prefers the more specific gender arrangement when that pool supports it, in this order:
@@ -83,11 +130,36 @@ function balanceScore(sideA: Player[], sideB: Player[]): number {
 }
 ```
 
-### 2. Challenge Preference (tiebreak, 1st stage)
-Balanced sides are usually competitive, but balance alone doesn't guarantee a player faces real opposition — two weak players paired together can look "balanced" against another weak pair without pushing anyone. When multiple arrangements land within a small margin of each other on Balance Score, prefer the one that gives the most players an opponent at or above their own skill level, rather than the one that gives anyone an easy win. This only breaks near-ties; it never overrides a clearly better Balance Score, and it never forces a pairing the window can't support — if every option in the window pairs someone down, that's simply the best available game this round.
+### 2. Partner Coverage (tiebreak, 1st stage)
+Balance and Novelty alone have a blind spot: within an Exact-level group every player shares the same skill rank, so Balance Score is *identical* (1.0) for every possible split — nothing there distinguishes one arrangement from another. Once a fresh (never-played) split exists, Novelty is tied too (1.0 for all of them). Left there, whatever wins next round after round ends up being decided by chance ordering, and — worse — a small cluster of players who happen to be simultaneously waiting more often than the rest of their level can end up rotating almost exclusively with each other, even though the pairings are all technically "fresh."
 
-### 2b. Win-Rate Balance (tiebreak, 2nd stage)
-If arrangements are still tied after Challenge, prefer the one where the two sides' current-session win rates are closest — the same balancing idea Balance Score applies to skill, now applied to win rate as a secondary consideration rather than folded into the main score.
+Coverage fixes this directly: prefer the arrangement whose players have collectively explored *less* of their own level so far, over one whose players have already played around more of it. This is the direct answer to "increase enforcement of novelty" — it's placed *first* among the tiebreaks, ahead of the two below, specifically so it's not drowned out by them.
+
+```typescript
+function coverageRatio(playerId: string, level: SkillLevel): number {
+  const roster = levelRoster(level)  // everyone who's EVER appeared in this level this session
+  if (roster.size <= 1) return 1      // nobody else to cover — reads as fully covered, not deficient
+  const partners = partnersPlayed(playerId)  // same "pair" relationship novelty already tracks
+  const covered = [...partners].filter(id => roster.has(id)).length
+  return covered / (roster.size - 1)
+}
+
+function coverageScore(sideA: Player[], sideB: Player[]): number {
+  const all = [...sideA, ...sideB]
+  const avgCovered = mean(all.map(p => coverageRatio(p.id, clusterOf(p))))
+  return 1 - avgCovered  // higher = these players have explored LESS of their level
+}
+```
+
+**The wide-roster, narrow-selection split**: `levelRoster` deliberately counts everyone who's *ever* appeared in that level this session — currently waiting, mid-match, or done for the day — not just whoever happens to be in today's eligible pool. A player shouldn't read as "fully covered" just because they've played everyone who happened to be waiting alongside them, when a peer at the same level they've genuinely never faced simply tends to be mid-match whenever they come up. Selection, of course, still only ever draws from who's currently eligible — the wide roster only changes how accurately "under-explored" is measured, not who can actually be picked.
+
+Also used as a **force-include** (see Fairness Safeguards below), not just a tiebreak.
+
+### 3. Challenge Preference (tiebreak, 2nd stage)
+Balanced sides are usually competitive, but balance alone doesn't guarantee a player faces real opposition — two weak players paired together can look "balanced" against another weak pair without pushing anyone. When multiple arrangements land within a small margin of each other on Balance Score (and, after that, Coverage), prefer the one that gives the most players an opponent at or above their own skill level, rather than the one that gives anyone an easy win. This only breaks near-ties; it never overrides a clearly better Balance Score, and it never forces a pairing the window can't support — if every option in the window pairs someone down, that's simply the best available game this round.
+
+### 3b. Win-Rate Balance (tiebreak, 3rd stage)
+If arrangements are still tied after Coverage and Challenge, prefer the one where the two sides' current-session win rates are closest — the same balancing idea Balance Score applies to skill, now applied to win rate as a secondary consideration rather than folded into the main score.
 
 ```typescript
 function winRateBalance(sideA: Player[], sideB: Player[], sessionId: string): number {
@@ -99,7 +171,7 @@ function winRateBalance(sideA: Player[], sideB: Player[], sessionId: string): nu
 
 `getSessionWinRate(playerId, sessionId)`: wins ÷ matchesPlayed within this session. Returns 0.5 (neutral) if the player has no matches yet this session — defaulting to neutral avoids penalising new players.
 
-### 3. Novelty Score (weight: 40%)
+### 1b. Novelty Score (weight: 40%)
 Penalises recently repeated pairings within the current session.
 
 - **Doubles**: A "pair" is two players on the same side
@@ -124,16 +196,18 @@ function noveltyScore(sideA: Player[], sideB: Player[], sessionId: string): numb
 const finalScore = 0.6 * balanceScore + 0.4 * noveltyScore
 // Tiebreak order among near-equal finalScores, after the Level and Gender
 // gates have already narrowed the candidate set:
-//   1. Challenge Preference (most players facing a same-or-above opponent)
-//   2. Win-Rate Balance (closest session win rates between the two sides)
-//   3. Arbitrary (first arrangement enumerated)
+//   1. Partner Coverage (players who've explored less of their level win —
+//      deliberately ranked ahead of Challenge/Win-Rate, see Partner Coverage above)
+//   2. Challenge Preference (most players facing a same-or-above opponent)
+//   3. Win-Rate Balance (closest session win rates between the two sides)
+//   4. Arbitrary (first arrangement enumerated)
 ```
 
 ---
 
-## Fairness Safeguards: Skip Cap and First-Game Priority
+## Fairness Safeguards: Skip Cap, First-Game Priority, and Under-Coverage
 
-Because scoring can legitimately pass over a player in the window in favor of a better-scoring group, the system tracks how many consecutive times each player has been present in a window but not selected into the winning arrangement — and separately fast-tracks anyone who hasn't played yet this session.
+Because scoring can legitimately pass over a player in the window in favor of a better-scoring group, the system tracks how many consecutive times each player has been present in a window but not selected into the winning arrangement — separately fast-tracks anyone who hasn't played yet this session — and separately still, fast-tracks anyone who's explored little of their own level even if they have played.
 
 **Skip cap:**
 - Each time a suggestion runs and a player is in the window but not chosen, their skip count increments.
@@ -145,9 +219,14 @@ Because scoring can legitimately pass over a player in the window in favor of a 
 - A player with 0 completed matches this session is also force-include eligible, regardless of skip count.
 - This is deliberately **not persisted** past a player's first game — there's no ongoing "total games fairness" mechanism. Early arrivals naturally accumulate more total games than late arrivals simply by having more session time; the goal is only to make sure a latecomer isn't stuck waiting behind repeated re-shuffles before their very first game.
 
-**Combined force-include:** the next time a player who qualifies under either rule appears in a window, they are **force-included** in the selected group regardless of score — zero-games players take priority over skip-capped players when both compete for the same limited slots. The remaining slots and side-split are still chosen to score as well as possible around the forced inclusion(s), and force-inclusion still respects whichever level/gender tier is active — a forced player is seated within a tier the window actually supports, never into one it doesn't.
+**Under-coverage (lowest priority of the three):**
+- A currently-eligible player whose Coverage Ratio (see Partner Coverage above) is below **50%** is also force-include eligible.
+- Distinct from first-game priority: a player can have played several games already and still qualify here, if none of those games happened to be against their own level (e.g. earlier Adjacent-tier or Unrestricted matches) — coverage is measured against the player's own level specifically, not total games played.
+- Sorted by ascending coverage ratio when several qualify — the least-covered join the list first.
 
-This is a backstop, not the common case — with a window of at least 10 (more in larger sessions), most players are picked well before hitting the skip cap, and most players get their first game within the first round or two. It exists for the rare outlier (an unusual skill level, the only player of a given gender, or someone who just checked in) who could otherwise be repeatedly out-scored or left waiting round after round.
+**Combined force-include, in priority order:** zero-games (hasn't played *at all* yet) → skip-capped (actively been passed over) → under-covered (would genuinely benefit from more variety). The next time a player who qualifies under any of the three appears in a window, they are **force-included** in the selected group regardless of score. The remaining slots and side-split are still chosen to score as well as possible around the forced inclusion(s), and force-inclusion still respects whichever level/gender tier is active — a forced player is seated within a tier the window actually supports, never into one it doesn't. Under-coverage is fresh-generation only, same scope boundary as win/loss-directed escalation and level anti-starvation scheduling — the lock-and-fill path never contributes to or reads from it.
+
+This is a backstop, not the common case — with a window of at least 10 (more in larger sessions), most players are picked well before hitting the skip cap, and most players get their first game within the first round or two. It exists for the rare outlier (an unusual skill level, the only player of a given gender, someone who just checked in, or someone who keeps landing in the same small rotating subgroup) who could otherwise be repeatedly out-scored or left waiting round after round.
 
 ---
 
@@ -164,10 +243,28 @@ In practice this now almost always means the Exact and Adjacent pools were both 
 ## Multi-Court Handling
 
 When multiple planning cards are open at once (multiple courts to fill in the same round):
-- Card 1 looks at every eligible waiting player, finds whoever's been waiting longest overall, and serves *their* skill level first (see "Per-Level Candidate Pools" above) — ties fall back to raw arrival order, which is already how the "longest waiting" comparison is computed, so no separate tiebreak logic is needed.
+- Card 1 looks at every eligible waiting player, finds whoever's been waiting longest overall, and serves *their* skill level first (see "Per-Level Candidate Pools" above and "Level Anti-Starvation Scheduling" below) — ties fall back to raw arrival order, which is already how the "longest waiting" comparison is computed, so no separate tiebreak logic is needed.
 - Its picked players are excluded from every subsequent card's pools in the same round — nobody is suggested for two courts at once, and a level that just lost its available players to Card 1 won't be servable again until the round changes.
 - Card 2 repeats the same "who's waited longest now" search against the reduced pool, and so on for each additional card. This means the level served can change from card to card within one round — e.g. Card 1 serves Beginner (the longest-waiting player happened to be a Beginner), Card 2 then serves Advanced (now the longest-waiting *remaining* player is Advanced) — there's no fixed rotation order beyond "whoever's waited longest, right now."
 - The Unrestricted tier's window (used only once a card's chosen level is fully exhausted) stays sized consistently across one Suggest-All pass, since `waitingCount` is computed from the same queue snapshot the whole batch shares; it only changes between separate suggestion actions, once the queue itself has actually moved (a court assignment, a new arrival, etc.).
+
+---
+
+## Level Anti-Starvation Scheduling
+
+"Whoever's waited longest, overall, decides which level gets served" sounds fair, but it breaks down for a thin level: a small Beginner pool often can't form 4 fresh same-level players at once, forcing escalation — and once the search is forced to Unrestricted (level dropped entirely), the scoring picks whoever scores best across the *whole* queue, not specifically the player who triggered the search. That player can genuinely lose their own escalated search round after round to bigger levels, purely because their level's odds of independently winning "longest wait" are worse.
+
+**The fix**: longest-wait stays the default rule almost all the time. A safety net only overrides it once a level has gone unserved for too long:
+
+- Track, per skill level, `roundsSinceServed` — the number of consecutive *successful* suggestions (across the whole session, not just one Suggest-All pass) since that level was last served. Session-scoped, persisted the same way `skipCounts` is (`useSmartMatchupRoundsSinceServed`, reset on session start/close).
+- **Default case**: if no level has reached `LEVEL_STARVATION_THRESHOLD` (3), behave exactly as described above — the single longest-waiting player decides the level. This is the common case; a reasonably balanced session may never trigger the override at all.
+- **Starvation override**: a level that's reached the threshold *and* has at least one eligible player waiting right now gets forced to anchor the search instead, regardless of who's technically waited longer elsewhere. An empty level's counter climbing means nothing — it can never trigger the override, since there's nobody to seat.
+- If more than one level is starved simultaneously, the most-starved one wins; ties break by that level's own longest-waiting member — even the override still leans on wait time wherever it can.
+- Once an anchor is picked (whether via the default rule or the override), **everything downstream is identical to before** — Exact → Adjacent → Unrestricted escalation, win/loss-directed neighbor selection, all proceed exactly as documented above, just anchored to whichever player was selected. The override only changes *which* player anchors the search, never how a level's own turn is handled once selected.
+- After a suggestion is found, the anchor's level resets to 0 and every other level's counter increments by 1. If no suggestion was found at all, counters are left untouched (mirrors how `skipCounts` only updates on a real attempt).
+- This only applies to fresh full-group generation, same scope boundary as win/loss-directed escalation — the lock-and-fill path (Resuggest / lock-and-fill on a `proposed` card) doesn't touch `roundsSinceServed`.
+
+Verified directly: a thin level whose members always arrive *after* every member of a much larger level — and would therefore never win on individual wait time, no matter how many rounds pass — gets forced in the instant its counter crosses the threshold, then scheduling reverts to normal longest-wait priority immediately afterward.
 
 ---
 
@@ -236,6 +333,11 @@ type MatchupSuggestion = {
 | `windowSize` | 10 | Floor of the Unrestricted-tier window — the flat size any session under ~20 waiting still sees |
 | `maxWindowSize` | 24 | Ceiling both the Unrestricted window and any single Exact/Adjacent level pool scale up to — defensive on the combinatorics, not a fairness dial for the level pools (see "Per-Level Candidate Pools" above) |
 | `skipCapThreshold` | 2 | Consecutive skips before a player is force-included |
+| `DIRECTIONAL_WIN_RATE_HIGH` | 0.65 | Session win rate at/above which Adjacent-tier escalation tries the stronger level first |
+| `DIRECTIONAL_WIN_RATE_LOW` | 0.35 | Session win rate at/below which Adjacent-tier escalation tries the weaker level first |
+| `DIRECTIONAL_MIN_GAMES` | 3 | Completed games this session required before a win rate is trusted as a directional signal — below this, escalation falls back to the original either-direction behavior |
+| `LEVEL_STARVATION_THRESHOLD` | 3 | Consecutive successful suggestions a level can go unserved before being forced to the front (see Level Anti-Starvation Scheduling) |
+| `UNDER_COVERED_THRESHOLD` | 0.5 | Coverage Ratio below which a player becomes force-include eligible (see Partner Coverage / Fairness Safeguards) |
 
 ---
 
@@ -269,6 +371,10 @@ async function getSessionSkipCount(playerId: string, sessionId: string): Promise
 ---
 
 ## Edge Cases
+
+- **An Advanced player whose own level is exhausted, with only Beginners available**: Adjacent cannot reach them (two rungs), so the search falls through to Unrestricted — which ignores level entirely and is a deliberately last-resort path.
+- **Advanced escalating "up" with nobody above, or Casual escalating "down" with nobody below**: no special-casing — the out-of-range query returns nothing, that attempt's empty pool fails its own freshness check like any other exhausted tier, and the search proceeds to the reciprocal fallback or Unrestricted.
+- **A player stored under the old seven-tier ladder** (`S`–`F`): mapped on read by `migrateSkillLevel` at the deserialize boundary, including inside closed-session snapshots and the match log. Unrecognised values land at Intermediate rather than throwing. Covered by `skill-level.test.ts`.
 - **Player has 0 session matches**: win rate defaults to 0.5 (neutral) for the Win-Rate Balance tiebreak; skill level alone carries the main Balance Score. The player is also first-game-priority eligible (see Fairness Safeguards).
 - **All candidates have equal final scores, challenge counts, and win-rate balance**: first arrangement by arrival order is returned
 - **Only 2 eligible players, match type is doubles**: "Smart Suggest" disabled — tooltip: "Need at least 4 available players for doubles"
@@ -285,4 +391,19 @@ async function getSessionSkipCount(playerId: string, sessionId: string): Promise
 - **Header Suggest clicked with no `empty` or `proposed` cards**: behaves like the old single-card Suggest — adds one new card and fills it
 - **Header Suggest filling multiple cards in one pass**: each card independently re-evaluates "who's waited longest now" against the pool already reduced by earlier cards in the same pass (see Multi-Court Handling) — the level served can change from card to card, and a card later in the list may end up left as-is if earlier cards already claimed the only players who could've filled it.
 - **A player checks in or gets assigned to a court mid-round, changing the waiting count right at the Unrestricted tier's scaling threshold (e.g. 19 → 20)**: harmless — the next `suggestMatchup` call simply recomputes it from the current queue; there's no stored "locked-in" window size to go stale
+- **The longest-waiting player has a 1-0 or 2-0 record**: too small a sample — below `DIRECTIONAL_MIN_GAMES` (3), so escalation uses the original either-direction behavior rather than treating a 100% record from one game as a real signal
+- **The longest-waiting player is winning a lot but the stronger neighbor level has nobody waiting at all**: primary direction has no candidates, immediately falls to the reciprocal fallback (the weaker neighbor, filtered to candidates who are themselves winning a lot) rather than stalling
+- **Reciprocal fallback pool has both qualifying and non-qualifying candidates at the same neighbor level** (e.g. two Beginner+ players on a win streak sitting right next to two who aren't): only the qualifying ones are ever selectable — the non-qualifying candidates are excluded from the pool entirely, not merely outscored, even when they're equally fresh
+- **Neither direction (primary or reciprocal fallback) produces a fresh arrangement**: falls through to Unrestricted exactly as the direction-blind case does — the directional logic never blocks the existing final fallback
+- **A player's win rate crosses a threshold between rounds** (e.g. a loss drops them from 67% to 60%): harmless — direction is recomputed fresh from the live match log on every `suggestMatchup` call, same as every other signal in this algorithm; there's nothing cached to go stale
 - **Two levels tie for "longest waiting" exactly**: can't actually happen — the comparison is a strict less-than over parsed timestamps, so the first one encountered in queue order wins deterministically; no separate tiebreak rule was needed.
+- **A level's `roundsSinceServed` counter climbs past the threshold while it's genuinely empty (nobody waiting)**: harmless — the starvation check requires an eligible player in that level before it can be forced in, so a climbing counter with nobody to seat never fires the override
+- **A thin level whose members always arrive after every member of a much larger band** (so it would never independently win "longest wait," no matter how many rounds pass): gets forced in the instant its counter crosses `LEVEL_STARVATION_THRESHOLD`, then scheduling reverts to normal longest-wait priority immediately afterward. Verified directly.
+- **Two levels are starved at the same time**: the most-starved one (highest `roundsSinceServed`) wins; ties break by that level's own longest-waiting member
+- **A single Suggest-All click fills several cards in one pass**: each card's `runSmartSuggest` call reads the same pre-click `roundsSinceServed` snapshot (same threading pattern `skipCounts` already uses) — a level can end up anchoring more than one card within that one batch before its counter visibly resets. Not a correctness issue: the existing cross-card exclusion (`claimed`/`excludedPlayerIds`) already drops a level out of consideration the moment its eligible members run out, and the counter is fully correct again by the very next separate suggestion action, which is the timescale the starvation override actually exists to protect.
+- **Lock-and-fill (Resuggest or header Suggest on a `proposed` card)**: never reads or writes `roundsSinceServed` — out of scope, same boundary as win/loss-directed escalation, since the locked players already pin down most of the level context for that card.
+- **A level of exactly 1 (nobody else has ever appeared there this session)**: Coverage Ratio reads as fully covered (1) for that lone player — nothing left to explore, not a deficiency, so they never get flagged as under-covered just for being alone in their level.
+- **A player has played several games this session, all against people outside their own level**: still under-covered relative to their level, and force-include eligible — Coverage Ratio is about who they've faced within their own level specifically, not their total game count. Verified directly: a player with 1 completed game (so not zero-games-eligible) whose only opponent was outside their level was still force-included, breaking up a subgroup that had otherwise been repeating itself.
+- **Within an Exact-level group, every player shares the same skill rank, so Balance Score is identical for every possible split**: Coverage is often the *first* dimension that actually differentiates otherwise-tied fresh arrangements — this is deliberate, not a fallback edge case; it's the main reason Coverage was inserted ahead of Challenge and Win-Rate Balance in the tiebreak order.
+- **`levelRoster` includes a player who's since left the session entirely (no longer in queue, no longer playing)**: harmless — they still count toward the denominator (how large the level's ever been), which is correct: a player who left having never met most of their level doesn't retroactively make everyone else "more covered."
+- **A group mixing two different levels in one match** (e.g. 2 Advanced + 2 Pro together): never produced — the level-tier gate only ever accepts a group where every player shares one band, so "cross-level" in practice means fully switching to the neighboring level's own pool, not blending the two.
