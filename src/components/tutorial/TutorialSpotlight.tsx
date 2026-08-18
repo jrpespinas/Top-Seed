@@ -154,7 +154,7 @@ export function TutorialSpotlight({
       {ringStyle && (
         <div
           aria-hidden
-          // Dashed + accent (steel slate), not a solid primary ring —
+          // Dashed + accent (violet), not a solid primary ring —
           // primary-colored rings already mean three different interactive
           // states elsewhere in this app (CourtCard's confirm-pending and
           // drop-target/drag-over rings, PlayerChip's drag-over ring), and

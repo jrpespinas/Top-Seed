@@ -11,7 +11,6 @@ import {
   Settings,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { ThemeToggle } from "@/components/ui/ThemeToggle";
 
 const navItems = [
   { href: "/",            icon: LayoutGrid,   label: "Dashboard"   },
@@ -92,7 +91,6 @@ export function Sidebar() {
           (moved out of the primary four), grouped with the other secondary
           destination rather than the day-to-day nav items above. */}
       <div className="px-2 pb-3 border-t border-border pt-3 flex flex-col gap-1">
-        <ThemeToggle className="w-full min-h-[44px] justify-center" />
         <NavItem
           href="/sessions"
           icon={CalendarDays}

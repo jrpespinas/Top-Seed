@@ -66,12 +66,12 @@ Four tiers, strongest first. Codes are words, not letters, so a value stored und
 
 | Level | Rank | Badge colour |
 |---|---|---|
-| Advanced | 1 | Orchid |
-| Intermediate | 2 | Indigo |
-| Beginner | 3 | Teal |
-| Casual | 4 | Slate |
+| Advanced | 1 | Platinum |
+| Intermediate | 2 | Gold |
+| Beginner | 3 | Silver |
+| Casual | 4 | Bronze |
 
-The badge ramp is a rarity ladder (chroma and lightness climb with rank), not a metals one — see DESIGN.md's Skill Badge section for why metals collide with this app's copper brand.
+The badge ramp is the classic metals ladder. Chroma can't climb (silver is less saturated than bronze), so the ordinal rests on cultural knowledge plus lightness, which climbs 0.66 → 0.83 — see DESIGN.md's Skill Badge section.
 
 **Adjacent = at most one rung apart, and symmetric.**
 

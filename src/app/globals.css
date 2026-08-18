@@ -2,227 +2,65 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ─── Palette ──────────────────────────────────────────────────────────────
+   One theme. There is no dark mode: this app is used courtside in a gym under
+   bright overhead light, where a dark UI fights the room rather than the other
+   way round. A single palette also removes a whole class of bug — every token
+   below had to be authored, and kept correct, twice.
+
+   Brand is Ateneo blue (#001196), used as a SECONDARY: the canvas is
+   predominantly white and the blue appears on primary actions, selection and
+   focus only. Its darkness does double duty — 12.6:1 as text on white, and
+   12.6:1 for white text on its own fill, so one token covers both roles.
+   ─────────────────────────────────────────────────────────────────────────── */
 :root {
-  /* Raw OKLCH channel values — enables Tailwind opacity modifiers (e.g. bg-primary/20) */
-  --color-bg-raw:                 0.09 0 0;
-  --color-surface-raw:            0.13 0 0;
-  --color-surface-elevated-raw:   0.18 0.004 38;
-  --color-border-raw:             0.28 0.006 38;
-  --color-ink-raw:                0.94 0.005 38;
-  --color-muted-raw:              0.62 0.006 38;
-  --color-skill-casual-raw:            0.680 0.015 250;   /* Casual — unranked slate, deliberately near-neutral */
-  --color-skill-beginner-raw:          0.760 0.105 185;   /* Beginner — teal */
-  --color-skill-intermediate-raw:      0.775 0.125 268;   /* Intermediate — indigo */
-  --color-skill-advanced-raw:          0.790 0.165 312;   /* Advanced — orchid, the rarest hue on the wheel here */
-  --color-primary-raw:            0.71 0.17 38;
-  --color-primary-hover-raw:      0.76 0.16 38;
-  --color-accent-raw:             0.62 0.14 220;
-  --color-success-raw:            0.65 0.17 145;
-  --color-warning-raw:            0.75 0.14 75;
-  --color-error-raw:              0.62 0.21 25;
+  --color-bg-raw:                 0.995 0.002 264;   /* white canvas, a breath of the brand hue */
+  --color-surface-raw:            1 0 0;             /* panels sit above the canvas */
+  --color-surface-elevated-raw:   0.955 0.004 264;
+  --color-border-raw:             0.905 0.006 264;
+  --color-ink-raw:                0.170 0.014 264;
+  --color-muted-raw:              0.470 0.010 264;   /* >=4.5:1 on the canvas */
 
-  /* Skill-level ramp — a rarity ladder, not a materials one.
-     Casual (slate) → Beginner (teal) → Intermediate (indigo) → Advanced (orchid).
+  --color-primary-raw:            0.317 0.202 264;   /* Ateneo blue #001196 */
+  --color-primary-hover-raw:      0.260 0.190 264;
+  /* Accent is NOT a second brand colour — it's the "state, not action" hue.
+     It has to stay visibly distinct from primary, because primary rings already
+     mean three things (confirm-pending, drop-target, drag-over) and several can
+     land on the very element a tutorial is spotlighting. An accent that matched
+     primary would read as "this needs a decision" rather than "here's a tip". */
+  --color-accent-raw:             0.480 0.140 305;
+  --color-success-raw:            0.460 0.120 150;
+  --color-warning-raw:            0.520 0.130 62;    /* darkened off bronze, and read as text */
+  --color-error-raw:              0.460 0.185 22;
 
-     Metals were the obvious first instinct and are wrong here: this app's
-     brand IS a metal. Primary is copper at H38, so "bronze" (H40) is
-     indistinguishable from it, "gold" (H92) sits beside the amber warning
-     (H75), and "diamond/steel" (H235) sits beside the accent (H220). A
-     bronze→gold→diamond ladder competes with the semantic palette for the
-     same arc of the wheel. Every tier of the previous ramp was within 17° of
-     a semantic role, and two were within 2°.
+  /* Gender markers. Deliberately low-chroma and deliberately NOT primary or
+     accent: those two used to carry male/female, which put the brand colour on
+     every player row — the exact opposite of the rarity that makes an accent
+     mean anything. These read as tinted grey, distinguishable at a glance
+     without competing with rank badges or the one blue CTA. */
+  --color-gender-m-raw:           0.550 0.055 250;
+  --color-gender-f-raw:           0.550 0.075 15;
 
-     So the ladder moves to the cool half, which the palette leaves nearly
-     empty, and borrows the rarity convention instead (common gray → rare →
-     epic): CHROMA AND LIGHTNESS BOTH CLIMB MONOTONICALLY with rank. That's
-     what makes the ordinal readable at 9px and under red-green colour vision
-     deficiency — hue alone would carry neither. Casual is deliberately close
-     to neutral: "unranked" should look like the absence of a colour, not a
-     colour of its own. Closest approach to any semantic role is now ΔE 0.30;
-     adjacent tiers are ΔE 0.12–0.15 apart.
+  /* Rank ladder — the classic metals. Chroma cannot climb here (silver is less
+     saturated than bronze, platinum less than gold), so the ordinal rests on
+     cultural knowledge plus LIGHTNESS, which climbs cleanly 0.66 -> 0.83.
+     Lightness is the more robust channel anyway: it survives every form of
+     colour-vision deficiency, where hue and chroma do not.
 
-     Deliberately NOT redefined under [data-theme="light"] — a skill badge is
-     a fixed medal, not theme-adaptive body text, and must render identically
-     whichever theme is open. All four are solid fills (see SkillBadge.tsx's
-     Filled Tier rule) under plain `text-black`; every fill sits at L ≥ 0.68,
-     which clears 7:1 against black, so no per-theme variant is needed.
+     The -ink variants are the same hue darkened for use as TEXT or BORDERS.
+     They are not decorative: on a white canvas the platinum fill is only
+     1.66:1 against the background, so a badge bordered with a tint of its own
+     fill would have no visible edge. Borders use -ink for ~7:1 on every tier.
+     See SkillBadge.tsx. */
+  --color-skill-casual-raw:           0.660 0.105 50;    /* Bronze */
+  --color-skill-beginner-raw:         0.720 0.018 255;   /* Silver */
+  --color-skill-intermediate-raw:     0.800 0.140 92;    /* Gold */
+  --color-skill-advanced-raw:         0.830 0.075 215;   /* Platinum */
 
-     The -ink tokens ARE theme-adaptive: they exist for anything that needs a
-     tier colour as *text*, where the fills would land ~1.5:1 on white. */
-
-  /* Semantic aliases (for direct CSS use) */
-  --color-bg:               oklch(var(--color-bg-raw));
-  --color-surface:          oklch(var(--color-surface-raw));
-  --color-surface-elevated: oklch(var(--color-surface-elevated-raw));
-  --color-border:           oklch(var(--color-border-raw));
-  --color-ink:              oklch(var(--color-ink-raw));
-  --color-muted:            oklch(var(--color-muted-raw));
-  --color-skill-casual:            oklch(var(--color-skill-casual-raw));
-  --color-skill-beginner:          oklch(var(--color-skill-beginner-raw));
-  --color-skill-intermediate:      oklch(var(--color-skill-intermediate-raw));
-  --color-skill-advanced:          oklch(var(--color-skill-advanced-raw));
-  --color-skill-casual-ink-raw:  var(--color-skill-casual-raw);
-  --color-skill-beginner-ink-raw:  var(--color-skill-beginner-raw);
-  --color-skill-intermediate-ink-raw:  var(--color-skill-intermediate-raw);
-  --color-skill-advanced-ink-raw:  var(--color-skill-advanced-raw);
-  --color-primary:          oklch(var(--color-primary-raw));
-  --color-primary-hover:    oklch(var(--color-primary-hover-raw));
-  --color-accent:           oklch(var(--color-accent-raw));
-  --color-success:          oklch(var(--color-success-raw));
-  --color-warning:          oklch(var(--color-warning-raw));
-  --color-error:            oklch(var(--color-error-raw));
-  /* Tier colour as *text*. The fills sit at L 0.60–0.84 — fine under black,
-     about 1.5:1 as text on white — so [data-theme="light"] darkens these. */
-
-
-  /* Z-index scale */
-  --z-dropdown:       10;
-  --z-sticky:         20;
-  --z-modal-backdrop: 30;
-  --z-modal:          40;
-  --z-popover:        45;
-  --z-toast:          50;
-  --z-tooltip:        60;
-}
-
-*,
-*::before,
-*::after {
-  box-sizing: border-box;
-}
-
-html {
-  height: 100%;
-}
-
-body {
-  min-height: 100%;
-  background-color: var(--color-bg);
-  color: var(--color-ink);
-  font-family: var(--font-space-grotesk), system-ui, sans-serif;
-  font-size: 15px;
-  line-height: 1.5;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-}
-
-@keyframes toast-in {
-  from {
-    opacity: 0;
-    transform: translateX(-50%) translateY(8px);
-  }
-  to {
-    opacity: 1;
-    transform: translateX(-50%) translateY(0);
-  }
-}
-
-@keyframes label-in {
-  from {
-    opacity: 0;
-    transform: translateX(4px);
-  }
-  to {
-    opacity: 1;
-    transform: translateX(0);
-  }
-}
-
-/* Feedback for a just-clicked Suggest/Resuggest — the card that was touched
-   glows so the click reads as acknowledged even when no players moved
-   (e.g. the queue couldn't fill it). Box-shadow only, no layout impact. */
-@keyframes card-suggest-pulse {
-  0%,
-  100% {
-    box-shadow: 0 0 0 0 oklch(var(--color-primary-raw) / 0);
-  }
-  50% {
-    box-shadow: 0 0 16px 2px oklch(var(--color-primary-raw) / 0.45);
-  }
-}
-
-/* Tutorial spotlight ring — pulses continuously (not just twice, unlike the
-   suggest-pulse above) for as long as a step stays on screen, since it's the
-   only affordance calling attention to the target (no dimming backdrop).
-   Deliberately accent (steel slate), not primary (copper): primary-colored
-   rings already mean three different real interactive states elsewhere
-   (CourtCard's confirm-pending and drop-target/drag-over rings, PlayerChip's
-   drag-over ring, the Suggest button's click-pulse) — several of which can
-   render on the exact element a tutorial step is spotlighting at the same
-   moment (e.g. relocating a chip, or substituting into a live match, while
-   that step's own ring is still showing). Reusing primary there would read
-   as "this needs a decision," not "here's a tip." The ring is also a dashed
-   border rather than a solid box-shadow ring (see TutorialSpotlight.tsx) so
-   the distinction doesn't rely on hue alone. */
-@keyframes tutorial-pulse {
-  0%,
-  100% {
-    box-shadow: 0 0 0 0 oklch(var(--color-accent-raw) / 0);
-  }
-  50% {
-    box-shadow: 0 0 0 4px oklch(var(--color-accent-raw) / 0.35);
-  }
-}
-
-@keyframes tutorial-in {
-  from {
-    opacity: 0;
-    transform: translateY(4px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-@layer utilities {
-  .animate-toast {
-    animation: toast-in 200ms ease-out forwards;
-  }
-
-  .animate-label-in {
-    animation: label-in 200ms ease-out forwards;
-  }
-
-  .animate-suggest-pulse {
-    animation: card-suggest-pulse 1s ease-in-out 2;
-  }
-
-  .animate-tutorial-pulse {
-    animation: tutorial-pulse 1.6s ease-in-out infinite;
-  }
-
-  .animate-tutorial-in {
-    animation: tutorial-in 200ms ease-out forwards;
-  }
-}
-
-/* ─── Light theme ─────────────────────────────────────────────────────────── */
-[data-theme="light"] {
-  --color-bg-raw:               1 0 0;          /* near-white canvas */
-  --color-surface-raw:          1 0 0;             /* white panels */
-  --color-surface-elevated-raw: 0.95 0 0;           /* perceptible hover / elevated surface */
-  --color-border-raw:           0.91 0 0;          /* refined structural gray — premium over strict 3:1 */
-  --color-ink-raw:              0.10 0.005 38;     /* near-black body text */
-  --color-muted-raw:            0.47 0.006 38;     /* ≥4.5:1 against white */
-  --color-primary-raw:          0.44 0.18 38;      /* dark copper — text + button bg */
-  --color-primary-hover-raw:    0.38 0.18 38;      /* deeper copper */
-  --color-accent-raw:           0.35 0.14 220;     /* darkened steel slate */
-  --color-success-raw:          0.35 0.17 145;     /* darkened court green */
-  --color-warning-raw:          0.42 0.14 75;      /* darkened amber */
-  --color-error-raw:            0.38 0.21 25;      /* darkened error */
-
-  /* Skill-level FILLS remain deliberately absent — see the long comment in
-     :root; the badge fill is fixed across both themes on purpose.
-     The outlined badge's INK is a different matter: a colour that works as a
-     background under black text does not work as text on white. These are the
-     same hues pulled down to the L 0.42–0.48 band this file already uses for
-     success/warning/error text, with chroma reduced where the hue cannot hold
-     it that dark (yellow most of all). */
-  --color-skill-casual-ink-raw:      0.45 0.015 250;
-  --color-skill-beginner-ink-raw:      0.46 0.095 185;
-  --color-skill-intermediate-ink-raw:      0.46 0.115 268;
-  --color-skill-advanced-ink-raw:      0.47 0.150 312;
+  --color-skill-casual-ink-raw:       0.450 0.095 50;
+  --color-skill-beginner-ink-raw:     0.460 0.020 255;
+  --color-skill-intermediate-ink-raw: 0.470 0.115 92;
+  --color-skill-advanced-ink-raw:     0.460 0.070 215;
 
   /* Semantic aliases */
   --color-bg:               oklch(var(--color-bg-raw));
@@ -237,7 +75,14 @@ body {
   --color-success:          oklch(var(--color-success-raw));
   --color-warning:          oklch(var(--color-warning-raw));
   --color-error:            oklch(var(--color-error-raw));
+  --color-gender-m:         oklch(var(--color-gender-m-raw));
+  --color-gender-f:         oklch(var(--color-gender-f-raw));
+  --color-skill-casual:       oklch(var(--color-skill-casual-raw));
+  --color-skill-beginner:     oklch(var(--color-skill-beginner-raw));
+  --color-skill-intermediate: oklch(var(--color-skill-intermediate-raw));
+  --color-skill-advanced:     oklch(var(--color-skill-advanced-raw));
 }
+
 
 /* ─── Theme switching transition (JS-triggered, ~250ms window) ────────────── */
 html.theme-switching *,

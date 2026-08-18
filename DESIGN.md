@@ -105,29 +105,29 @@ components:
 
 Top Seed is a professional operations tool — the kind an experienced tournament director would choose. Dark, precise, and deliberately undecorated. The interface should feel like a control room, not a mobile app. Every element earns its presence. The organizer standing courtside with a tablet should feel equipped, not entertained.
 
-The typographic system does the heavy lifting. Bold geometric headings (Space Grotesk) for player names, session titles, and labels; monospace (JetBrains Mono) for every number that matters — queue positions, win rates, match counts, payment amounts. Data is data. It gets its own voice. The brand color (a warm copper-coral, `oklch(0.71 0.17 38)`) is used sparingly: primary actions, active states, the moment when a match begins. Its rarity is the point. Everything else is ink on near-black.
+The typographic system does the heavy lifting. Bold geometric headings (Space Grotesk) for player names, session titles, and labels; monospace (JetBrains Mono) for every number that matters — queue positions, win rates, match counts, payment amounts. Data is data. It gets its own voice. The brand color (Ateneo Blue, `oklch(0.317 0.202 264)` / `#001196`) is used sparingly: primary actions, active states, the moment when a match begins. Its rarity is the point. Everything else is ink on white.
 
 This is not a friendly app. It does not use soft card shadows, grid layouts with identical tiles, or welcoming illustrations. It is a precision tool for someone running a competitive session where speed and clarity matter more than aesthetics. The premium feel comes from restraint, precision, and zero visual noise.
 
 The surface has grown since this system was first documented — Sessions (list + detail, with an Excel export), Settings (a Danger Zone for data resets), and manual Payment tracking are now real, shipped pages, not just the Dashboard/Players/Matches/Leaderboard core. None of them earned a register change: same dark canvas, same restraint, same two-step confirm for anything destructive.
 
 **Key Characteristics:**
-- Near-pure black background; warmth lives in the brand copper only, never in the surface
+- White canvas; colour lives in the brand blue and the rank ladder only, never in the surface
 - Monospace for all numerical data; geometric sans for all text and labels
-- One accent color (copper-coral) used exclusively for active states and primary CTAs
+- One accent color (Ateneo Blue) used exclusively for active states and primary CTAs
 - Flat surfaces with tonal separation only; shadows reserved for focused primary elements
 - Responsive motion (150–250ms) via `motion/react`; `MotionConfig reducedMotion="user"` wraps every animated section
 - Tablet-first tap targets — minimum 44×44px, primary session actions 48×48px
 
 ## 2. Colors: The Midnight Court Palette
 
-A committed dark palette anchored by one copper-coral accent. All neutrals are pure black variants; all warmth is delivered by the brand color alone.
+A restrained light palette anchored by one deep blue accent. Neutrals are white and near-white tinted a breath toward the brand hue; there is a single theme — no dark mode. The app is used courtside in a gym under bright overhead light, where a dark UI fights the room.
 
 ### Primary
-- **Court Copper** (`oklch(0.71 0.17 38)`): The brand anchor. Used only for a fixed set of semantic purposes, never decoratively: primary action buttons (Start Match, Assign to Court, Confirm), active navigation states, the open-session badge, the winning side's `TeamChip` in match history, and the Female gender icon. Its hover variant (`oklch(0.76 0.16 38)`) lightens slightly rather than darkening, preserving warmth under bright gym lighting.
+- **Ateneo Blue** (`oklch(0.317 0.202 264)`, `#001196`): The brand anchor. Used only for a fixed set of semantic purposes, never decoratively: primary action buttons (Start Match, Assign to Court, Confirm), active navigation states, the open-session badge, and the winning side's `TeamChip` in match history. Its hover variant (`oklch(0.26 0.19 264)`) deepens. Used as a **secondary** on a predominantly white canvas — its darkness does double duty at 12.6:1 both as text on white and for white text on its own fill.
 
 ### Secondary
-- **Steel Slate** (`oklch(0.62 0.14 220)`): A cool slate-blue for secondary highlights and non-destructive secondary actions. Contrasts the copper without competing with it. Used for In Use / In Progress court status badges and the Male gender icon.
+- **Accent** (`oklch(0.48 0.14 305)`): violet. The "state, not action" hue — In Use / In Progress badges and the tutorial spotlight. Deliberately far from primary (ΔE 0.21): primary rings already mean confirm-pending, drop-target and drag-over, and any of those can land on the element a tutorial is spotlighting at the same moment.
 
 ### Tertiary
 - **Court Green** (`oklch(0.65 0.17 145)`): Semantic only. Available court status, Paid payment status. Never decorative.
@@ -142,7 +142,7 @@ A committed dark palette anchored by one copper-coral accent. All neutrals are p
 - **Graphite Muted** (`oklch(0.62 0.006 38)`): Secondary labels, placeholder text, helper copy, inactive controls. Achieves ≥7:1 contrast against Void Black — courtside-grade legibility even for secondary information.
 - **Error Red** (`oklch(0.62 0.21 25)`): Destructive actions and error states. Used at 10–15% opacity for backgrounds, full for text.
 
-**The One Signal Rule.** Court Copper appears on at most one focal point per screen region at a time. Its rarity is what communicates "this is the primary action." When two copper elements compete in the same region, the signal collapses into decoration.
+**The One Signal Rule.** Ateneo Blue appears on at most one focal point per screen region at a time. Its rarity is what communicates "this is the primary action." When two blue elements compete in the same region, the signal collapses into decoration.
 
 **The Pure Void Rule.** The background is always `oklch(0.09 0 0)` — no chroma, no hue tint. Any warm tilt on the bg is prohibited. The warmth belongs to the accent; the canvas earns its contrast by being genuinely dark.
 
@@ -168,7 +168,7 @@ A committed dark palette anchored by one copper-coral accent. All neutrals are p
 
 Top Seed is flat by default. Tonal separation across the dark scale (Void Black → Charcoal Panel → Lifted Surface) provides all the depth the interface needs. No box-shadows on cards, list rows, or panels at rest.
 
-The single exception: a diffuse copper glow is permitted on focused or hovered primary elements (Court Copper CTAs). The glow uses the primary color at reduced opacity (`ring-primary/50`) — never a generic gray shadow — so the copper signal is reinforced rather than diluted by unrelated depth.
+The single exception: a diffuse glow is permitted on focused or hovered primary elements. It uses the primary color at reduced opacity (`ring-primary/50`) — never a generic gray shadow — so the brand signal is reinforced rather than diluted by unrelated depth.
 
 Interactive states use two elevation signals: `bg-surface-elevated` for hover (tonal lift) and `ring-1 ring-primary/40` for selected/active states (color lift). These combine but never compete — tonal lift is structural, color lift is semantic.
 
@@ -178,7 +178,7 @@ Interactive states use two elevation signals: `bg-surface-elevated` for hover (t
 
 **The Tonal Stack Rule.** Depth is expressed through the three-step neutral ramp: bg → surface → surface-elevated. A component that sits on `surface` uses `surface-elevated` for its hover state, and `bg` for its bottom border/divider. The stack always goes bg → surface → surface-elevated, never in reverse.
 
-Sticky headers use the same rule for a second trigger: scroll position, not just hover. A sticky title bar sitting at `bg` switches to `bg-surface-elevated` once the page has scrolled past it, paired with a plain `0 1px 0 var(--color-border)` line — never a black-tinted blur shadow. A blurred black shadow is nearly invisible against the near-black default theme; lightness is this system's only valid depth signal, in both themes. (This replaced an earlier interim fix that tried to fix the shadow's color instead of abandoning shadow-for-depth in dark mode — the color-based fix was the wrong instinct, corrected during the session-page audit.)
+Sticky headers use the same rule for a second trigger: scroll position, not just hover. A sticky title bar sitting at `bg` switches to `bg-surface-elevated` once the page has scrolled past it, paired with a plain `0 1px 0 var(--color-border)` line — never a black-tinted blur shadow. Lightness, not shadow blur, is this system's depth signal. (The rule predates the move to a single light theme, when a blurred black shadow was nearly invisible against a near-black canvas; it was kept because a lightness step reads more crisply than a shadow on white too.)
 
 ## 5. Components
 
@@ -188,7 +188,7 @@ Precision tools for the organizer who is standing, glancing, and acting. Every c
 
 Three variants, one shared radius (8px / `rounded-md`). All use 150ms ease-out transitions on `background-color` and `color`. `focus-visible:ring-2` replaces outline on all interactive elements.
 
-- **Primary** (copper fill): `bg-primary text-bg` with `hover:bg-primary-hover`. Full-width (`w-full`) for primary session actions (Assign to Court, Start Match, End Match); content-width for contextual actions. Minimum height 44px (`py-2.5`) on courtside-priority actions; 36px (`py-1.5`) acceptable in dense UIs (headers, footers). The copper fill is the signal — only one per screen region.
+- **Primary** (blue fill): `bg-primary text-bg` with `hover:bg-primary-hover`. Full-width (`w-full`) for primary session actions (Assign to Court, Start Match, End Match); content-width for contextual actions. Minimum height 44px (`py-2.5`) on courtside-priority actions; 36px (`py-1.5`) acceptable in dense UIs (headers, footers). The blue fill is the signal — only one per screen region.
 
 - **Ghost / Secondary** (no fill): `text-muted hover:text-ink hover:bg-surface-elevated`, optional `border border-border/60`. Used for secondary actions (Add, Cancel, nav headers). The border variant signals form-level actions; the borderless variant signals list-level controls.
 
@@ -206,24 +206,20 @@ Extracted to `useConfirmFocus(isConfirming, swapped?)` in `src/hooks/useConfirmF
 
 The most frequently rendered component — appears on every player row, chip, and picker. A compact badge (`h-5`, or `h-4` in `dense` contexts, `rounded-sm` 4px, content-width) in JetBrains Mono Bold at 10px / 9px.
 
-Four levels map to a **rarity ladder**, not a materials one: Casual (slate) → Beginner (teal) → Intermediate (indigo) → Advanced (orchid).
+Four levels map to the classic **metals ladder**: Casual (Bronze) → Beginner (Silver) → Intermediate (Gold) → Advanced (Platinum).
 
-**Why not bronze/silver/gold.** That was the first instinct and it's wrong for this palette, because the brand itself is a metal. Primary is copper at H38, which makes "bronze" (H40) indistinguishable from it; "gold" (H92) sits beside the amber warning (H75); "diamond/steel" (H235) sits beside the accent (H220). A metals ladder competes with the semantic palette for the same arc of the wheel — in the previous seven-tier ramp every tier landed within 17° of a semantic role, and two within 2°.
-
-The ladder therefore lives in the cool half, which the semantic palette leaves nearly empty, and borrows the rarity convention instead (common gray → rare → epic). **Chroma and lightness both climb monotonically with rank.** That redundancy is the point: it's what keeps the ordinal readable at 9px and under red-green colour-vision deficiency, where hue alone would carry neither. Casual sits deliberately close to neutral — "unranked" should read as the absence of a colour rather than a colour of its own.
+**Chroma deliberately does not climb.** Silver is less saturated than bronze, platinum less than gold — so unlike a rarity ramp, rank can't be read from saturation. It rests on cultural knowledge (everyone knows the order) plus **lightness, which climbs cleanly 0.66 → 0.72 → 0.80 → 0.83**. That's the more robust channel regardless: lightness survives every form of colour-vision deficiency, where hue and chroma do not.
 
 | Level | Tier | OKLCH | Background | Text | Border |
 |-------|------|-------|-----------|------|--------|
-| ADVANCED | Orchid | `0.790 0.165 312` | `bg-skill-advanced` (solid) | `text-black` | `border-skill-advanced/50` |
-| INTERMEDIATE | Indigo | `0.775 0.125 268` | `bg-skill-intermediate` (solid) | `text-black` | `border-skill-intermediate/50` |
-| BEGINNER | Teal | `0.760 0.105 185` | `bg-skill-beginner` (solid) | `text-black` | `border-skill-beginner/50` |
-| CASUAL | Slate | `0.680 0.015 250` | `bg-skill-casual` (solid) | `text-black` | `border-skill-casual/50` |
+| ADVANCED | Platinum | `0.830 0.075 215` | `bg-skill-advanced` (solid) | `text-black` | `border-skill-advanced-ink/40` |
+| INTERMEDIATE | Gold | `0.800 0.140 92` | `bg-skill-intermediate` (solid) | `text-black` | `border-skill-intermediate-ink/40` |
+| BEGINNER | Silver | `0.720 0.018 255` | `bg-skill-beginner` (solid) | `text-black` | `border-skill-beginner-ink/40` |
+| CASUAL | Bronze | `0.660 0.105 50` | `bg-skill-casual` (solid) | `text-black` | `border-skill-casual-ink/40` |
 
-Measured separations: adjacent tiers ΔE 0.12–0.15; closest approach to any semantic role ΔE 0.30; black label ≥7:1 on every fill.
+Measured: tightest pair anywhere ΔE 0.126 (including against every semantic role); black label ≥6.7:1 on every fill.
 
-**Skill badge colors are identical in both themes** — the one deliberate exception to this system's usual dark/light color-pair convention. A skill badge is a fixed medal, not theme-adaptive body text; the `--color-skill-*` tokens are defined once in `:root` and intentionally not redefined under `[data-theme="light"]`. Label text is plain `text-black` — fixed pure black needs no theme variant and no indirection to stay correct against fills that all sit at L ≥ 0.68.
-
-The parallel `--color-skill-*-ink` tokens **are** theme-adaptive. They exist for anything that needs a tier colour as *text*: the fills would land around 1.5:1 on white, so the light theme darkens them into the L 0.45 band.
+**Borders use `-ink`, not a tint of the fill.** On this white canvas the platinum fill is only 1.66:1 against the background, so a badge bordered from its own fill would have no visible edge. The darkened `--color-skill-*-ink` variants give roughly 7:1 on every tier — that is what those tokens are for. Label text is plain `text-black`; every fill clears 6.7:1 under black.
 
 **The Filled Tier Rule.** Every level is a solid fill, not just the top ones — a real medal at every rank, not a tinted chip that fades toward invisible at the bottom. This was briefly abandoned for an outlined treatment borrowed from a dark-themed reference app; it didn't survive a dense light-themed list. Outlining moves rank into a 1px border and 9px glyph strokes — roughly a quarter the coloured area of a fill, most of it thin strokes — and the badge's whole job is peripheral rank recognition down twenty rows. Area is what does that. Never use a color outside this table for skill levels; the gradation is the signal.
 
@@ -231,7 +227,7 @@ The parallel `--color-skill-*-ink` tokens **are** theme-adaptive. They exist for
 
 A small Lucide glyph (Mars / Venus) that rides alongside SkillBadge wherever a player is listed — Player Row, PlanningCard's Player Chip, CourtCard's In Use body, AddPlayersModal's review grid, MatchesView's TeamChip. Minimum legible size 14px; below that the glyph's arrow/cross strokes stop reading as distinct shapes and degrade to an undifferentiated dot.
 
-**The Fixed Gender Mapping.** Male (Mars) is always `text-accent` (Steel Slate); Female (Venus) is always `text-primary` (Court Copper). This is a deliberate, singular exception to Court Copper's "primary actions only" convention — decided explicitly, not a drift to be "corrected" back. Never swap the mapping per-screen or introduce a third color for either.
+**The Fixed Gender Mapping.** Male (Mars) is `text-gender-m` (cool slate); Female (Venus) is `text-gender-f` (muted rose). These have their own low-chroma tokens rather than borrowing `primary`/`accent`, which is how it used to work — gender appears on every player row, so binding it to the brand put the accent colour everywhere and destroyed the scarcity that makes it mean "this is the action". Never swap the mapping per-screen or introduce a third color for either.
 
 ### Status Badge
 
@@ -258,9 +254,9 @@ Active-state colors are semantic, not decorative: Paid uses `success/15` backgro
 
 Two complementary nav surfaces — Sidebar and BottomBar — sharing an identical primary-item vocabulary. `md:` (768px) is the single switch point between them, which per this project's own breakpoint definitions (`CLAUDE.md` — Tablet: 768px+) makes Sidebar the tablet **and** desktop nav, not desktop-only; BottomBar serves phones exclusively.
 
-**Sidebar** (`hidden md:flex`, 768px+): Fixed-left, 80px wide (`w-20`), `bg-surface border-r border-border`, `z-sticky`. Logo lockup at top (64px tall header, "TS" in Court Copper, Space Grotesk Bold 18px). Nav items stacked vertically with icon (16px) above label (9px, font-medium), each `min-h-[44px]`. ThemeToggle, Sessions, and Settings are pinned to the bottom below a divider, matching the same 44px floor and icon/label sizing as the primary items above them — Sessions sits here as a secondary destination rather than in the day-to-day primary group.
+**Sidebar** (`hidden md:flex`, 768px+): Fixed-left, 80px wide (`w-20`), `bg-surface border-r border-border`, `z-sticky`. Logo lockup at top (64px tall header, "TS" in Ateneo Blue, Space Grotesk Bold 18px). Nav items stacked vertically with icon (16px) above label (9px, font-medium), each `min-h-[44px]`. Sessions and Settings are pinned to the bottom below a divider, matching the same 44px floor and icon/label sizing as the primary items above them — Sessions sits here as a secondary destination rather than in the day-to-day primary group.
 
-**BottomBar** (`md:hidden`, below 768px): Fixed-bottom, 60px tall, same `bg-surface border-t border-border`. Four primary destinations share the row as equal `flex-1` slots (Dashboard, Players, Matches, Rankings — same order and same nav labels as Sidebar), icons at 20px (slightly larger than sidebar for thumb recognition), labels at 10px. The Leaderboard feature's nav label reads "Rankings" (not "Leaderboard") in both surfaces — "Leaderboard" (11 characters) risks truncating at phone widths; "Rankings" (8 characters) doesn't, and it's already the app's own internal vocabulary for this feature (see the empty states and `aria-label`s in `LeaderboardView.tsx`). The page itself still opens on a "Leaderboard" heading — only the nav label changed. A vertical divider separates the primary four from a narrower fixed-width utility segment — Settings, then Sessions, then ThemeToggle, each pinned to a 48px column — deliberately sized down to Sidebar's own convention rather than the Bottom Bar's primary-row sizing: icons at 16px, labels at 9px, all three matching each other exactly so the trio reads as one consistent secondary tier. Eight interactive targets in total, all `min-h-[44px]` regardless of segment.
+**BottomBar** (`md:hidden`, below 768px): Fixed-bottom, 60px tall, same `bg-surface border-t border-border`. Four primary destinations share the row as equal `flex-1` slots (Dashboard, Players, Matches, Rankings — same order and same nav labels as Sidebar), icons at 20px (slightly larger than sidebar for thumb recognition), labels at 10px. The Leaderboard feature's nav label reads "Rankings" (not "Leaderboard") in both surfaces — "Leaderboard" (11 characters) risks truncating at phone widths; "Rankings" (8 characters) doesn't, and it's already the app's own internal vocabulary for this feature (see the empty states and `aria-label`s in `LeaderboardView.tsx`). The page itself still opens on a "Leaderboard" heading — only the nav label changed. A vertical divider separates the primary four from a narrower fixed-width utility segment — Settings, then Sessions, each pinned to a 48px column — deliberately sized down to Sidebar's own convention rather than the Bottom Bar's primary-row sizing: icons at 16px, labels at 9px, all three matching each other exactly so the trio reads as one consistent secondary tier. Seven interactive targets in total, all `min-h-[44px]` regardless of segment.
 
 **Item states** (shared vocabulary):
 - Default: `text-muted`, icon `strokeWidth={1.75}`
@@ -268,9 +264,7 @@ Two complementary nav surfaces — Sidebar and BottomBar — sharing an identica
 - Hover: `hover:text-ink hover:bg-surface-elevated` (sidebar only — bottom bar has no hover)
 - Focus: `focus-visible:ring-2 focus-visible:ring-primary/50` on every nav item in both surfaces — `ring-inset` on Bottom Bar's edge-flush items (the primary five and Settings) so the ring stays inside the element instead of risking clipping against the viewport edge.
 
-The active sidebar item gets a copper fill block (`bg-primary text-bg`), making it the only non-text copper element in the nav. Bottom bar active is copper text only (no fill) — appropriate for a touch surface where fill can feel heavy.
-
-`ThemeToggle` shares the nav item vocabulary exactly — transparent at rest, `hover:bg-surface-elevated` on hover — rather than carrying its own permanent `bg-surface-elevated` fill. A control that sits directly beside NavItems in both surfaces reads as one family only when its resting state matches theirs.
+The active sidebar item gets a blue fill block (`bg-primary text-bg`), making it the only non-text blue element in the nav. Bottom bar active is blue text only (no fill) — appropriate for a touch surface where fill can feel heavy.
 
 ### CourtCard
 
@@ -288,7 +282,7 @@ The highest-stakes card in the application. Two root states: **Available** and *
 
 ### PlanningCard
 
-The matchup staging card. Fixed width of `w-[76vw] md:w-[252px]` in horizontal scroll (`fullWidth` override for column layout). Three states: **Empty**, **Filling**, **Ready**. Border transitions: dashed (`border-dashed border-border/50`) → solid (`border-border`) → copper (`border-primary/40`).
+The matchup staging card. Fixed width of `w-[76vw] md:w-[252px]` in horizontal scroll (`fullWidth` override for column layout). Three states: **Empty**, **Filling**, **Ready**. Border transitions: dashed (`border-dashed border-border/50`) → solid (`border-border`) → blue (`border-primary/40`).
 
 **Header**: Match type toggle (`1v1` / `2v2`) on the left — pill-group style with `bg-surface-elevated text-ink` for active, `text-muted` for inactive. Grip icon (12px, `text-muted/40`) + Dismiss (`×`) on the right. The grip's low opacity is intentional: it signals drag affordance without competing with the type toggle.
 
@@ -354,7 +348,7 @@ Extracted to `useToast()` + `<ToastViewport />` in `src/components/ui/Toast.tsx`
 
 No dimming backdrop — a full-screen scrim would block the organizer from just doing the task instead of reading the tip, which contradicts the whole point of a tutorial gated on real progress. Instead: a pulsing ring (`border-2 border-dashed border-accent` around the live target, `.animate-tutorial-pulse` — a continuous `box-shadow` glow in accent, `1.6s ease-in-out infinite`, unlike the two-pulse `.animate-suggest-pulse` this borrows its shape from) plus a small anchored callout (`bg-surface border border-accent/40 rounded-lg shadow-lg`, `w-[288px]`). The target is found live via `document.querySelector('[data-tutorial-target="…"]')` and tracked with a `requestAnimationFrame` poll rather than scroll/resize listeners on specific ancestors — catches any layout shift from any source, and bails out of re-rendering when the measured rect hasn't actually moved.
 
-**Deliberately accent, not primary — and dashed, not solid.** Primary-colored rings already carry three distinct real meanings elsewhere: `CourtCard`'s confirm-pending ring, its drop-target/drag-over ring, and `PlayerChip`'s own drag-over ring — and several of those can render on the *exact* element a tutorial step is spotlighting at the same moment (mid-relocate, or mid-substitute onto a live match). A tutorial ring in primary would read as "this needs a decision," not "here's a tip." Accent (steel slate) plus a dashed rather than solid border means the distinction never rests on hue alone — someone with a color-vision deficiency still sees a different shape, not just a different color that might not read as different at all.
+**Deliberately accent, not primary — and dashed, not solid.** Primary-colored rings already carry three distinct real meanings elsewhere: `CourtCard`'s confirm-pending ring, its drop-target/drag-over ring, and `PlayerChip`'s own drag-over ring — and several of those can render on the *exact* element a tutorial step is spotlighting at the same moment (mid-relocate, or mid-substitute onto a live match). A tutorial ring in primary would read as "this needs a decision," not "here's a tip." Accent (violet) plus a dashed rather than solid border means the distinction never rests on hue alone — someone with a color-vision deficiency still sees a different shape, not just a different color that might not read as different at all.
 
 Callout placement: below the target by default, flipping above (bottom-anchored, so an unmeasured callout height is never guessed at) when there isn't room below. Horizontally clamped within the viewport with a 12px margin either side. Entrance via `.animate-tutorial-in` (`opacity` + 4px `translateY`, 200ms ease-out — same shape as `label-in`/`toast-in`).
 
@@ -371,18 +365,18 @@ Portaled to `document.body` (`PlayerModal`/`AddPlayersModal`'s pattern), `z-[var
 ## 6. Do's and Don'ts
 
 ### Do:
-- **Do** use Court Copper (`oklch(0.71 0.17 38)`) on exactly one primary action per screen region — Start Match, Assign to Court, Confirm, End Match.
+- **Do** use Ateneo Blue (`oklch(0.317 0.202 264)`) on exactly one primary action per screen region — Start Match, Assign to Court, Confirm, End Match.
 - **Do** set all quantitative data (win rates, queue positions, amounts, counts, durations) in JetBrains Mono at 500 weight.
 - **Do** keep the page background at exactly `oklch(0.09 0 0)` — no chroma, no tint.
 - **Do** size all interactive elements at minimum 44×44px; primary session actions (Start Match, End Match, Assign to Court, Confirm) at minimum 44×44px with `py-2.5` or equivalent.
-- **Do** use semantic colors only for state: Court Green for available/paid, Caution Amber for unpaid/warning, Steel Slate for in-progress/in-use.
+- **Do** use semantic colors only for state: green for available/paid, amber for unpaid/warning, violet accent for in-progress/in-use.
 - **Do** keep transitions at 150–250ms ease-out; motion conveys state changes only (button press, status update, panel slide). Wrap animated sections in `<MotionConfig reducedMotion="user">`.
 - **Do** respect `prefers-reduced-motion`: the global CSS rule (`animation-duration: 0.01ms`, `transition-duration: 0.01ms`) handles this system-wide.
 - **Do** use the two-step inline confirm pattern for all destructive actions. No modals for deletions — the confirm replaces the action in the same row at the same height.
 - **Do** keep court picker and other contextual action pickers spatially anchored to the element that triggered them. Never render pickers in a column footer detached from the triggering card.
 - **Do** move focus explicitly on every confirm-swap transition (to Cancel on entry, back to the trigger on exit). A ref pair, not React state — the swap unmounts the focused element.
 - **Do** give every focusable element a `focus-visible:ring-2`, including bare inline-text actions — add `rounded-sm px-1 -mx-1` if there's no natural padding for the ring to sit in.
-- **Do** use `bg-surface-elevated` (lightness, not shadow blur) as the depth signal for anything that needs to read as "lifted" in dark mode — hover, scroll position, or otherwise.
+- **Do** use `bg-surface-elevated` (lightness, not shadow blur) as the depth signal for anything that needs to read as "lifted" — hover, scroll position, or otherwise.
 - **Do** set `scope="col"` on every `<th>` in every data table, no exceptions.
 
 ### Don't:
@@ -397,7 +391,7 @@ Portaled to `document.body` (`PlayerModal`/`AddPlayersModal`'s pattern), `z-[var
 - **Don't** apply box-shadow to cards or rows at rest. Tonal separation via the dark scale is sufficient; shadows at rest mean the component was ported from a light-mode system without adaptation.
 - **Don't** ship placeholder chrome. Disabled buttons for unbuilt features ("coming soon" tooltips) erode organizer trust. If a feature isn't built, the button doesn't exist yet.
 - **Don't** use the centered icon-in-circle + heading + CTA empty state template. It's the most common AI-generated empty state. Use a single plain text line + minimal CTA instead.
-- **Don't** use the accent color (Steel Slate) for status-of-fact badges like "Playing." Reserve accent for interactive signals (in-progress matches, navigational highlights). Informational-only states use `text-muted bg-surface-elevated`.
+- **Don't** use the accent color (slate) for status-of-fact badges like "Playing." Reserve accent for interactive signals (in-progress matches, navigational highlights). Informational-only states use `text-muted bg-surface-elevated`.
 - **Don't** use `focus-visible:underline` as a substitute for a ring, even on dense inline text inside a toast or pill. It's a deprecated pattern in this system, not a legitimate secondary convention — every instance of it has been migrated to a padded ring.
 - **Don't** "fix" a dark-mode shadow by tinting its color instead of dropping it. If a shadow is invisible against `oklch(0.09 0 0)`, the answer is `bg-surface-elevated`, never a lighter-colored shadow.
 - **Don't** make a table row look hoverable everywhere but only respond to a link buried in one cell. If the row highlights on hover, the whole row is the click target.

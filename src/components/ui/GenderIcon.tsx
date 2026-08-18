@@ -3,7 +3,10 @@ import type { Gender } from "@/types";
 import { cn } from "@/lib/utils";
 
 const ICONS = { M: Mars, F: Venus } as const;
-const COLORS = { M: "text-accent", F: "text-primary" } as const;
+// Their own tokens, not primary/accent. Gender appears on every player row, so
+// binding it to the brand put the accent colour everywhere and destroyed the
+// scarcity that makes it read as "this is the action". Low chroma on purpose.
+const COLORS = { M: "text-gender-m", F: "text-gender-f" } as const;
 const LABELS = { M: "Male", F: "Female" } as const;
 
 // Below this, the Mars/Venus glyph's arrow and cross strokes stop reading as

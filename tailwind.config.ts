@@ -21,6 +21,8 @@ const config: Config = {
         success:              "oklch(var(--color-success-raw) / <alpha-value>)",
         warning:              "oklch(var(--color-warning-raw) / <alpha-value>)",
         error:                "oklch(var(--color-error-raw) / <alpha-value>)",
+        "gender-m":           "oklch(var(--color-gender-m-raw) / <alpha-value>)",
+        "gender-f":           "oklch(var(--color-gender-f-raw) / <alpha-value>)",
         "skill-advanced":       "oklch(var(--color-skill-advanced-raw) / <alpha-value>)",
         "skill-advanced-ink":   "oklch(var(--color-skill-advanced-ink-raw) / <alpha-value>)",
         "skill-intermediate":   "oklch(var(--color-skill-intermediate-raw) / <alpha-value>)",

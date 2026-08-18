@@ -11,10 +11,9 @@ import {
   Settings,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { ThemeToggle } from "@/components/ui/ThemeToggle";
 
 // Same four destinations, same order, as Sidebar's primary nav — "shared
-// item vocabulary" per DESIGN.md. Sessions/Settings/ThemeToggle are the
+// item vocabulary" per DESIGN.md. Sessions/Settings are the
 // secondary trio Sidebar pins below a divider; mirrored here as a narrower
 // end segment rather than flex-1 slots, so they read as secondary without
 // being hidden (this is the only nav surface below md:, so nothing here can
@@ -91,8 +90,6 @@ export function BottomBar() {
           <CalendarDays size={16} strokeWidth={pathname.startsWith("/sessions") ? 2.5 : 1.75} aria-hidden />
           <span className="text-[9px] font-medium leading-none truncate max-w-full px-0.5">Sessions</span>
         </Link>
-
-        <ThemeToggle className="w-12 flex-shrink-0 justify-center min-h-[44px]" />
       </div>
     </nav>
   );

@@ -11,7 +11,7 @@ Organizer-focused web application for managing badminton sessions: players, cour
 ## Tech Stack
 - **Framework**: Next.js 14 (App Router)
 - **Language**: TypeScript (strict mode)
-- **Styling**: Tailwind CSS + shadcn/ui
+- **Styling**: Tailwind CSS + shadcn/ui. **Single light theme — no dark mode.** One token block in `globals.css`; brand is Ateneo blue `#001196`, used as a secondary on a predominantly white canvas
 - **ORM**: Prisma
 - **Database**: PostgreSQL
 - **Auth**: NextAuth.js (credentials provider for organizer login)

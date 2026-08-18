@@ -1,35 +1,28 @@
 import type { SkillLevel } from "@/types";
 import { cn, SKILL_LABELS, SKILL_LABELS_SHORT } from "@/lib/utils";
 
-// A rarity ladder, not a materials one (see the --color-skill-* tokens in
-// globals.css): slate → teal → indigo → orchid. Chroma AND lightness both
-// climb with rank, which is what keeps the ordinal readable at 9px and under
-// red-green colour-vision deficiency — hue alone would carry neither. Metals
-// were tried first and collide with this palette: the brand is copper (H38),
-// so bronze is the same hue, gold neighbours the amber warning, and diamond
-// neighbours the steel accent.
+// The classic metals ladder: Bronze -> Silver -> Gold -> Platinum.
 //
-// The Filled Tier Rule: every level is a solid fill, not just the top ones — a
-// real medal, not a tinted chip. Text is plain `text-black` (not the
-// theme-relative `text-bg`, and not a CSS-variable token either — a newly-added
-// Tailwind theme key needs a dev-server restart to take effect, and without it
-// the class silently produces no rule at all), since the fill is fixed across
-// both themes and pure black needs no indirection to stay correct.
+// Chroma deliberately does NOT climb here — silver is less saturated than
+// bronze, platinum less than gold — so unlike a rarity ramp the ordinal can't
+// be read from saturation. It rests on cultural knowledge (everyone knows the
+// order) plus LIGHTNESS, which climbs cleanly 0.66 -> 0.72 -> 0.80 -> 0.83.
+// That's the more robust channel regardless: lightness survives every form of
+// colour-vision deficiency, where hue and chroma do not.
 //
-// This was briefly outlined instead, to match a dark-themed reference app. It
-// didn't survive contact with a dense light-themed list: outlining moves rank
-// into a 1px border and 9px glyph strokes, roughly a quarter of the colored
-// area of a fill and most of that in thin strokes. The badge's whole job is
-// peripheral rank recognition down twenty rows, and area is what does that.
+// Fills are solid with plain `text-black` (Tailwind's built-in — the fill is a
+// fixed value, so the label needs no token indirection). Every fill clears
+// 6.7:1 under black.
 //
-// --color-skill-*-ink still exists for anything that needs the tier color as
-// *text* — the fills sit at OKLCH L 0.60–0.84, fine under black but ~1.5:1 as
-// text on white, so that token darkens them under [data-theme="light"].
+// BORDERS USE -ink, NOT A TINT OF THE FILL. On this white canvas the platinum
+// fill is only 1.66:1 against the background; a border tinted from its own
+// fill would leave the badge with no visible edge at all. The darkened -ink
+// variant gives ~7:1 on every tier. This is why those tokens exist.
 const variants: Record<SkillLevel, string> = {
-  ADVANCED: "bg-skill-advanced text-black border border-skill-advanced/50",
-  INTERMEDIATE: "bg-skill-intermediate text-black border border-skill-intermediate/50",
-  BEGINNER: "bg-skill-beginner text-black border border-skill-beginner/50",
-  CASUAL: "bg-skill-casual text-black border border-skill-casual/50",
+  ADVANCED: "bg-skill-advanced text-black border border-skill-advanced-ink/40",
+  INTERMEDIATE: "bg-skill-intermediate text-black border border-skill-intermediate-ink/40",
+  BEGINNER: "bg-skill-beginner text-black border border-skill-beginner-ink/40",
+  CASUAL: "bg-skill-casual text-black border border-skill-casual-ink/40",
 };
 
 export function SkillBadge({

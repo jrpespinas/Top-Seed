@@ -171,11 +171,8 @@ export function SessionsListView() {
       <div
         className={cn(
           "sticky top-0 z-[var(--z-sticky)] pt-[env(safe-area-inset-top)] transition-colors duration-200",
-          // Dark mode reads elevation as surface lightness, not shadow color
-          // (a black shadow blur is nearly invisible on a near-black bg) —
-          // surface-elevated already IS this app's lighter-elevation step in
-          // dark mode, and a legible tint-darker step in light mode, so one
-          // token covers the "scrolled, lifted header" cue in both themes.
+          // Elevation reads as surface lightness, not shadow colour, so one
+          // token covers the "scrolled, lifted header" cue.
           headerShadow ? "bg-surface-elevated shadow-[0_1px_0_var(--color-border)]" : "bg-bg"
         )}
       >
