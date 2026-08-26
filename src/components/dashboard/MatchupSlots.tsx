@@ -7,6 +7,7 @@ import { dragEndpointKind, readEndpointPayload, writeEndpointPayload } from "./D
 import { canDrop, type Endpoint } from "@/lib/roster-swap";
 import { SkillBadge } from "@/components/ui/SkillBadge";
 import { GenderIcon } from "@/components/ui/GenderIcon";
+import { ElapsedTimer } from "@/components/ui/ElapsedTimer";
 import { cn } from "@/lib/utils";
 import { X } from "lucide-react";
 
@@ -28,6 +29,9 @@ export function MatchupSlots({
   onSlotTap,
   onRemovePlayer,
   onEndpointDrop,
+  waitingSince,
+  gamesPlayed,
+  peerMedianEnteredAt,
 }: {
   card: PlanningCardType;
   selectedChip: SlotAddress | null;
@@ -36,6 +40,12 @@ export function MatchupSlots({
   onSlotTap: (side: "A" | "B", index: number) => void;
   onRemovePlayer?: (side: "A" | "B", index: number) => void;
   onEndpointDrop?: (from: Endpoint, to: Endpoint) => void;
+  /** playerId -> QueueEntry.enteredQueueAt. Waiting time lives on the queue
+   * entry, not on Player, and a carded player keeps theirs (placement never
+   * removes it) — which is the invariant that makes this renderable here. */
+  waitingSince?: Map<string, string>;
+  gamesPlayed?: Map<string, number>;
+  peerMedianEnteredAt?: string;
 }) {
   const [dragOverSlot, setDragOverSlot] = useState<SlotRef | null>(null);
   const rowCount = card.matchType === "DOUBLES" ? 2 : 1;
@@ -83,6 +93,9 @@ export function MatchupSlots({
           <PlayerChip
             key={`${side}-${i}`}
             player={player}
+            waitingSinceISO={waitingSince?.get(player.id)}
+            gamesPlayed={gamesPlayed?.get(player.id)}
+            peerMedianEnteredAt={peerMedianEnteredAt}
             isSelected={
               selectedChip?.cardId === card.id &&
               selectedChip?.side === side &&
@@ -138,6 +151,9 @@ export function MatchupSlots({
 
 function PlayerChip({
   player,
+  waitingSinceISO,
+  gamesPlayed,
+  peerMedianEnteredAt,
   isSelected,
   isDragOver,
   onClick,
@@ -148,6 +164,9 @@ function PlayerChip({
   onDrop,
 }: {
   player: Player;
+  waitingSinceISO?: string;
+  gamesPlayed?: number;
+  peerMedianEnteredAt?: string;
   isSelected: boolean;
   isDragOver: boolean;
   onClick: () => void;
@@ -182,6 +201,28 @@ function PlayerChip({
         <span className="text-xs text-ink truncate leading-none min-w-[44px]">{player.name}</span>
         <SkillBadge level={player.skillLevel} compact />
         {player.gender && <GenderIcon gender={player.gender} size={14} />}
+        {/* Games then wait, same order as the player rows. Terser format here
+            (`3g`, not `3 G`) — the chip is ~250px and already carries name,
+            badge, gender and two numbers. */}
+        <span className="ml-auto flex items-center gap-1.5 flex-shrink-0">
+          <span
+            className="text-[10px] font-mono tabular-nums text-muted leading-none"
+            title={`${gamesPlayed ?? 0} games played`}
+            aria-label={`${gamesPlayed ?? 0} games played`}
+          >
+            {gamesPlayed ?? 0}g
+          </span>
+          {waitingSinceISO && (
+            <ElapsedTimer
+              startedAtISO={waitingSinceISO}
+              peerMedianStartedAtISO={peerMedianEnteredAt}
+              className="text-[10px] font-mono tabular-nums leading-none"
+              ariaLabel={(elapsed, isLong) =>
+                `Waiting ${elapsed}${isLong ? " — waiting a while" : ""}`
+              }
+            />
+          )}
+        </span>
       </button>
       {onRemove && (
         <button

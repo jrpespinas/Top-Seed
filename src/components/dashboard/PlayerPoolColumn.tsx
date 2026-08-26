@@ -251,6 +251,9 @@ interface Props {
   bench: BenchEntry[];
   gamesPlayedMap: Map<string, number>;
   slottedPlayerIds: Set<string>;
+  /** Median queue-entry time across everyone waiting — drives the relative
+   * "waited too long" colour so both surfaces agree on who's an outlier. */
+  peerMedianEnteredAt?: string;
   onQueueRemove: (id: string) => void;
   onMoveToBench: (id: string) => void;
   onBenchReturnToQueue: (id: string) => void;
@@ -288,6 +291,7 @@ function PlayerRow({
   endpoint,
   gamesPlayed,
   waitingSinceISO,
+  peerMedianEnteredAt,
   onMoveToBench,
   onReturnToQueue,
   onRemove,
@@ -309,6 +313,7 @@ function PlayerRow({
   // Queue rows only — how long this player has been in their current queue
   // position (not total session time; see QueueEntry.enteredQueueAt).
   waitingSinceISO?: string;
+  peerMedianEnteredAt?: string;
   onMoveToBench?: () => void;
   onEdit?: () => void;
   onReturnToQueue?: () => void;
@@ -406,6 +411,7 @@ function PlayerRow({
                 <Clock size={9} strokeWidth={2} className="text-muted/70" aria-hidden />
                 <ElapsedTimer
                   startedAtISO={waitingSinceISO}
+                  peerMedianStartedAtISO={peerMedianEnteredAt}
                   className="text-[10px] font-mono tabular-nums leading-none"
                   ariaLabel={(elapsed, isLong) =>
                     `Waiting ${elapsed}${isLong ? " — waiting a while" : ""}`
@@ -521,6 +527,7 @@ export function PlayerPoolColumn({
   bench,
   gamesPlayedMap,
   slottedPlayerIds,
+  peerMedianEnteredAt,
   onQueueRemove,
   onMoveToBench,
   onBenchReturnToQueue,
@@ -758,6 +765,7 @@ export function PlayerPoolColumn({
                           endpoint={{ kind: "queue", playerId: entry.player.id }}
                           gamesPlayed={gamesPlayedMap.get(entry.player.id)}
                           waitingSinceISO={entry.enteredQueueAt}
+                          peerMedianEnteredAt={peerMedianEnteredAt}
                           onMoveToBench={() => onMoveToBench(entry.id)}
                           onRemove={() => onQueueRemove(entry.id)}
                           onEdit={() => handleEditPlayer(entry.id, "queue")}
@@ -823,6 +831,7 @@ export function PlayerPoolColumn({
                           isSelected={selectedPlayerId === entry.player.id}
                           gamesPlayed={gamesPlayedMap.get(entry.player.id)}
                           waitingSinceISO={entry.enteredQueueAt}
+                          peerMedianEnteredAt={peerMedianEnteredAt}
                           onMoveToBench={() => onMoveToBench(entry.id)}
                           onRemove={() => onQueueRemove(entry.id)}
                           onEdit={() => handleEditPlayer(entry.id, "queue")}

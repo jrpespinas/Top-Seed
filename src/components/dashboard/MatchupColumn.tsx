@@ -23,6 +23,9 @@ interface Props {
   justSuggestedCardIds?: Set<string>;
   selectedPlayer?: Player | null;
   selectedChip: SlotAddress | null;
+  waitingSince?: Map<string, string>;
+  gamesPlayed?: Map<string, number>;
+  peerMedianEnteredAt?: string;
   onSlotTap: (cardId: string, side: "A" | "B", index: number) => void;
   onEndpointDrop: (from: Endpoint, to: Endpoint) => void;
   onCancelChipSelection: () => void;
@@ -46,6 +49,9 @@ export function MatchupColumn({
   justSuggestedCardIds,
   selectedPlayer,
   selectedChip,
+  waitingSince,
+  gamesPlayed,
+  peerMedianEnteredAt,
   onSlotTap,
   onEndpointDrop,
   onCancelChipSelection,
@@ -133,6 +139,9 @@ export function MatchupColumn({
                       isDraggingAny={draggingCardId !== null}
                       selectedPlayer={selectedPlayer}
                       selectedChip={selectedChip}
+              waitingSince={waitingSince}
+              gamesPlayed={gamesPlayed}
+              peerMedianEnteredAt={peerMedianEnteredAt}
                       onSlotTap={(side, index) => onSlotTap(card.id, side, index)}
                       onEndpointDrop={onEndpointDrop}
                       onCancelChipSelection={onCancelChipSelection}

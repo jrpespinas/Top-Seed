@@ -25,6 +25,9 @@ interface Props {
   isDraggingAny: boolean;
   selectedPlayer?: Player | null;
   selectedChip: SlotAddress | null;
+  waitingSince?: Map<string, string>;
+  gamesPlayed?: Map<string, number>;
+  peerMedianEnteredAt?: string;
   onSlotTap: (side: "A" | "B", index: number) => void;
   onEndpointDrop?: (from: Endpoint, to: Endpoint) => void;
   onCancelChipSelection: () => void;
@@ -47,6 +50,9 @@ export function PlanningCard({
   isDraggingAny,
   selectedPlayer,
   selectedChip,
+  waitingSince,
+  gamesPlayed,
+  peerMedianEnteredAt,
   onSlotTap,
   onEndpointDrop,
   onCancelChipSelection,
@@ -206,6 +212,9 @@ export function PlanningCard({
           onSlotTap={onSlotTap}
           onRemovePlayer={onRemovePlayer}
           onEndpointDrop={onEndpointDrop}
+          waitingSince={waitingSince}
+          gamesPlayed={gamesPlayed}
+              peerMedianEnteredAt={peerMedianEnteredAt}
         />
         {suggestion?.pairsExhausted && (
           <p className="text-[10px] text-muted mt-1.5 px-1.5">

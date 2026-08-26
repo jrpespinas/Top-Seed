@@ -224,6 +224,26 @@ export function DashboardClient({ sessionId, onTutorialCheck }: Props) {
     return ids;
   }, [planningCards]);
 
+  // playerId -> when they last entered the queue. Matchup chips show waiting
+  // time, but a chip only holds a bare Player; enteredQueueAt lives on the
+  // QueueEntry behind it, which a carded player still has (placement never
+  // removes it).
+  // Stable timestamp, not a duration: durations drift as the clock moves, so
+  // each ElapsedTimer derives its own live threshold from this instead.
+  const queueMedianEnteredAt = useMemo(() => {
+    const waiting = queue.filter((e) => !e.isInMatch);
+    if (waiting.length === 0) return undefined;
+    const times = waiting.map((e) => new Date(e.enteredQueueAt).getTime()).sort((a, b) => a - b);
+    const mid = Math.floor(times.length / 2);
+    const median = times.length % 2 ? times[mid] : (times[mid - 1] + times[mid]) / 2;
+    return new Date(median).toISOString();
+  }, [queue]);
+
+  const waitingSince = useMemo(
+    () => new Map(queue.map((e) => [e.player.id, e.enteredQueueAt])),
+    [queue]
+  );
+
   const rosterState = useMemo<RosterState>(
     () => ({ queue, bench, cards: planningCards, courts }),
     [queue, bench, planningCards, courts]
@@ -971,6 +991,7 @@ export function DashboardClient({ sessionId, onTutorialCheck }: Props) {
             bench={bench}
             gamesPlayedMap={gamesPlayedMap}
             slottedPlayerIds={slottedPlayerIds}
+            peerMedianEnteredAt={queueMedianEnteredAt}
             onQueueRemove={handleQueueRemove}
             onMoveToBench={handleMoveToBench}
             onBenchReturnToQueue={handleBenchReturnToQueue}
@@ -1007,6 +1028,9 @@ export function DashboardClient({ sessionId, onTutorialCheck }: Props) {
             justSuggestedCardIds={justSuggestedCardIds}
             selectedPlayer={selectedPoolPlayer}
             selectedChip={selectedChip}
+            waitingSince={waitingSince}
+            gamesPlayed={gamesPlayedMap}
+            peerMedianEnteredAt={queueMedianEnteredAt}
             onSlotTap={handleSlotTap}
             onEndpointDrop={applySwap}
             onCancelChipSelection={() => setSelection(null)}
