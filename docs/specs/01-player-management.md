@@ -84,29 +84,44 @@ Standard dialog behaviors: discard-confirmation when closing with unsaved change
 
 **Skill-level history is not implemented.** The modal shows the copy "Changing skill level creates a history entry" when editing a player's skill level — this is currently misleading UI text; no history record of any kind is created anywhere in the codebase. A real backend should either implement the write path this copy implies, or the copy should be removed until it does.
 
-### Dashboard bulk-add (`AddPlayersModal.tsx`, opened from `PlayerPoolColumn.tsx`'s "Add" button)
-The Dashboard's own multi-player creation entry point, writing into the same session queue `/players` reads from `session-store.ts`.
+### Dashboard add-players (`AddPlayersModal.tsx`, opened from `PlayerPoolColumn.tsx`'s "Add" button)
+The Dashboard's own player-creation entry point, writing into the same session queue `/players` reads from `session-store.ts`.
 
-**Two steps: paste, then review.** Not a repeatable-row form — the common case is an organizer with a list of names already sitting in a group chat, so the flow leads with a bulk paste and only then asks for per-player detail.
+**One screen, no wizard.** This was previously a two-step flow — paste every name into a textarea, then review a grid and set each player's level and gender. The split was the problem: an organizer typing twelve names transitioned away and was shown twelve blank gender toggles with no memory of who was who. Bulk entry isn't the hard part; *batching the detail entry away from the names* is. So the paste step and the review step are now the same surface.
 
-**Step 1 — paste.** A single textarea, one name per line. Splitting is newline-only on purpose: a comma inside a pasted name ("Smith, John") must not become two players. `Cmd/Ctrl+Enter` continues. Empty input is rejected inline.
+**Quick-add is the whole flow for one player.** A single line at the top — name input, `SkillLevelSelect`, `GenderToggle`, and an Add button. One player costs `type → Enter → Add`; it used to cost `type → Continue → set level → set gender → Add`.
 
-**Step 2 — review.** Every parsed name becomes a row carrying Name (editable), Skill Level (`SkillLevelSelect`), and Gender (`GenderToggle`, required).
+**Enter commits from anywhere in that row**, then returns focus to the name field — not just from the name input. Handled in the capture phase, because two children claim Enter and would otherwise win: a `GenderToggle` pill is a `<button>`, so Enter fires its click and toggles the gender you just picked back *off*; `SkillLevelSelect`'s trigger opens its dropdown. Intercepting on the way down suppresses both.
+- The dropdown keeps Enter while it is genuinely open, where it means "choose this level". Space and the arrow keys still open it, so nothing becomes unreachable by keyboard.
+- Enter on a gender pill reads as "this one, and add" — the pill's gender is applied even if it wasn't the selected one, which saves a keystroke, and it carries forward as the sticky default like any other choice. `GenderToggle` exposes `data-gender` on each pill so the container can read that without parsing label text.
+- With an empty name there is nothing to commit, so the keystroke is left to whichever control has focus rather than being swallowed for a no-op.
 
-- **One responsive `<table>`, not two markups.** A real table at `sm:`+ (sticky header, one `<tr>` per player); below that the same table reflows via CSS to stacked row-cards. Duplicating the interactive cells per breakpoint would register two DOM nodes per row id in the name-input / row / gender-toggle ref maps that drive focus management and scroll-to-invalid-row, and whichever copy mounted last — not whichever was visible — would win.
-- **"Set for all"** applies a skill level and/or gender to every row at once. It is a one-shot trigger, not a bound value: rows hand-edited afterward keep their own values until "Set for all" is used again, and the caption says so. Hidden for a single row, which has no "all" to act on. Each application is undoable via toast.
-- **Duplicate names are flagged live** — against both the existing session roster and other rows in the same batch (both colliding rows are marked, not just the second). Comparison is case-sensitive on purpose: "Alex" and "alex" are different people, not a normalisation problem to solve. Submission is blocked until resolved, focusing the first offender.
-- **Missing gender is gated behind a submit attempt.** Every row starts with no gender, so validating live would ring every row red the instant the grid renders — a wall of errors on an untouched form. On a failed submit the first offending row is scrolled into view and its toggle focused.
-- **Back preserves work.** Returning to the paste step and continuing again reconciles against the existing rows by name, so a name that survives the round-trip keeps the skill and gender already set on it. Names are matched through per-name queues rather than a single map, so two rows sharing a name (already flagged as duplicates) each keep their own values instead of collapsing onto one.
+- **Sticky defaults are the engine.** Level and gender persist across commits, so the next row inherits what the last player used. Players check in as clusters (three intermediate men arrive together), which makes "same as the one before" right far more often than any fixed default, and reduces a run of similar players to *name, Enter, name, Enter*. Level starts at Intermediate; gender starts unset.
+- **Paste still works, and lands as incomplete rows.** A paste containing a newline is intercepted and split into staged rows (newline-only, so "Smith, John" stays one player). It cannot complete anyone — none of them have a gender — so it stages them honestly rather than filling in a guess.
+
+**Staged rows sit directly below: one row shape, in the order they were added.** Every row carries the same persistent controls — name, `SkillLevelSelect`, `GenderToggle`, remove — whether or not it's complete.
+
+- This replaced a two-shape split: a form row for anyone missing a gender under a "Needs a gender" heading, and a compact `SkillBadge` + `GenderIcon` read-back with an Edit button under "Ready to add". It cost three states to hold at once (which section a row is in, which shape it has, whether it's in edit mode), and rows physically jumped between sections the moment a gender was set. A row missing a gender now shows it plainly — neither pill is lit — which is the only thing the split was actually communicating.
+- **The name is a borderless input** that draws its edge only on hover and focus. It reads as text, so a stack of them stays calm rather than looking like a six-field form, while staying directly editable with no Edit button and no mode to enter.
+- **Rows are divided by hairlines, not boxed as cards.** Six bordered cards each containing three bordered controls was the bulk of the visual noise.
+- **A persistent "Set all" bar** sits above the list whenever 2+ rows are staged, sticky to the top of the scroll area so a long list can be re-swept without scrolling back. It applies a level or a gender to **every** staged row and stays available for as long as rows are staged. Its controls sit in the same columns as each row's (a spacer holds the remove column), so it reads as the same pair of controls aimed at everyone at once.
+  - It previously swept only the incomplete rows, which made it effectively one-shot: setting a gender for all graduated every row to "ready" and left the control with nothing to reach, so a mis-tap could only be undone by editing each row by hand — the exact work it exists to avoid. A sweep you can't re-aim isn't a bulk edit.
+  - Overwriting a hand-edited row is the accepted cost; every sweep snapshots the prior rows and offers undo. Level and gender sweep independently, so re-aiming gender never disturbs levels.
+  - The controls display the rows' *shared* value rather than the last one applied — "everyone is Male", not a memory the rows may have diverged from. `GenderToggle` shows nothing selected for a mixed set; `SkillLevelSelect` needs a concrete level, so it falls back to the last swept one when mixed.
+  - Tapping the already-active gender pill is a no-op rather than `GenderToggle`'s usual deselect, which here would strip the gender from every row at once.
+  - The bar carries the only remaining progress signal: a muted "N still need a gender" line, shown only when that count is non-zero.
+- **Duplicate names are flagged live** — against both the existing session roster and other rows in the same batch (both colliding rows are marked, not just the second), and the quick-add input itself flags a duplicate before you commit it. Comparison is case-sensitive on purpose: "Alex" and "alex" are different people, not a normalisation problem to solve. Submission is blocked until resolved.
+- **Missing gender is gated behind a submit attempt.** Rows begin without one, so validating live would ring every pasted row red the instant it lands. On a failed submit the first offending row is scrolled into view and its toggle focused.
+- **An uncommitted quick-add draft is included on submit.** Typing a name and pressing the submit button without pressing Enter first adds that player rather than silently dropping them — the worst possible failure on this surface.
 - **Row removal** shows a toast with undo, restoring the row at its original index.
-- **Blank rows are silently excluded** from submission; the submit label counts only valid rows.
 - Submit is re-entrancy guarded by a ref, not just `disabled` — a fast double-tap on a tablet can beat React's re-render and submit the batch twice.
+- Closing with anything staged (or a draft name typed) raises the discard confirmation.
 
-On submit, each valid row becomes a new `QueueEntry` with a client-generated player id (`p-{timestamp}-{i}`) and a `sessionJoinedAt`/`enteredQueueAt` staggered by `i` milliseconds so multiple players typed in the same batch preserve their row order when the FIFO queue later sorts by check-in time (see `05-queue-matchup.md`). These are immediately visible on `/players`.
+On submit, each row becomes a new `QueueEntry` with a client-generated player id (`p-{timestamp}-{i}`) and a `sessionJoinedAt`/`enteredQueueAt` staggered by `i` milliseconds so multiple players added in the same batch preserve their order when the FIFO queue later sorts by check-in time (see `05-queue-matchup.md`). These are immediately visible on `/players`.
 
 ### Shared form controls (`src/components/ui/`)
 - **`SkillLevelSelect`** — a custom combobox (not a native `<select>`), showing the selected `SkillBadge` plus the full skill label ("Intermediate", "Advanced", etc.) with a portaled dropdown list. Used by both `PlayerModal` and `AddPlayersModal` so the two entry points stay visually and behaviorally identical.
-- **`GenderToggle`** — a two-button (M/F) toggle-radio group, click-again-to-deselect. `variant="full"` renders full words in a 2-column grid (`PlayerModal`); `variant="compact"` renders bare letters in a single-line pair (`AddPlayersModal`'s repeatable rows, where horizontal space is tight).
+- **`GenderToggle`** — a two-button (M/F) toggle-radio group, click-again-to-deselect. `variant="full"` renders full words in a 2-column grid (`PlayerModal`); `variant="compact"` renders bare letters in a single-line pair (`AddPlayersModal`'s quick-add line and staged rows, where horizontal space is tight).
 - **`PaymentToggle`** — a three-button (Paid/Unpaid/Waived) toggle-radio group rendered directly in the `/players` table row (not in `PlayerModal`). Single tap sets the exact state; no cycling.
 
 ---
@@ -115,7 +130,7 @@ On submit, each valid row becomes a new `QueueEntry` with a client-generated pla
 
 - **`PlayerModal`**: name required, minimum 2 characters after trim.
 - **`AddPlayersModal`**: name required (non-empty after trim) — no minimum length enforced, an inconsistency with `PlayerModal`'s stricter rule for the same underlying field.
-- **No duplicate-name detection exists anywhere** — not in `PlayerModal`, not in `PlayersView`'s save logic, not in `AddPlayersModal`/the Dashboard's add-players handler. Two players with an identical name can be created without warning on either surface.
+- **Duplicate-name detection exists only in `AddPlayersModal`**, which blocks submission against both the current roster and the batch itself. `PlayerModal` and `PlayersView`'s save logic have none: renaming an existing player onto another player's name still goes through without warning.
 
 ---
 
@@ -126,7 +141,7 @@ Places where the UI implies behavior that has no real implementation behind it �
 1. **No persistence beyond localStorage.** Every "save" writes to `localStorage`; nothing survives a cleared browser or a different device.
 2. **No cross-session player history *across* sessions, though a single past session is now viewable.** `/players` can show a closed session's frozen roster (name, skill, gender, payment, notes) via `SessionSelect`, but there's still no way to look up a specific person's history across every session they've played, and no quick "re-add a regular" flow into a new session — every new session starts from zero. If the real product wants a persistent club roster, that's a reversal of this decision, not an extension of it.
 3. **Skill-level history is UI-only copy with no data behind it.** No history record is ever created on a skill-level change.
-4. **No duplicate-name detection**, despite name being the only required, user-typed identifier.
+4. **Duplicate-name detection is add-time only.** `AddPlayersModal` blocks it, but editing a player's name on `/players` can still produce a collision, despite name being the only required, user-typed identifier.
 5. **In-match players are invisible on `/players`.** See the "Known limitation" note above — court state isn't in a shared store yet.
 6. **Validation is inconsistent between `PlayerModal` and the Dashboard bulk-add** (2-character minimum in the modal, none in `AddPlayersModal`) — `/players` itself has no creation entry point, only edit, so this surfaces only via the modal opened from a row.
 

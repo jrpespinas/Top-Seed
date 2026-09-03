@@ -33,6 +33,10 @@ export function GenderToggle({ value, onChange, variant = "full", className, err
           key={g}
           type="button"
           role="radio"
+          // Lets a container hijack Enter on a focused pill to mean "this
+          // gender, and submit" — AddPlayersModal's quick-add row does this —
+          // without having to read the pill's own label text back out.
+          data-gender={g}
           aria-checked={value === g}
           onClick={() => onChange(value === g ? undefined : g)}
           className={cn(
