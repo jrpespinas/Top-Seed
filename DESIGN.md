@@ -345,13 +345,39 @@ The first cut split them: a form row under "Needs a gender", a compact `SkillBad
 
 ### Match Row
 
-The list item on `/matches` (`MatchesView.tsx`). Two-row layout below `lg:` (meta line, then matchup + badge/actions), single row at `lg:` via a `display: contents` collapse so both breakpoints share one DOM tree.
+The list item on `/matches` (`MatchesView.tsx`). Meta line above, matchup below, actions right; stacks at one column below `lg:`.
 
-**TeamChip**: Renders one side's players as a pill (`rounded-md`, `bg-surface-elevated/70` at rest). Multiple players within the same chip (doubles) are separated by a middot (`·`, `text-ink`) rather than a border-rule divider — full names now render in this chip (not first names), and a 1px rule was too faint to notice next to a two-word name like "Aims Guinto," where it wasn't obvious whether that was one player or two. The two chips for a match sit side by side with plain muted "vs" text between them (`text-muted/60`, no background/border — an enclosing chip was tried and rejected as too heavy for a divider word).
+**A fixture line, with the result marked on the winner.** `✓ Bogs · Mel  vs  Karl · Ez`. The connector stays neutral and the outcome lives on the winning side, where it varies by *position* — left or right, row to row — which is what makes it scannable down a long log.
 
-**Winner colorization**: The winning side's `TeamChip` gets `border-primary/40` + `text-primary`; the losing side stays neutral. Draws and voided matches leave both sides neutral (no winner to mark).
+A verb (`beat` / `drew with`) was built first and reverted. It was solving a real problem: the result had been carried by a `border-primary/40` on the winning chip against a `border-transparent` loser, the single most important fact on the page riding its faintest signal. But a session is overwhelmingly decisive matches, so "beat" rendered identically on every row — constant text in the most central slot of the layout, carrying no information while costing the fixture-list reading everyone already knows. **A word that never varies is not a signal.** The check glyph does the same job positionally.
 
-**Result badge**: Only rendered for states color alone can't express — `Draw`, `Voided` — or that are framed relative to an active player search (`Win`/`Loss` from that player's perspective). A decisive result with no search active shows no badge at all; the winning `TeamChip`'s own color already says who won, so repeating the winning side's names in a separate badge (the previous behavior) was redundant.
+**The loser recedes; the winner does not shout.** The winning `TeamChip` takes a `Check` glyph plus a light `bg-primary/[0.07]` and `border-primary/35`; the losing side drops to `text-muted` on a transparent ground. Filling forty winners with brand blue down a log would be a wall of colour that stops meaning anything — dimming the loser produces the same asymmetry at a fraction of the ink and scales with the list instead of fighting it.
+
+**Draws carry an explicit badge**, shown regardless of whether a player is searched. With the winner marked by a glyph, an unmarked row would otherwise be the only thing saying "draw", and absence is a poor way to state a fact. Voided matches keep their own badge and read `vs` with neither side marked.
+
+**The aria-label spells the result out** — "Bogs & Mel beat Karl & Ez" — because a glyph announces as nothing. The visible row and the label convey the same fact by different means, rather than the label being a parallel description of the layout.
+
+**TeamChip**: one side's players as a pill, separated by a middot (`·`) rather than a rule — full names render here, and a 1px divider was too faint next to a two-word name like "Aims Guinto" to say whether that was one player or two. Each name carries a `dense compact` `SkillBadge`, hidden below `sm:` where width is tightest. The badge is wrapped in a span rather than given a `className`, because `cn` is a plain join with no tailwind-merge and `hidden` over `SkillBadge`'s own `inline-flex` would resolve by stylesheet order rather than intent.
+
+**Duration** is shown from `endedAt − startedAt`, a field that existed on every record and was never displayed. A match running long for *this session* (≥1.5× the session median, floored at 10 minutes) gets weight and a `Timer` glyph — not a semantic colour, which would imply something is wrong with a long match. Absent entirely when `endedAt` is null; "0m" would read as a real, absurdly short match rather than as an absence.
+
+**Court is deliberately not shown.** Every court in this app is identical and auto-numbered, so it can't inform anything about a match. `courtName` stays on the record and in the Excel export; it just stops occupying the row.
+
+**Upset chip**: `Zap` + "Upset" in brand blue when the weaker side won, using `matchUpset` — the same difficulty term the Leaderboard's bonus uses, exported so the two surfaces can never disagree about what an upset is.
+
+**Result badge**: only `Voided`, or `Win`/`Loss`/`Draw` framed against an active player search. A decisive result with no search shows none — the sentence already says who beat whom.
+
+### Session Recap
+
+The band above the match list, and the analogue of the Leaderboard apex for a page whose contents are chronological rather than ranked. Two modes in one slot, never two components: with no player searched it answers *what happened* (matches, court time, longest match and who won it, upsets); once search resolves to a person it answers *how their night went* (record, time on court, current streak, best win).
+
+It always describes exactly what is on screen — a header summarising the whole session while the list showed a filtered subset would be quietly lying. It deliberately carries **no points and no ranking**: those belong to the Leaderboard, and two surfaces computing a standing are two surfaces that can disagree.
+
+Rendered as a `<dl>` of value-over-label pairs on a flat `bg-surface` band — not stat cards, and not the hero-metric block. Cells appear only when they have something to say, so a session with no upsets simply has one fewer.
+
+**Search resolves to a person, not a substring.** Every framed result on the page hangs off one identity, and rows filter to that player's matches. Searching "kar" shows Karl's night, not a mix of Karl's and Karina's with badges computed against whichever of them each row happened to contain.
+
+**Wins and Losses are disabled without a search.** They previously fell through to `result === "SIDE_A"` / `"SIDE_B"` — and Side A is only "whichever side was written first", so those two pills split the same matches into two meaningless halves. A control that explains why it's unavailable beats a control that lies. The bar splits into result filters and highlight toggles (`Upsets`, `Long`) with a divider, matching the Leaderboard's `Sort | Type` pattern.
 
 ### Session Row
 

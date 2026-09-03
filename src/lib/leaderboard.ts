@@ -1,4 +1,4 @@
-import type { MatchRecord, MatchType, Player, SkillLevel } from "@/types";
+import type { MatchRecord, MatchType, Player, Side, SkillLevel } from "@/types";
 import { SKILL_RANK } from "./skill-level";
 
 export type LeaderboardSort = "points" | "form" | "wins" | "matchesPlayed";
@@ -120,6 +120,27 @@ function matchBonus(player: Player, side: Player[], opponents: Player[]): number
       : 0;
 
   return Math.min(MAX_MATCH_BONUS, difficulty + carry);
+}
+
+/**
+ * Was this match an upset, and by how much?
+ *
+ * The match-level counterpart to `matchBonus`, sharing its `difficulty` term so
+ * the Matches page and the Leaderboard can never disagree about what an upset
+ * is. It deliberately omits the `carry` term: carry describes one player's
+ * position within their own pair, which has no meaning for the match as a whole.
+ *
+ * Returns null for draws, voided matches, and any win where the victors were
+ * not the weaker side.
+ */
+export function matchUpset(match: MatchRecord): { side: Side; bonus: number } | null {
+  if (match.status !== "COMPLETED" || !match.result || match.result === "DRAW") return null;
+  const winnersAreA = match.result === "SIDE_A";
+  const winners = winnersAreA ? match.sideA : match.sideB;
+  const losers = winnersAreA ? match.sideB : match.sideA;
+  const difficulty = Math.max(0, Math.round(avgRank(winners) - avgRank(losers)));
+  if (difficulty === 0) return null;
+  return { side: winnersAreA ? "A" : "B", bonus: Math.min(MAX_MATCH_BONUS, difficulty) };
 }
 
 /**

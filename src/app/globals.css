@@ -84,6 +84,25 @@
 }
 
 
+/* ─── Form controls ────────────────────────────────────────────────────────
+   WebKit draws its own clear button inside `input[type="search"]` as soon as
+   the field has content. Every search field in this app already renders its
+   own clear button — positioned, sized and coloured to match the rest of the
+   UI — so the native one appeared beside it as a second, differently-styled X.
+   Safari's `::-webkit-search-decoration` goes too; we draw our own magnifier.
+
+   Suppressing the widget rather than switching to `type="text"` keeps the
+   search semantics: the correct announcement to a screen reader, and the
+   platform behaviours that ride on the input type.
+   ─────────────────────────────────────────────────────────────────────────── */
+@layer base {
+  input[type="search"]::-webkit-search-cancel-button,
+  input[type="search"]::-webkit-search-decoration {
+    -webkit-appearance: none;
+    appearance: none;
+  }
+}
+
 /* ─── Z-index scale ────────────────────────────────────────────────────────
    Referenced in 12 components long before it was defined here — every
    `z-[var(--z-modal)]` was resolving to an invalid value, which browsers drop

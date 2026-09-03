@@ -16,10 +16,25 @@ Create, run, and close matches. Records win/loss/draw results only — no score 
 
 ## Pages & Components
 
-### `/matches` — Match Log
-- Filter bar: date range picker, match type (All / Singles / Doubles), status chips (All / In Progress / Completed / Voided)
-- Table: Date, Court, Type, Side A Players, Side B Players, Result, End Type, Actions
-- "New Match" button → `/matches/new`
+### `/matches` — Match Log (built; `MatchesView.tsx`)
+
+Session-scoped, reverse-chronological, grouped by hour. Matches are created on the Dashboard, not here — `/matches/new` and `/matches/[id]` below are **specced but unbuilt**, and there is no "New Match" button on this page.
+
+**Each row is a fixture line with the result marked on the winner**: `✓ Bogs · Mel  vs  Karl · Ez`. A verb (`beat`) was built first and reverted — a session is overwhelmingly decisive matches, so the word was identical on every row: constant text in the most central slot, carrying no information while costing the familiar fixture-list reading. A mark on the winning side varies by position instead, which is what makes it scannable. The losing side dims rather than the winner filling — the same asymmetry at a fraction of the ink, which is what lets it survive forty rows. Draws carry an explicit badge, since an unmarked row is a poor way to state a fact. Rows also carry time, match type, **duration** (`endedAt − startedAt`, previously never displayed), a `SkillBadge` per player at `sm:`+, and an upset chip.
+
+**Court is not displayed.** Every court is identical and auto-numbered, so it cannot inform anything about a match. `courtName` remains on the record and in the Excel export.
+
+**A match is "long" relative to this session** — ≥1.5× the median duration, floored at 10 minutes, and null (nothing is long) under three timed matches. A constant would fire on every match some nights and none on others. The threshold is always computed from the **whole session**, never the filtered set: derived from the filtered set, activating the Long filter would recompute the median from long matches only and immediately re-exclude the shorter half of them.
+
+**Upsets** use `matchUpset`, exported from `leaderboard.ts` so the Matches page and the Leaderboard share one definition. It reuses the bonus's `difficulty` term and omits `carry`, which describes a player's position within their own pair and has no match-level meaning.
+
+**Search resolves to a person, not a substring.** Rows filter to that player's matches and every framed result hangs off that one identity, so searching "kar" shows Karl's night rather than a mix of Karl's and Karina's.
+
+**Filter bar**: search, then result filters (All / Wins / Losses / Draws / Voided), then highlight toggles (Upsets / Long) after a divider. **Wins and Losses are disabled without a search** — they previously fell through to `result === "SIDE_A"` and `"SIDE_B"`, and since Side A is merely whichever side was written first, those pills split the same matches into two meaningless halves. Clearing the search resets an active Wins/Losses filter rather than leaving it framed against nobody.
+
+**Session recap band** above the list, in two modes sharing one slot: *what happened* (matches, court time, longest match and who won it, upsets) by default, and *how their night went* (record, time on court, streak, best win) once a player is searched. It always describes the currently-visible set, and deliberately carries no points or ranking — those belong to the Leaderboard, and two surfaces computing a standing are two that can disagree.
+
+**Void / Restore** is a soft delete: a voided row keeps a persistent Restore action indefinitely, not just for the undo-toast window, and `previousResult` preserves the original outcome so Restore brings back the real result. Batch select mode voids many at once; Escape steps back one level (confirm → selecting → default).
 
 ### `/matches/new` — Create Match (single-screen form)
 **Step 1 — Players:**
@@ -91,10 +106,9 @@ getMatches(filter?: {
 ---
 
 ## Leaderboard Implications
-- `COMPLETED`, non-walkover: both sides get win or loss counted
-- `COMPLETED`, walkover: winning side gets +win only; losing side record unchanged
-- `DRAW`: both sides get +draw; neither gets a win or loss
-- `VOIDED`: excluded from all stats
+- `COMPLETED`: both sides get a win, loss, or draw counted. A draw is worth 1 point and half a win in Form — see `04-leaderboard.md` for the full points model, which replaced the old Wilson-based rating.
+- `COMPLETED`, walkover: winning side would get +win only, losing side unchanged — **`isWalkover` does not exist in `src/`** (no field on `MatchRecord`, no recording UI). When it ships, the ranking has to be revisited: a walkover would otherwise inflate the winner's Points and deflate the loser's Form.
+- `VOIDED`: excluded from all stats, on both the Leaderboard and the Matches recap.
 
 ---
 
