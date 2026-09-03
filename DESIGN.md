@@ -180,6 +180,17 @@ Interactive states use two elevation signals: `bg-surface-elevated` for hover (t
 
 Sticky headers use the same rule for a second trigger: scroll position, not just hover. A sticky title bar sitting at `bg` switches to `bg-surface-elevated` once the page has scrolled past it, paired with a plain `0 1px 0 var(--color-border)` line — never a black-tinted blur shadow. Lightness, not shadow blur, is this system's depth signal. (The rule predates the move to a single light theme, when a blurred black shadow was nearly invisible against a near-black canvas; it was kept because a lightness step reads more crisply than a shadow on white too.)
 
+
+**The Z-Index Scale.** Six semantic steps in `globals.css`, never an arbitrary `999`:
+
+```
+--z-sticky 10 · --z-modal-backdrop 20 · --z-modal 30 · --z-popover 40 · --z-toast 50 · --z-tooltip 60
+```
+
+**Popover sits above modal**, inverting the conventional ordering, and that inversion is the point. Every popover here — `SkillLevelSelect`, `SessionSelect`, `TutorialMenu` — portals its panel to `document.body` to escape `overflow` clipping, so it is never *inside* a modal's stacking context; it is a sibling competing on the same axis. Ranked below the modal, a dropdown opened from inside one renders behind it and cannot be clicked at all. Popovers are transient and self-dismissing (outside mousedown, scroll, resize), so out-ranking the modal costs nothing.
+
+This was learned the hard way: the scale shipped in the conventional order and immediately broke the level picker in `AddPlayersModal` and `PlayerModal`. Before the scale existed those values were invalid and every layer fell back to `auto`, where DOM order happened to put the body-portaled panel last — accidentally correct. Declaring the layering is what exposed the real constraint. These custom properties were referenced by 12 components long before they were defined — every `z-[var(--z-modal)]` was resolving to an invalid value, which browsers drop to `auto`, so the app's entire layering was accidental rather than declared. The same audit found `animate-toast`, `animate-suggest-pulse`, and `animate-tutorial-pulse` referenced with no `@keyframes` anywhere in the project, despite the reduced-motion block already carrying bespoke fallbacks for two of them.
+
 ## 5. Components
 
 Precision tools for the organizer who is standing, glancing, and acting. Every component has complete states: default, hover, focus-visible, active, disabled. Tap targets are minimum 44×44px — courtside use demands it.
@@ -345,6 +356,26 @@ The list item on `/matches` (`MatchesView.tsx`). Two-row layout below `lg:` (met
 ### Session Row
 
 The navigable table row on `/sessions` — a different interaction model from Player Row (no drag, no hover-reveal controls): the entire `<tr>` is the click/keyboard target (`onClick`, `tabIndex={0}`, `role="row"`, `onKeyDown` for Enter/Space), not an inline link inside one cell. Hover and focus share one treatment (`bg-surface-elevated/40`) so the affordance matches what's actually clickable — a row that only responds to a link buried inside it, while the whole row visually hovers, is the wrong version of this component. Every session-history table (list and detail) also sets `scope="col"` on every header cell; this is non-negotiable baseline semantics, not a nice-to-have.
+
+### Leaderboard Apex
+
+The one surface that trades operational restraint for a result worth screenshotting. Every other page is used mid-session — standing, under gym lights, where restraint is load-bearing. This one is read *afterwards*, and Design Principle 4 already licenses the difference: dense during a session, spacious between them. Color strategy is **Committed at the apex, Restrained below** — the champion block carries the brand blue as a real surface, the table beneath returns to normal.
+
+**Three tiers, three different objects** — not one card at three sizes, which would be an identical-card grid with extra steps:
+
+| Tier | Treatment |
+|---|---|
+| Champion | Filled `bg-primary`, `text-bg`, centre column at `md:` and full width below. Largest type on the page. |
+| Runners-up | `bg-surface` with `border-primary/25`, rank numeral in `text-primary/70`, about a third the presence. |
+| Honors | `bg-surface border-border`, neutral icon in a `surface-elevated` tile, quietest of the three. |
+
+**Ranks 1–2–3 must never use gold / silver / bronze.** The metals ladder is already spoken for: `SkillBadge` runs Bronze → Silver → Gold → Platinum for Casual → Beginner → Intermediate → Advanced, and those badges render *inside* these very slots. A gold rank-1 frame beside a gold Intermediate badge is one visual system saying two unrelated things. Hierarchy runs on the brand blue, size, and position.
+
+**Honors are the third tier for a reason.** They recognise a moment, not a placing; giving one podium weight would flatten the hierarchy the apex exists to express. Podium players are excluded from them, so the block names five distinct people rather than four.
+
+**Motion.** `animate-apex-rise` — 320ms, `cubic-bezier(0.22, 1, 0.36, 1)`, no `fill-mode`. The element's resting style *is* its final state, so a hidden tab, a headless render, or a browser that skips the animation still shows the champion. A reveal enhances an already-visible default; it never gates one. This is the app's only entrance animation, and it earns its place because this page announces a result rather than loading into a task.
+
+**Narrative chips** on field rows (`W4` streak, upset bolt) render only when true. A row without them reads as ordinary, not as missing data — which is exactly why they aren't columns.
 
 ### Toast / Undo Notification
 

@@ -84,6 +84,64 @@
 }
 
 
+/* ─── Z-index scale ────────────────────────────────────────────────────────
+   Referenced in 12 components long before it was defined here — every
+   `z-[var(--z-modal)]` was resolving to an invalid value, which browsers drop
+   to `auto`, so the whole app's layering was accidental rather than declared.
+
+   POPOVER SITS ABOVE MODAL, which inverts the usual ordering and is the whole
+   reason this block is ordered the way it is. Every popover in this app
+   (SkillLevelSelect, SessionSelect, TutorialMenu) portals its panel to
+   `document.body` to escape `overflow` clipping, so it is never inside the
+   modal's stacking context — it is a sibling. Rank it below the modal and a
+   dropdown opened from inside one renders behind it and cannot be clicked,
+   which is exactly what happened to the level picker in AddPlayersModal and
+   PlayerModal. Popovers are transient and self-dismissing (outside mousedown,
+   scroll, resize), so out-ranking the modal costs nothing.
+   ─────────────────────────────────────────────────────────────────────────── */
+:root {
+  --z-sticky:          10;
+  --z-modal-backdrop:  20;
+  --z-modal:           30;
+  --z-popover:         40;
+  --z-toast:           50;
+  --z-tooltip:         60;
+}
+
+/* ─── Motion ───────────────────────────────────────────────────────────────
+   These three utilities were referenced by Toast, the Suggest button, and the
+   tutorial spotlight, and the reduced-motion block below already carried
+   bespoke fallbacks for two of them — but the keyframes themselves were
+   missing, so the classes did nothing at all.
+
+   `apex-rise` deliberately has no fill-mode: the element's resting style is
+   its final state, so a hidden tab, a headless render, or a browser that
+   never runs the animation still shows the champion. A reveal must enhance an
+   already-visible default, never gate it.
+   ─────────────────────────────────────────────────────────────────────────── */
+@keyframes toast-in {
+  from { opacity: 0; transform: translate(-50%, 8px); }
+  to   { opacity: 1; transform: translate(-50%, 0); }
+}
+.animate-toast { animation: toast-in 200ms cubic-bezier(0.22, 1, 0.36, 1); }
+
+@keyframes suggest-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 oklch(var(--color-primary-raw) / 0); }
+  50%      { box-shadow: 0 0 16px 2px oklch(var(--color-primary-raw) / 0.45); }
+}
+.animate-suggest-pulse { animation: suggest-pulse 1.1s ease-out 2; }
+
+@keyframes tutorial-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 oklch(var(--color-accent-raw) / 0.15); }
+  50%      { box-shadow: 0 0 0 4px oklch(var(--color-accent-raw) / 0.35); }
+}
+.animate-tutorial-pulse { animation: tutorial-pulse 1.6s ease-out infinite; }
+
+@keyframes apex-rise {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.animate-apex-rise { animation: apex-rise 320ms cubic-bezier(0.22, 1, 0.36, 1); }
 /* ─── Theme switching transition (JS-triggered, ~250ms window) ────────────── */
 html.theme-switching *,
 html.theme-switching *::before,

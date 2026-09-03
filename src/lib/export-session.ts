@@ -40,12 +40,25 @@ function buildMatchesSheet(matches: MatchRecord[]) {
 // "no cross-session aggregation" (see docs/specs/08-sessions.md), not the
 // app's live all-time /leaderboard.
 function buildLeaderboardSheet(sessionMatches: MatchRecord[]) {
-  const header = ["Rank", "Player", "Matches Played", "Wins", "Draws", "Losses", "Win Rate", "Rating"];
-  // Sorted by Rating (a Wilson score lower bound, not naive Win Rate) — same
-  // rationale as the live /leaderboard: a 1-1 record shouldn't outrank a
-  // genuine multi-match record just because both compute to 100%. Keeping
-  // this sheet's order consistent with what the app itself shows.
-  const standings = computeLeaderboard(sessionMatches, { matchType: "ALL", sort: "rating" });
+  const header = [
+    "Rank",
+    "Player",
+    "Matches Played",
+    "Wins",
+    "Draws",
+    "Losses",
+    "Win Rate",
+    "Result Points",
+    "Bonus Points",
+    "Points",
+    "Form",
+    "Longest Streak",
+  ];
+  // Ordered by Points, matching what the app itself shows. Points are
+  // 3 a win + 1 a draw plus a bonus for beating stronger opposition; Form is
+  // the shrunk win share used as the tiebreak. Result and bonus points are
+  // split out so a reader can reconstruct the total rather than trust it.
+  const standings = computeLeaderboard(sessionMatches, { matchType: "ALL", sort: "points" });
   const rows = standings.map((row) => ({
     Rank: row.isTied ? `T-${row.rank}` : row.rank,
     Player: row.name,
@@ -54,7 +67,11 @@ function buildLeaderboardSheet(sessionMatches: MatchRecord[]) {
     Draws: row.draws,
     Losses: row.losses,
     "Win Rate": `${Math.round(row.winRate * 100)}%`,
-    Rating: `${Math.round(row.rating * 100)}%`,
+    "Result Points": row.resultPoints,
+    "Bonus Points": row.bonusPoints,
+    Points: row.points,
+    Form: `${Math.round(row.form * 100)}%`,
+    "Longest Streak": row.longestStreak,
   }));
   return XLSX.utils.json_to_sheet(rows, { header });
 }

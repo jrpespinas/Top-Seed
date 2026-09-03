@@ -1,21 +1,27 @@
 "use client";
 
 import { useState, useMemo } from "react";
-import { Search, X } from "lucide-react";
+import { Search, X, Zap, Flame, Timer, Users } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useMatchLog } from "@/lib/match-log-store";
 import { useSessionOptions } from "@/lib/session-store";
 import { SessionSelect } from "@/components/ui/SessionSelect";
+import { SkillBadge } from "@/components/ui/SkillBadge";
 import {
   computeLeaderboard,
+  selectHonors,
+  championSummary,
+  type LeaderboardRow,
   type LeaderboardSort,
   type MatchTypeFilter,
+  type Honor,
+  type HonorKind,
 } from "@/lib/leaderboard";
 
 const SORT_OPTIONS: { key: LeaderboardSort; label: string }[] = [
-  { key: "rating", label: "Rating" },
+  { key: "points", label: "Points" },
+  { key: "form", label: "Form" },
   { key: "wins", label: "Wins" },
-  { key: "winRate", label: "Win Rate" },
   { key: "matchesPlayed", label: "Matches Played" },
 ];
 
@@ -24,6 +30,23 @@ const MATCH_TYPE_OPTIONS: { key: MatchTypeFilter; label: string }[] = [
   { key: "DOUBLES", label: "Doubles" },
   { key: "ALL", label: "Combined" },
 ];
+
+const SORT_LABELS: Record<LeaderboardSort, string> = {
+  points: "Points",
+  form: "Form",
+  wins: "Wins",
+  matchesPlayed: "Matches",
+};
+
+const HONOR_ICONS: Record<HonorKind, typeof Zap> = {
+  upset: Zap,
+  streak: Flame,
+  onCourt: Timer,
+  pair: Users,
+};
+
+/** Slots flanking the podium. Two keeps the apex to five recognised players. */
+const HONOR_SLOTS = 2;
 
 function PillGroup<T extends string>({
   options,
@@ -62,6 +85,153 @@ function PillGroup<T extends string>({
   );
 }
 
+function record(row: LeaderboardRow): string {
+  return `${row.wins}–${row.draws}–${row.losses}`;
+}
+
+/**
+ * The apex.
+ *
+ * Three tiers of recognition in one composition, each a visibly different
+ * object rather than the same card at three sizes: the champion on a filled
+ * brand ground, runners-up outlined in the same blue, honors neutral and
+ * quietest. Five people are named; the first one holds the centre.
+ *
+ * Ranks deliberately do NOT use gold / silver / bronze. That ladder is already
+ * spoken for — `SkillBadge` runs Bronze → Platinum for Casual → Advanced, and
+ * those badges sit inside these very slots. A gold rank-1 frame beside a gold
+ * Intermediate badge would be one visual system saying two unrelated things.
+ * Hierarchy runs on the brand blue, size, and position instead.
+ */
+function Apex({
+  champions,
+  runnersUp,
+  honors,
+  sort,
+}: {
+  champions: LeaderboardRow[];
+  runnersUp: LeaderboardRow[];
+  honors: Honor[];
+  sort: LeaderboardSort;
+}) {
+  const lead = champions[0];
+  const summary = champions.length === 1 ? championSummary(lead) : null;
+  const names =
+    champions.length <= 2
+      ? champions.map((c) => c.name).join(" & ")
+      : `${champions.length}-way tie`;
+
+  return (
+    <section
+      className="px-4 sm:px-6 pt-5 pb-6 border-b border-border"
+      aria-label="Session highlights"
+    >
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-[1fr_1.5fr_1fr] md:items-end">
+        {/* Champion — full width on mobile, centre column on desktop. */}
+        <div
+          className={cn(
+            "col-span-2 md:col-span-1 md:order-2 animate-apex-rise motion-reduce:animate-none",
+            "rounded-lg bg-primary text-bg px-5 py-5 sm:py-6 flex flex-col"
+          )}
+        >
+          <div className="flex items-start gap-3">
+            <span className="font-mono text-3xl sm:text-4xl font-bold leading-none text-bg/55 tabular-nums">
+              1
+            </span>
+            {champions.length === 1 && (
+              <span className="ml-auto flex-shrink-0">
+                <SkillBadge level={lead.skillLevel} compact />
+              </span>
+            )}
+          </div>
+
+          <h2 className="mt-3 text-2xl sm:text-3xl font-bold tracking-tight text-balance break-words">
+            {names}
+          </h2>
+
+          <p className="mt-1.5 font-mono text-sm tabular-nums text-bg/80">
+            <span className="text-lg font-semibold text-bg">{lead.points}</span> pts
+            <span className="text-bg/40"> · </span>
+            {record(lead)}
+            <span className="text-bg/40"> · </span>
+            {Math.round(lead.form * 100)}% form
+          </p>
+
+          {summary && <p className="mt-2 text-sm text-bg/80 text-pretty">{summary}</p>}
+
+          {sort !== "points" && (
+            <p className="mt-2 text-[11px] text-bg/60">Leading on {SORT_LABELS[sort]}</p>
+          )}
+        </div>
+
+        {runnersUp[0] && <RunnerUp row={runnersUp[0]} className="md:order-1" />}
+        {runnersUp[1] && <RunnerUp row={runnersUp[1]} className="md:order-3" />}
+      </div>
+
+      {honors.length > 0 && (
+        <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-3">
+          {honors.map((honor) => (
+            <HonorSlot key={honor.kind} honor={honor} />
+          ))}
+        </div>
+      )}
+    </section>
+  );
+}
+
+function RunnerUp({ row, className }: { row: LeaderboardRow; className?: string }) {
+  return (
+    <div
+      className={cn(
+        "rounded-lg bg-surface border border-primary/25 px-3.5 py-3.5 flex flex-col",
+        "animate-apex-rise motion-reduce:animate-none",
+        className
+      )}
+    >
+      <div className="flex items-start gap-2">
+        <span className="font-mono text-xl font-bold leading-none text-primary/70 tabular-nums">
+          {row.rank}
+        </span>
+        <span className="ml-auto flex-shrink-0">
+          <SkillBadge level={row.skillLevel} compact dense />
+        </span>
+      </div>
+      <p className="mt-2 text-sm font-semibold text-ink truncate">{row.name}</p>
+      <p className="mt-0.5 font-mono text-xs tabular-nums text-muted">
+        <span className="text-ink font-semibold">{row.points}</span> pts
+        <span className="text-muted/50"> · </span>
+        {record(row)}
+      </p>
+    </div>
+  );
+}
+
+/**
+ * Quietest of the three tiers on purpose. An honor recognises a moment, not a
+ * placing — giving it podium weight would flatten the hierarchy the apex is
+ * built to express.
+ */
+function HonorSlot({ honor }: { honor: Honor }) {
+  const Icon = HONOR_ICONS[honor.kind];
+  return (
+    <div className="rounded-lg bg-surface border border-border px-3.5 py-3 flex items-center gap-3">
+      <span className="flex-shrink-0 w-8 h-8 rounded-md bg-surface-elevated flex items-center justify-center text-muted">
+        <Icon size={15} strokeWidth={2} aria-hidden />
+      </span>
+      <div className="min-w-0 flex-1">
+        <p className="text-[11px] font-medium text-muted uppercase tracking-wide">{honor.label}</p>
+        <p className="text-sm font-semibold text-ink truncate">{honor.name}</p>
+      </div>
+      <p
+        className="text-xs text-muted text-right flex-shrink-0 max-w-[45%] truncate"
+        title={honor.detail}
+      >
+        {honor.detail}
+      </p>
+    </div>
+  );
+}
+
 function rankClasses(rank: number): string {
   if (rank === 1) return "text-base font-bold text-primary tabular-nums";
   if (rank <= 3) return "text-sm font-semibold text-primary/80 tabular-nums";
@@ -71,15 +241,13 @@ function rankClasses(rank: number): string {
 export function LeaderboardView() {
   const matches = useMatchLog();
   const { sessions, selectedSessionId, setSelectedSessionId } = useSessionOptions();
-  // Rating, not raw Win Rate, is the default sort — a 1-1 record is a naive
-  // 100% win rate, which used to out-rank a genuine 20-2 record on small
-  // sample size alone. Rating (a Wilson score lower bound; see leaderboard.ts)
-  // asks how confident we actually are in that percentage given how many
-  // matches back it up, so an unproven small sample can't out-rank a real
-  // track record. It's also the one ranking number phones can see (Wins is
-  // hidden below `lg:` — see the table header below), so defaulting to
-  // anything else would make the visible order look arbitrary against it.
-  const [sort, setSort] = useState<LeaderboardSort>("rating");
+  // Points, not a rate, is the default. A rate makes a 2-match record look
+  // like a 20-match one, and the previous default — a Wilson lower bound —
+  // over-corrected for that at session sample sizes, rendering a 5-0 as 57%.
+  // Points are additive, verifiable by the player who earned them, and the
+  // one number that can't deflate on a perfect record. Form is the tiebreak
+  // and stays available as its own sort for the rate view.
+  const [sort, setSort] = useState<LeaderboardSort>("points");
   const [matchType, setMatchType] = useState<MatchTypeFilter>("ALL");
   const [search, setSearch] = useState("");
 
@@ -98,6 +266,23 @@ export function LeaderboardView() {
     const q = search.trim().toLowerCase();
     return rankedRows.filter((r) => r.name.toLowerCase().includes(q));
   }, [rankedRows, search]);
+
+  const apex = useMemo(() => {
+    if (rankedRows.length === 0) return null;
+    const podium = rankedRows.slice(0, 3);
+    const champions = podium.filter((r) => r.rank === 1);
+    const runnersUp = podium.filter((r) => r.rank !== 1);
+    const honors = selectHonors(
+      rankedRows,
+      HONOR_SLOTS,
+      new Set(podium.map((r) => r.playerId))
+    );
+    return { champions, runnersUp, honors };
+  }, [rankedRows]);
+
+  // Search puts the reader in lookup mode, not recap mode — a podium above a
+  // one-row result would be answering a question nobody asked.
+  const showApex = apex !== null && !search.trim();
 
   const hasAnyCompletedMatches = useMemo(
     () => sessionMatches.some((m) => m.status === "COMPLETED"),
@@ -177,10 +362,19 @@ export function LeaderboardView() {
         </div>
       </div>
 
-      {/* "T-" legend — the row-level title="Tied on every ranking criterion"
-          tooltip is mouse-only and never fires on touch, the primary input
-          here, so a tie is otherwise unexplained on the device this app
-          targets first. Only rendered when a tie is actually visible. */}
+      {showApex && apex && (
+        <Apex
+          champions={apex.champions}
+          runnersUp={apex.runnersUp}
+          honors={apex.honors}
+          sort={sort}
+        />
+      )}
+
+      {/* "T-" legend — the row-level title tooltip is mouse-only and never
+          fires on touch, the primary input here. Fires far less often since
+          points replaced a percentage: identical rates were common, identical
+          point totals with identical form much less so. */}
       {rows.some((r) => r.isTied) && (
         <p className="px-4 sm:px-6 py-1.5 text-[10px] text-muted bg-surface-elevated/40 border-b border-border/60">
           T- = tied with another player on every ranking criterion
@@ -190,88 +384,109 @@ export function LeaderboardView() {
       {/* Table */}
       {rows.length > 0 ? (
         <table className="w-full border-collapse" role="grid" aria-label="Player rankings">
-          {/* The filter bar now stacks on mobile (search above pills,
-              flex-col) and sits in one row at sm+ (flex-row) — two different
-              heights, so the offset needs two values, not one:
+          {/* Offsets track the sticky header stack above, which changes height
+              at sm: (search stacks above the pills on mobile, sits beside them
+              from sm:). The apex is NOT part of this maths — it scrolls away
+              above and the header sticks at the same place either way.
               Mobile:  title (h-14, 56px) + filter bar (py-2.5=20 + search
                        row 40 + gap-2=8 + pills row 36 + border 1) = 56+105=161
               sm+:     title (56) + filter bar (py-2.5=20 + max(40,36)=40
                        + border 1) = 56+61=117
-              Recalculate both if the header stack above changes — this is
-              the exact fragility the prior critique of this page named as
-              a risk, now doubled by the responsive split. Each also adds
+              Recalculate both if that stack changes. Each also adds
               env(safe-area-inset-top) — 0 on non-notched devices, the actual
-              notch/status-bar height on ones that have it — since the sticky
-              wrapper above gained that same inset as padding-top. */}
+              notch height on ones that have it — matching the wrapper above. */}
           <thead className="sticky top-[calc(161px+env(safe-area-inset-top))] sm:top-[calc(117px+env(safe-area-inset-top))] z-[var(--z-sticky)] bg-bg">
             <tr className="border-b border-border">
               <th className="text-left text-xs font-medium text-muted pl-4 sm:pl-6 pr-3 py-2.5 w-[52px]">
                 Rank
               </th>
               <th className="text-left text-xs font-medium text-muted px-3 py-2.5">Player</th>
+              <th className="text-right text-xs font-medium text-muted px-3 py-2.5 w-[76px]">
+                <abbr title="Wins–Draws–Losses" className="no-underline">
+                  W–D–L
+                </abbr>
+              </th>
               <th className="hidden md:table-cell text-right text-xs font-medium text-muted px-3 py-2.5 w-[70px]">
                 Matches
               </th>
-              <th className="hidden lg:table-cell text-right text-xs font-medium text-muted px-3 py-2.5 w-[60px]">
-                Wins
-              </th>
-              <th className="hidden lg:table-cell text-right text-xs font-medium text-muted px-3 py-2.5 w-[60px]">
-                Draws
-              </th>
-              <th className="hidden lg:table-cell text-right text-xs font-medium text-muted px-3 py-2.5 w-[60px]">
-                Losses
-              </th>
-              <th className="hidden lg:table-cell text-right text-xs font-medium text-muted px-3 py-2.5 w-[80px]">
-                Win Rate
+              <th
+                className="hidden sm:table-cell text-right text-xs font-medium text-muted px-3 py-2.5 w-[70px]"
+                title="Win share with two pseudo-matches added — everyone starts the day 1–1, so an unproven record can't out-rank a real one"
+              >
+                Form
               </th>
               <th
-                className="text-right text-xs font-medium text-muted pl-3 pr-4 sm:pr-6 py-2.5 w-[80px]"
-                title="Confidence-adjusted win rate — accounts for how many matches back it up, so one lucky win can't out-rank a real track record"
+                className="text-right text-xs font-medium text-muted pl-3 pr-4 sm:pr-6 py-2.5 w-[72px]"
+                title="3 points a win, 1 a draw, plus a bonus for beating stronger opposition"
               >
-                Rating
+                Points
               </th>
             </tr>
           </thead>
           <tbody>
-            {rows.map((row) => {
-              return (
-                <tr
-                  key={row.playerId}
-                  className="border-b border-border/50 hover:bg-surface-elevated/40 transition-colors"
-                >
-                  <td className="pl-4 sm:pl-6 pr-3 py-3">
-                    <span className={rankClasses(row.rank)} title={row.isTied ? "Tied on every ranking criterion" : undefined}>
-                      {row.isTied ? `T-${row.rank}` : row.rank}
-                    </span>
-                  </td>
-                  <td className="px-3 py-3 min-w-[140px]">
+            {rows.map((row) => (
+              <tr
+                key={row.playerId}
+                className="border-b border-border/50 hover:bg-surface-elevated/40 transition-colors"
+              >
+                <td className="pl-4 sm:pl-6 pr-3 py-3">
+                  <span
+                    className={rankClasses(row.rank)}
+                    title={row.isTied ? "Tied on every ranking criterion" : undefined}
+                  >
+                    {row.isTied ? `T-${row.rank}` : row.rank}
+                  </span>
+                </td>
+                <td className="px-3 py-3 min-w-[140px]">
+                  <div className="flex items-center gap-2 min-w-0">
                     <span className="text-sm font-medium text-ink truncate">{row.name}</span>
-                  </td>
-                  <td className="hidden md:table-cell px-3 py-3 text-right">
-                    <span className="font-mono text-sm tabular-nums text-muted">{row.matchesPlayed}</span>
-                  </td>
-                  <td className="hidden lg:table-cell px-3 py-3 text-right">
-                    <span className="font-mono text-sm tabular-nums text-muted">{row.wins}</span>
-                  </td>
-                  <td className="hidden lg:table-cell px-3 py-3 text-right">
-                    <span className="font-mono text-sm tabular-nums text-muted">{row.draws}</span>
-                  </td>
-                  <td className="hidden lg:table-cell px-3 py-3 text-right">
-                    <span className="font-mono text-sm tabular-nums text-muted">{row.losses}</span>
-                  </td>
-                  <td className="hidden lg:table-cell px-3 py-3 text-right">
-                    <span className="font-mono text-sm tabular-nums text-muted">
-                      {Math.round(row.winRate * 100)}%
-                    </span>
-                  </td>
-                  <td className="pl-3 pr-4 sm:pr-6 py-3 text-right">
-                    <span className="font-mono text-sm font-semibold tabular-nums text-ink">
-                      {Math.round(row.rating * 100)}%
-                    </span>
-                  </td>
-                </tr>
-              );
-            })}
+                    {/* The narrative the old eight columns had no room for.
+                        Chips only appear when they're true, so a row without
+                        them reads as ordinary rather than as missing data. */}
+                    {row.currentStreak >= 2 && (
+                      <span
+                        className="flex-shrink-0 inline-flex items-center gap-0.5 font-mono text-[10px] font-semibold tabular-nums text-primary bg-primary/[0.08] border border-primary/20 rounded-sm px-1 py-0.5"
+                        title={`On a ${row.currentStreak}-match winning streak`}
+                      >
+                        <Flame size={9} strokeWidth={2.5} aria-hidden />W{row.currentStreak}
+                      </span>
+                    )}
+                    {row.bestUpset && (
+                      <span
+                        className="flex-shrink-0 inline-flex items-center text-muted"
+                        title={`Beat ${row.bestUpset.opponentNames.join(" & ")} — stronger opposition`}
+                        aria-label="Beat stronger opposition"
+                      >
+                        <Zap size={11} strokeWidth={2.5} aria-hidden />
+                      </span>
+                    )}
+                  </div>
+                </td>
+                <td className="px-3 py-3 text-right">
+                  <span className="font-mono text-sm tabular-nums text-muted">{record(row)}</span>
+                </td>
+                <td className="hidden md:table-cell px-3 py-3 text-right">
+                  <span className="font-mono text-sm tabular-nums text-muted">{row.matchesPlayed}</span>
+                </td>
+                <td className="hidden sm:table-cell px-3 py-3 text-right">
+                  <span className="font-mono text-sm tabular-nums text-muted">
+                    {Math.round(row.form * 100)}%
+                  </span>
+                </td>
+                <td className="pl-3 pr-4 sm:pr-6 py-3 text-right">
+                  <span
+                    className="font-mono text-sm font-semibold tabular-nums text-ink"
+                    title={
+                      row.bonusPoints > 0
+                        ? `${row.points} = ${row.resultPoints} from results + ${row.bonusPoints} bonus`
+                        : `${row.resultPoints} from ${row.wins} wins and ${row.draws} draws`
+                    }
+                  >
+                    {row.points}
+                  </span>
+                </td>
+              </tr>
+            ))}
           </tbody>
         </table>
       ) : (
