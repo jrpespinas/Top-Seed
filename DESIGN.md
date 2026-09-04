@@ -413,7 +413,7 @@ The band above the match list, and the analogue of the Leaderboard apex for a pa
 
 It always describes exactly what is on screen — a header summarising the whole session while the list showed a filtered subset would be quietly lying. It deliberately carries **no points and no ranking**: those belong to the Leaderboard, and two surfaces computing a standing are two surfaces that can disagree.
 
-Rendered as a `<dl>` of value-over-label pairs on a flat `bg-surface` band — not stat cards, and not the hero-metric block. Cells appear only when they have something to say, so a session with no upsets simply has one fewer.
+Duration cells carry a `Timer` glyph before the value; counts don't. Without it a bare "2h 36m" sits beside a bare "12" and both read as plain numbers until the eye reaches the label underneath — and the mark only keeps meaning if counts stay unmarked. Rendered as a `<dl>` of value-over-label pairs on a flat `bg-surface` band — not stat cards, and not the hero-metric block. Cells appear only when they have something to say, so a session with no upsets simply has one fewer.
 
 **Search resolves to a person, not a substring.** Every framed result on the page hangs off one identity, and rows filter to that player's matches. Searching "kar" shows Karl's night, not a mix of Karl's and Karina's with badges computed against whichever of them each row happened to contain.
 

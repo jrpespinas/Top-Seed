@@ -616,7 +616,11 @@ function Recap({
   player: Player | null;
   playerRow: ReturnType<typeof computeLeaderboard>[number] | null;
 }) {
-  const cells: { value: string; label: string; strong?: boolean }[] = [];
+  // `icon` marks a cell whose value is a duration. Without it a bare "2h 36m"
+  // sits beside a bare "12" and both read as plain counts until you reach the
+  // label underneath — the glyph says "this one is time" before the eye gets
+  // there. Counts stay iconless so the mark keeps meaning something.
+  const cells: { value: string; label: string; strong?: boolean; icon?: typeof Timer }[] = [];
 
   if (player && playerRow) {
     cells.push({
@@ -625,7 +629,7 @@ function Recap({
       strong: true,
     });
     if (playerRow.timeOnCourtMs > 0) {
-      cells.push({ value: formatDurationMs(playerRow.timeOnCourtMs), label: "on court" });
+      cells.push({ value: formatDurationMs(playerRow.timeOnCourtMs), label: "on court", icon: Timer });
     }
     // Same threshold as the Leaderboard chip: two wins is noise.
     if (playerRow.currentStreak >= 3) {
@@ -644,7 +648,7 @@ function Recap({
       strong: true,
     });
     if (recap.totalCourtTimeMs > 0) {
-      cells.push({ value: formatDurationMs(recap.totalCourtTimeMs), label: "court time" });
+      cells.push({ value: formatDurationMs(recap.totalCourtTimeMs), label: "court time", icon: Timer });
     }
     if (recap.longest) {
       // Naming one side without saying which would read as "these two played
@@ -655,7 +659,11 @@ function Recap({
             winner === "A" ? recap.longest.match.sideA : recap.longest.match.sideB
           )}`
         : "longest · drawn";
-      cells.push({ value: formatDurationMs(recap.longest.durationMs), label: longestLabel });
+      cells.push({
+        value: formatDurationMs(recap.longest.durationMs),
+        label: longestLabel,
+        icon: Timer,
+      });
     }
     if (recap.upsetCount > 0) {
       cells.push({
@@ -683,11 +691,19 @@ function Recap({
           <div key={cell.label} className="min-w-0">
             <dd
               className={cn(
-                "font-mono tabular-nums text-ink truncate",
+                "flex items-center gap-1 font-mono tabular-nums text-ink",
                 cell.strong ? "text-lg font-semibold" : "text-sm font-medium"
               )}
             >
-              {cell.value}
+              {cell.icon && (
+                <cell.icon
+                  size={cell.strong ? 14 : 12}
+                  strokeWidth={2.5}
+                  className="text-muted flex-shrink-0"
+                  aria-hidden
+                />
+              )}
+              <span className="truncate">{cell.value}</span>
             </dd>
             <dt className="text-[11px] text-muted truncate">{cell.label}</dt>
           </div>
