@@ -23,6 +23,17 @@
 
   --color-primary-raw:            0.317 0.202 264;   /* Ateneo blue #001196 */
   --color-primary-hover-raw:      0.260 0.190 264;
+
+  /* Two light steps of the brand, for the apex's lower placings. Real tokens
+     rather than alpha over white: stacked transparency makes contrast
+     unpredictable and is the usual sign of an incomplete palette.
+
+     Lightness descends and chroma climbs as the placings go up — page 0.995 /
+     0.002, honours 0.972 / 0.016, runners-up 0.945 / 0.030, champion 0.317 /
+     0.202 — so the two channels agree and blue *intensity* encodes rank
+     instead of merely decorating it. Both clear 5.8:1 for muted text. */
+  --color-primary-tint-raw:       0.945 0.030 264;
+  --color-primary-tint-soft-raw:  0.972 0.016 264;
   /* Accent is NOT a second brand colour — it's the "state, not action" hue.
      It has to stay visibly distinct from primary, because primary rings already
      mean three things (confirm-pending, drop-target, drag-over) and several can
@@ -71,6 +82,8 @@
   --color-muted:            oklch(var(--color-muted-raw));
   --color-primary:          oklch(var(--color-primary-raw));
   --color-primary-hover:    oklch(var(--color-primary-hover-raw));
+  --color-primary-tint:      oklch(var(--color-primary-tint-raw));
+  --color-primary-tint-soft: oklch(var(--color-primary-tint-soft-raw));
   --color-accent:           oklch(var(--color-accent-raw));
   --color-success:          oklch(var(--color-success-raw));
   --color-warning:          oklch(var(--color-warning-raw));
@@ -83,6 +96,61 @@
   --color-skill-advanced:     oklch(var(--color-skill-advanced-raw));
 }
 
+
+/* ─── Print ────────────────────────────────────────────────────────────────
+   Only the session sheet prints. `visibility` rather than `display: none`
+   because the sheet is portaled into a modal: collapsing its ancestors would
+   take the sheet with them, whereas hiding everything and re-showing the
+   subtree leaves the box tree intact.
+
+   `[data-print-only]` is the sheet's second page — the full standings, which
+   the screen and the captured PNG never show. A chat thumbnail with sixty rows
+   is unreadable; a noticeboard sheet missing fifty people is useless. One
+   component serves both by hiding a different half of itself.
+   ─────────────────────────────────────────────────────────────────────────── */
+[data-print-only] { display: none; }
+
+@media print {
+  @page { size: A4 portrait; margin: 12mm; }
+
+  html, body { background: #fff !important; }
+
+  /* Scoped with :has() so the isolation only engages when a sheet is actually
+     open. Unscoped, printing any other page would hide everything and reveal
+     nothing — a blank sheet of paper instead of the page you asked for. */
+  body:has([data-print-root]) * { visibility: hidden !important; }
+  body:has([data-print-root]) [data-print-root],
+  body:has([data-print-root]) [data-print-root] * { visibility: visible !important; }
+
+  /* The preview scales the sheet down to fit the modal; the printed sheet must
+     land at its true A4 width regardless of that zoom. */
+  [data-print-root] {
+    position: absolute !important;
+    left: 0 !important;
+    top: 0 !important;
+    width: 100% !important;
+    transform: none !important;
+    box-shadow: none !important;
+  }
+
+  /* Browsers drop background colours when printing unless told otherwise.
+     Without this the sheet's filled champion block prints as bare paper with
+     near-white text on it — invisible, and worse than never having filled it.
+     Scoped to the sheet, so nothing else in the app starts printing its
+     backgrounds. */
+  [data-print-root],
+  [data-print-root] * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  [data-print-only] { display: block !important; }
+  [data-screen-only] { display: none !important; }
+
+  /* A player's row split across a page break is the one layout failure that
+     makes a printed table hard to read. */
+  tr, thead { break-inside: avoid; }
+}
 
 /* ─── Form controls ────────────────────────────────────────────────────────
    WebKit draws its own clear button inside `input[type="search"]` as soon as
@@ -161,6 +229,62 @@
   to   { opacity: 1; transform: translateY(0); }
 }
 .animate-apex-rise { animation: apex-rise 320ms cubic-bezier(0.22, 1, 0.36, 1); }
+
+/* The crowning.
+   ─────────────────────────────────────────────────────────────────────────
+   A white sheet lies over the champion's blue ground and retreats to the
+   right, so the card starts looking like one of the runners-up and the brand
+   colour *arrives*. The blue is the only thing separating first place from
+   second, which makes its arrival the one piece of motion here that carries
+   meaning rather than decorating a box that was already there.
+
+   The overlay's RESTING clip-path is fully retreated (set inline on the
+   element), so no-animation means no sheet — a hidden tab or a headless
+   render shows a finished blue card, never a blank white one. Same reason
+   nothing here uses animation-fill-mode.
+
+   The content's hold is baked into its keyframes rather than expressed as an
+   animation-delay. A delay without fill-mode shows the resting state first and
+   then snaps to the 0% frame — a visible flash. `0%, 38%` holds it invisible
+   until the sheet has cleared enough that near-white text is never sitting on
+   near-white ground. */
+@keyframes crown-wipe {
+  from { clip-path: inset(0 0 0 0); }
+  to   { clip-path: inset(0 0 0 100%); }
+}
+.animate-crown-wipe { animation: crown-wipe 520ms cubic-bezier(0.16, 1, 0.3, 1); }
+
+@keyframes crown-content {
+  0%, 38% { opacity: 0; }
+  100%    { opacity: 1; }
+}
+.animate-crown-content { animation: crown-content 700ms cubic-bezier(0.22, 1, 0.36, 1); }
+
+/* The rank numeral flares as the champion is crowned, then settles.
+   ─────────────────────────────────────────────────────────────────────────
+   `.crown-numeral` carries the RESTING glow — faint, permanent, and the
+   animation's own final frame, so nothing needs animation-fill-mode and an
+   unplayed animation still leaves the numeral correctly lit.
+
+   A continuous pulse was the obvious move and is the wrong one: this page is
+   opened repeatedly across a night, and a number throbbing on every visit is
+   the same fatigue the crown reveal is gated to avoid. The flare rides the
+   crowning and is otherwise still.
+
+   Glow is already a sanctioned material here (see DESIGN.md's Elevation
+   rule — a diffuse glow on a focused primary element, in a palette colour and
+   never a grey shadow). This is that rule inverted: the page's own near-white
+   glowing on the brand ground rather than the brand glowing on white. */
+.crown-numeral {
+  text-shadow: 0 0 10px oklch(var(--color-bg-raw) / 0.25);
+}
+
+@keyframes crown-glow {
+  0%   { opacity: 0.55; text-shadow: 0 0 0 oklch(var(--color-bg-raw) / 0); }
+  40%  { opacity: 1;    text-shadow: 0 0 24px oklch(var(--color-bg-raw) / 0.8); }
+  100% { opacity: 0.55; text-shadow: 0 0 10px oklch(var(--color-bg-raw) / 0.25); }
+}
+.animate-crown-glow { animation: crown-glow 900ms cubic-bezier(0.22, 1, 0.36, 1); }
 /* ─── Theme switching transition (JS-triggered, ~250ms window) ────────────── */
 html.theme-switching *,
 html.theme-switching *::before,

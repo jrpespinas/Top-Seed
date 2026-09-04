@@ -1,5 +1,6 @@
 import { Sidebar } from "./Sidebar";
 import { BottomBar } from "./BottomBar";
+import { WaitTrendRecorder } from "./WaitTrendRecorder";
 import { ZoomGuard } from "./ZoomGuard";
 
 export function AppShell({ children }: { children: React.ReactNode }) {
@@ -13,6 +14,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         {children}
       </main>
       <BottomBar />
+      {/* Renders nothing — samples the live queue so /players can chart how
+          waits moved across the evening. Here rather than on that page, which
+          is not where a session is actually spent. */}
+      <WaitTrendRecorder />
     </div>
   );
 }

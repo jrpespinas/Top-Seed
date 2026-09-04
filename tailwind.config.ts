@@ -17,6 +17,8 @@ const config: Config = {
         muted:                "oklch(var(--color-muted-raw) / <alpha-value>)",
         primary:              "oklch(var(--color-primary-raw) / <alpha-value>)",
         "primary-hover":      "oklch(var(--color-primary-hover-raw) / <alpha-value>)",
+        "primary-tint":       "oklch(var(--color-primary-tint-raw) / <alpha-value>)",
+        "primary-tint-soft":  "oklch(var(--color-primary-tint-soft-raw) / <alpha-value>)",
         accent:               "oklch(var(--color-accent-raw) / <alpha-value>)",
         success:              "oklch(var(--color-success-raw) / <alpha-value>)",
         warning:              "oklch(var(--color-warning-raw) / <alpha-value>)",

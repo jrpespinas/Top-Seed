@@ -1,8 +1,8 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import Link from "next/link";
-import { ArrowLeft, CalendarDays, Download } from "lucide-react";
+import { ArrowLeft, CalendarDays, Download, Share2 } from "lucide-react";
 import { SkillBadge } from "@/components/ui/SkillBadge";
 import { GenderIcon } from "@/components/ui/GenderIcon";
 import { StatusBadge } from "@/components/ui/StatusBadge";
@@ -13,8 +13,13 @@ import {
   useCourtsSnapshot,
   useQueueSnapshot,
   useBenchSnapshot,
+  useSessionCheckIns,
 } from "@/lib/session-store";
 import { useMatchLog } from "@/lib/match-log-store";
+import { computeLeaderboard, selectHonors } from "@/lib/leaderboard";
+import { computeSessionRecap } from "@/lib/match-history";
+import { ExportSheetModal } from "@/components/leaderboard/ExportSheetModal";
+import type { ShareSheetData } from "@/components/leaderboard/ShareSheet";
 import type { SessionPlayerSnapshot } from "@/types";
 
 // null covers rows with no sessionJoinedAt — snapshots taken before this
@@ -85,6 +90,30 @@ export function SessionDetailView({ sessionId }: { sessionId: string }) {
     [matches, sessionId]
   );
 
+  const [isExportOpen, setIsExportOpen] = useState(false);
+  const checkInByPlayer = useSessionCheckIns(sessionId);
+
+  // Declared above the `!summary` early return, and tolerant of a null summary,
+  // because hooks can't sit behind a conditional return.
+  const sheetData = useMemo((): ShareSheetData | null => {
+    if (!summary) return null;
+    const rows = computeLeaderboard(sessionMatches, {
+      matchType: "ALL",
+      sort: "points",
+      checkInByPlayer,
+    });
+    if (rows.length === 0) return null;
+    const recap = computeSessionRecap(sessionMatches);
+    return {
+      sessionName: summary.name,
+      sessionDate: summary.date,
+      rows,
+      honors: selectHonors(rows, 3),
+      matchesPlayed: recap.matchesPlayed,
+      totalCourtTimeMs: recap.totalCourtTimeMs,
+    };
+  }, [summary, sessionMatches, checkInByPlayer]);
+
   if (!summary) {
     return (
       <div className="flex flex-col min-h-full">
@@ -120,6 +149,15 @@ export function SessionDetailView({ sessionId }: { sessionId: string }) {
           </div>
           <StatusBadge status={summary.status === "OPEN" ? "open" : "closed"} />
           <button
+            onClick={() => setIsExportOpen(true)}
+            disabled={!sheetData}
+            title={sheetData ? undefined : "No completed matches to export"}
+            className="flex items-center gap-1.5 text-xs text-muted hover:text-ink hover:bg-surface-elevated transition-colors px-2.5 py-1.5 rounded-md border border-border/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-border disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:text-muted disabled:hover:bg-transparent"
+          >
+            <Share2 size={12} strokeWidth={2} aria-hidden />
+            Share sheet
+          </button>
+          <button
             onClick={async () => {
               // Dynamically imported: xlsx is a large library that should only
               // ever load when someone actually clicks Export, not on every
@@ -131,7 +169,7 @@ export function SessionDetailView({ sessionId }: { sessionId: string }) {
             className="flex items-center gap-1.5 text-xs text-muted hover:text-ink hover:bg-surface-elevated transition-colors px-2.5 py-1.5 rounded-md border border-border/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-border"
           >
             <Download size={12} strokeWidth={2} aria-hidden />
-            Export to Excel
+            Excel
           </button>
         </div>
         <p className="text-xs text-muted">
@@ -198,6 +236,12 @@ export function SessionDetailView({ sessionId }: { sessionId: string }) {
           <p className="text-sm text-muted">No players in this session</p>
         </div>
       )}
+
+      <ExportSheetModal
+        isOpen={isExportOpen}
+        onClose={() => setIsExportOpen(false)}
+        data={sheetData}
+      />
     </div>
   );
 }
@@ -214,6 +258,7 @@ function DetailHeader() {
           Sessions
         </Link>
       </div>
+
     </div>
   );
 }

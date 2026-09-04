@@ -627,7 +627,8 @@ function Recap({
     if (playerRow.timeOnCourtMs > 0) {
       cells.push({ value: formatDurationMs(playerRow.timeOnCourtMs), label: "on court" });
     }
-    if (playerRow.currentStreak >= 2) {
+    // Same threshold as the Leaderboard chip: two wins is noise.
+    if (playerRow.currentStreak >= 3) {
       cells.push({ value: `W${playerRow.currentStreak}`, label: "on the trot" });
     }
     if (playerRow.bestUpset) {
@@ -668,7 +669,7 @@ function Recap({
 
   return (
     <section
-      className="px-4 sm:px-6 py-3.5 bg-surface border-b border-border animate-apex-rise motion-reduce:animate-none"
+      className="px-4 sm:px-6 py-3.5 bg-surface border-b border-border"
       aria-label={player ? `${player.name} this session` : "Session summary"}
     >
       {player && (

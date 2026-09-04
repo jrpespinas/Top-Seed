@@ -307,6 +307,20 @@ The matchup staging card. Fixed width of `w-[76vw] md:w-[252px]` in horizontal s
 
 **Drag affordance**: The card itself is draggable (`cursor-grab`) when non-empty. `GripVertical` icon in header. While dragging another card, this card dims (`opacity-50 scale-[0.98]`).
 
+### Roster Table
+
+The table below the bento on `/players`, in a card matching the cells above rather than running full bleed — the roster reads as one more panel on the page instead of as the page's floor.
+
+**The card uses `overflow-clip`, never `overflow-hidden`.** Both clip the sticky header's square corners to the rounded card, but `hidden` additionally makes the card a scroll container — which captures the sticky header and stops it pinning to the viewport, the exact bug that looks like nothing until you scroll sixty rows. `clip` clips without scrolling, so the nearest scrollport stays the page and sticky still works.
+
+Matching the head's resting background to the card was tried first and isn't sufficient: `headerShadow` keys off *window* scroll, not the card's own position, so the head lifts to `surface-elevated` while the card's top corner is very often still on screen — and a grey box with square corners then cuts across the rounded border.
+
+**A live Waiting column**, open sessions only. Someone on court or on the bench reads "—" rather than a stale number carried over from before they were pulled — the same exclusion the bento's aggregate makes, applied per row.
+
+**Games played is a number plus a proportional rule** against the busiest player. A column of bare integers has to be read one cell at a time; sixty rules of varying length show the shape of the session's rotation at a glance — the bento histogram's story, told per person. Players well below the field take `warning` on both the figure and the rule, so the "behind the field" names in the Rotation cell are findable in the table without a search.
+
+**Columns thin rather than crowd.** Check-in and Notes drop below `xl:`, because a ninth column at 1024px would squeeze the interactive Payment toggle. The mobile cards keep every field, wait time included.
+
 ### Player Row
 
 The atomic list item in the PlayerPoolColumn — used for both queue entries and bench entries. Height minimum 44px (`min-h-[44px]`), full-width, `border-b border-border/40`.
@@ -342,6 +356,32 @@ The first cut split them: a form row under "Needs a gender", a compact `SkillBad
 **"Set all" is a persistent bar, not a one-shot.** Above the list at 2+ rows, sticky to the top of the scroll area, sweeping a level or gender across *every* staged row. Its controls sit in the same columns as each row's — a spacer holds the remove column — so it reads as the same controls aimed at everyone at once. Scoping it to the incomplete rows (the first cut) quietly made it single-use: setting a gender for all graduated every row to "ready", leaving the control nothing to act on, so a mis-tap on M/F could only be undone row by row. A sweep you can't re-aim isn't a bulk edit — it's a default with extra steps. Each sweep snapshots and offers undo (`Set 9 to Male`); the two fields sweep independently. The controls show the rows' *shared* value, not the last one applied, so the toggle reads back "everyone is Male" and goes blank for a mixed set — and tapping the active pill is a deliberate no-op, since `GenderToggle`'s normal deselect would empty every row here. A muted "N still need a gender" line on the bar is the only progress signal left, and appears only when that count is non-zero.
 
 **Validation**: Gender is required per player (missing-gender state is gated behind a submit attempt, not shown live — every row starts genderless, so showing it immediately would ring every card red before the organizer has touched anything). Duplicate names are checked live and case-sensitively, both against existing session players and within the current batch.
+
+### Roster Overview (bento)
+
+The dashboard above `/players`' table (`RosterOverview.tsx`). Six cells over a 6-column grid at `lg:`, two on mobile.
+
+**"Demographics" don't exist in this app.** `Player` carries name, skill, gender, notes and payment — no age, no location, no tenure — and `CLAUDE.md` rules out cross-session aggregation, so there's no history either. What the data does support is better for an organiser: **composition and fairness**. Skill mix, gender mix, money collected, and a games-played distribution answering the one thing the queue system exists to guarantee and has never reported on — *did anyone get left out?*
+
+**The bento is the table's control surface, not decoration stacked on it.** Skill and gender segments call the page's existing `toggleSkillFilter` / `toggleGenderFilter`; unselected segments dim to 25%, so the bar doubles as a read-out of what the table below is currently showing.
+
+**Stats are computed from the unfiltered roster.** Deriving them from the filtered rows would make each chart describe its own selection — click "Advanced" and the skill mix collapses to 100% Advanced, destroying the proportions you just clicked. The overview always shows the whole night; the table shows the slice.
+
+**Charts are hand-built SVG-free markup**, not a library. Recharts is ~100KB into a PWA for four bars and a histogram; flex children with percentage widths cost nothing, use the palette tokens directly, and can't drift from the design system.
+
+**Rows are grouped by content height, not by topic.** Grid rows stretch every cell to their tallest member, so a thin cell sitting beside a chart is guaranteed dead space — the first cut had two single-figure cells inflated to match `Collected` next to them. Cells now pair up: two figures share one *Session* cell, skill and gender share one *Make-up* cell (both are proportional bars driving the same table, so two stacked read as one idea rather than two half-empty ones), and *Rotation* runs full width with the laggards' names filling what the histogram alone would leave blank.
+
+**Every always-present row fills exactly six columns**, so a closed session — which has no waiting data at all — ends on a complete row instead of a hole. Figures sit at `text-3xl sm:text-4xl` rather than `text-5xl`; at that scale a figure-plus-caption cell simply couldn't fill the height the grid gave it.
+
+**Two bans this layout is built to dodge.** *Identical card grids*: cells carry deliberately different spans (1 / 1 / 2 / 2 / 2 / 4), which is the whole difference between a bento and a stat grid. *The hero-metric template*: big numbers, yes — mono, tabular, `text-5xl` — but no gradient accents and no repeated metric-plus-supporting-stats blocks.
+
+**Two charts, two encodings, chosen by what the axis means.** The wait *distribution* is a step line over fixed five-minute buckets — binned counts have nothing to interpolate between midpoints, so a stairs plot holds each value flat across its bucket and asserts nothing in between, which is also the only honest treatment of the open-ended `20+` bin. The wait *trend* is a true polyline, because clock time is continuous and the gap between samples really does carry meaning. A box plot was rejected for both: quartiles describe noise at queue-sized samples, and it asks more reading literacy than the task needs.
+
+**The old bar version, for the record.** Minutes on x, players on y, fixed five-minute buckets. A box plot's quartiles describe noise at queue-sized samples and demand more reading literacy than the task needs; "three people have been waiting 15+ minutes" is a sentence with an action attached, a whisker isn't. It also keeps one visual language with the rotation histogram sitting two cells away. The long-wait line is the session's own median match length rather than a constant — sit through longer than a match and you missed a full rotation cycle — so the same waits read as healthy at a club playing 25-minute games and backed-up at one playing 8.
+
+**Waiting cells are live and conditional.** Average wait and Waiting longest read the shared `useTick` clock and appear only for the open session — a closed one never recorded `enteredQueueAt`. Bench sitters and players on court are both excluded: one opted out of the queue, the other's timestamp describes a wait that already ended. The longest-wait cell lists the next three beneath the headline, so "who's up?" is answered with a shortlist rather than one name and another trip to the Dashboard.
+
+**Rotation uses `warning`, never `error`.** Someone playing less than the field is worth walking over about, not an alarm. Empty histogram buckets keep a 2px hairline so the axis still reads as a continuous scale rather than a gap.
 
 ### Match Row
 
@@ -392,16 +432,57 @@ The one surface that trades operational restraint for a result worth screenshott
 | Tier | Treatment |
 |---|---|
 | Champion | Filled `bg-primary`, `text-bg`, centre column at `md:` and full width below. Largest type on the page. |
-| Runners-up | `bg-surface` with `border-primary/25`, rank numeral in `text-primary/70`, about a third the presence. |
+| Runners-up | `bg-primary-tint`, rank numeral in `text-primary/70`, about a third the presence. **Stepped**: second is taller than third, as a real podium is. |
 | Honors | `bg-surface border-border`, neutral icon in a `surface-elevated` tile, quietest of the three. |
+
+**Colour intensity encodes placing.** Three grounds stepping down from the champion — `bg-primary` (L 0.317 / C 0.202), `bg-primary-tint` on the runners-up (0.945 / 0.030), `bg-primary-tint-soft` on the awards (0.972 / 0.016), over a page at 0.995 / 0.002. Lightness descends and chroma climbs together as the placings go up, so the two channels agree and the blue *is* the hierarchy rather than decoration laid over it.
+
+They are real tokens, not alpha over white. Stacked transparency makes contrast unpredictable and is the usual sign of an incomplete palette; both tints clear 5.8:1 for muted text and 16:1 for ink. The awards' icon tile is white rather than a third tint — stacking two washes of one hue muddies both, where a cut-out reads as a chip and keeps the icon crisp. For the same reason an award tag riding a runners-up card is a white chip with brand text, since a neutral one would read as a grey smudge on blue.
+
+The 60-row field below stays neutral. The apex is the coloured object; a table that joined it would dissolve the boundary the whole layout is built on.
 
 **Ranks 1–2–3 must never use gold / silver / bronze.** The metals ladder is already spoken for: `SkillBadge` runs Bronze → Silver → Gold → Platinum for Casual → Beginner → Intermediate → Advanced, and those badges render *inside* these very slots. A gold rank-1 frame beside a gold Intermediate badge is one visual system saying two unrelated things. Hierarchy runs on the brand blue, size, and position.
 
-**Honors are the third tier for a reason.** They recognise a moment, not a placing; giving one podium weight would flatten the hierarchy the apex exists to express. Podium players are excluded from them, so the block names five distinct people rather than four.
+**Awards are the third tier for a reason.** They recognise a moment, not a placing; giving one podium weight would flatten the hierarchy the apex exists to express. Five named awards — **Giant Killer**, **On Fire**, **The Carry**, **The Android**, **The Duo** — ranked by how far clear of the next player the leader is, not by a fixed priority list. That list made a one-rung upset outrank a six-match streak purely because of position.
 
-**Motion.** `animate-apex-rise` — 320ms, `cubic-bezier(0.22, 1, 0.36, 1)`, no `fill-mode`. The element's resting style *is* its final state, so a hidden tab, a headless render, or a browser that skips the animation still shows the champion. A reveal enhances an already-visible default; it never gates one. This is the app's only entrance animation, and it earns its place because this page announces a result rather than loading into a task.
+**A podium winner wears their award as a tag on their own card**, not as a separate card below: the podium card is already where that person is being recognised, and a second card with the same name reads as a duplicate. Only awards won from outside the top three become cards, and when there are none the strip is not rendered at all rather than left as an empty row. One award per player, and the champion's summary line stays silent about whatever their own tag already says.
+
+**Motion — the crowning.** A sheet in the runners-up's own tint lies over the champion's blue ground and retreats to the right (`crown-wipe`, 520ms, `ease-out-expo`), so the card literally starts as one of them and the brand colour *arrives*. The blue is the only thing separating first place from second, which makes its arrival the one gesture here that carries meaning rather than decorating a box that was already there. Runners-up rise beneath it (`apex-rise`, 320ms); the champion's content fades in behind the sheet (`crown-content`, 700ms).
+
+**It plays only when the top of the table changes**, remembered per session in `localStorage`. The animation is worth having *because* it is rare: an organiser opens this page repeatedly across a night, and a celebration that replays on every mount stops reading as one by the third viewing. Gating it on a real change turns the motion into information — "the lead changed" — which is the only kind of motion the product register asks for. Storage is read in an effect, never during render, and wrapped: it throws outright in some privacy modes, where the correct fallback is a leaderboard that simply doesn't animate.
+
+**The rank numeral flares and settles** (`crown-glow`, 900ms): it brightens to full and blooms a soft near-white halo, then falls back to a faint permanent glow. A continuous pulse was the obvious move and is the wrong one — this page is opened repeatedly across a night, and a number throbbing on every visit is exactly the fatigue the crown reveal is gated to avoid. `.crown-numeral` carries the resting glow, which is also the animation's final frame, so nothing needs `fill-mode`. Glow is already sanctioned here by the Elevation rule (diffuse, in a palette colour, never a grey shadow); this is that rule inverted — the page's near-white glowing on the brand ground rather than the brand glowing on white.
+
+Two rules hold the whole thing up:
+
+- **No `animation-fill-mode`, anywhere.** The sheet's *resting* clip-path is fully retreated, so an unplayed animation leaves a finished blue card rather than a blank white one. A hidden tab, a headless render, or a browser that skips animations still shows the champion. A reveal enhances an already-visible default; it never gates one.
+- **Holds are baked into keyframes, never expressed as `animation-delay`.** A delay without fill-mode shows the resting state first and then snaps to the 0% frame — a visible flash. `crown-content` holds at `0%, 38%` so near-white text is never sitting on the near-white sheet.
+
+This is the app's only entrance animation. It earns its place because this page announces a result rather than loading into a task — and the Matches recap band, which is working data rather than an announcement, had a copy of the old rise that has since been removed for exactly that reason.
 
 **Narrative chips** on field rows (`W4` streak, upset bolt) render only when true. A row without them reads as ordinary, not as missing data — which is exactly why they aren't columns.
+
+### Session Share Sheet
+
+The printable / postable artifact (`ShareSheet.tsx`), reached from an Export button on the Leaderboard header and a Share sheet button on `/sessions/[id]`.
+
+**Fixed at 794px — A4 at 96dpi — not fluid.** That single decision is what lets one component be two artifacts: the print path lands edge-correct on A4 and Letter, and `html-to-image` captures the same node at 2× for a chat-legible PNG. A responsive sheet would need testing at every width and would still capture at whatever width the viewport happened to be.
+
+**The same palette as the live apex.** Filled `bg-primary` champion, `bg-primary-tint` runners-up, `bg-primary-tint-soft` awards. The sheet was built white-with-blue-rules first to spare a gym printer's cartridge; that was overruled, on the grounds that a sheet which doesn't look like the app it came from is a worse outcome than an expensive print — and the PNG, which costs nothing to render in colour, is the artifact people actually see.
+
+**That carries a hard dependency:** browsers drop background colours when printing unless told otherwise, so the print block sets `print-color-adjust: exact` on the `[data-print-root]` subtree only. Without it the filled champion prints as bare paper with near-white text on it — invisible, and strictly worse than never having filled it. Scoped to the sheet so nothing else in the app starts printing its backgrounds.
+
+Two things the sheet still declines to copy: the numeral's glow, because a text-shadow prints as a grey smudge and captures as one, and filled `SkillBadge` metals, which render as bordered mono text instead.
+
+**One component, two audiences.** `data-screen-only` and `data-print-only` hide different halves: screen and PNG carry the top ten, the printed sheet continues onto a second page with the full field. A chat thumbnail with sixty rows is unreadable; a noticeboard sheet missing fifty people is useless. Splitting inside one component means the two can't drift.
+
+**A scoring footnote, not decoration.** The sheet is posted to people who weren't looking over the organiser's shoulder — "why is Mira above Karen" is the first reply in the thread, so one line answers it before it's asked.
+
+**Preview, then choose.** The Export button opens the sheet itself with Download image and Print beneath, not a format dropdown. The sheet must be in the DOM to be captured at all, so previewing costs nothing, and it turns the format question from a blind decision into a consequence of seeing the thing.
+
+**Print isolation is scoped with `:has()`.** `body:has([data-print-root]) * { visibility: hidden }` engages only while a sheet is open; unscoped, printing any other page in the app would hide everything and reveal nothing — a blank sheet of paper. `visibility` rather than `display` because the sheet is portaled inside a modal, and collapsing its ancestors would take it with them.
+
+**The capture's real failure mode is fonts.** Cloned nodes don't inherit the document's loaded `@font-face` rules, so a capture without `getFontEmbedCSS` renders the whole sheet in the fallback stack. It fails silently and looks almost right, which is what makes it the standard way this feature ships broken.
 
 ### Toast / Undo Notification
 

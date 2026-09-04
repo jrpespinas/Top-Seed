@@ -44,16 +44,25 @@ export interface LeaderboardRow {
   bestUpset: UpsetRecord | null;
   /** Most wins alongside one partner, minimum two matches together. */
   bestPartner: PartnerRecord | null;
+  /** Wins in doubles where the partner sat below this player on the ladder. */
+  carryWins: number;
+  /** Σ rungs carried across those wins — magnitude, and the tiebreak. */
+  carryRungs: number;
   timeOnCourtMs: number;
-  rank: number;
   /**
-   * True when another row shares this exact rank on every criterion — the UI
-   * shows a "T-" prefix so a manufactured, confident-looking split is never
-   * presented for identical records. Far rarer since points replaced a
-   * percentage: three decimal-identical rates are common, three identical
-   * point totals with identical form much less so.
+   * When this player entered the session — the final ranking tiebreak.
+   *
+   * Never null: a row exists only because the player appeared in at least one
+   * completed match, so their first match is always available as a fallback.
    */
-  isTied: boolean;
+  checkInAt: string;
+  /**
+   * Always sequential — 1, 2, 3, 4 — never competition ranking with shared
+   * places. Two players on identical records are separated by name rather
+   * than presented as joint, so a reader never has to decode a "T-" prefix
+   * or wonder why two rows carry the same number.
+   */
+  rank: number;
 }
 
 /**
@@ -222,7 +231,10 @@ function collectAppearances(
   return byPlayer;
 }
 
-function summarize(aggregate: Aggregate): Omit<LeaderboardRow, "rank" | "isTied"> {
+function summarize(
+  aggregate: Aggregate,
+  checkIn: string | undefined
+): Omit<LeaderboardRow, "rank"> {
   let wins = 0;
   let draws = 0;
   let losses = 0;
@@ -230,6 +242,8 @@ function summarize(aggregate: Aggregate): Omit<LeaderboardRow, "rank" | "isTied"
   let timeOnCourtMs = 0;
   let currentStreak = 0;
   let longestStreak = 0;
+  let carryWins = 0;
+  let carryRungs = 0;
   let bestUpset: UpsetRecord | null = null;
 
   const partners = new Map<string, PartnerRecord>();
@@ -243,6 +257,18 @@ function summarize(aggregate: Aggregate): Omit<LeaderboardRow, "rank" | "isTied"
       currentStreak++;
       longestStreak = Math.max(longestStreak, currentStreak);
       const player = side.find((p) => p.id === aggregate.playerId)!;
+      // Deliberately NOT gated on being the underdog, unlike the points bonus.
+      // The points gate exists so an easy win can't be paid twice; this award
+      // asks a plainer question — did you win with someone below you? — and
+      // beating a weak pair while carrying a weak partner is still carrying.
+      const mate = side.find((q) => q.id !== player.id);
+      if (mate) {
+        const rungs = SKILL_RANK[mate.skillLevel] - SKILL_RANK[player.skillLevel];
+        if (rungs > 0) {
+          carryWins++;
+          carryRungs += rungs;
+        }
+      }
       const bonus = matchBonus(player, side, opponents);
       bonusPoints += bonus;
       if (bonus > 0 && (!bestUpset || bonus > bestUpset.bonus)) {
@@ -304,18 +330,39 @@ function summarize(aggregate: Aggregate): Omit<LeaderboardRow, "rank" | "isTied"
     longestStreak,
     bestUpset,
     bestPartner,
+    carryWins,
+    carryRungs,
     timeOnCourtMs,
+    // Real check-in when the session store knows it, otherwise this player's
+    // first match — a close proxy, and the reason this can never be null.
+    // `played` is chronological and non-empty by construction: an aggregate
+    // only exists because an appearance was recorded for it.
+    checkInAt: checkIn ?? aggregate.played[0].match.startedAt,
   };
 }
 
 export function computeLeaderboard(
   matches: MatchRecord[],
-  options: { matchType: MatchTypeFilter; sort: LeaderboardSort }
+  options: {
+    matchType: MatchTypeFilter;
+    sort: LeaderboardSort;
+    /** Player id → ISO check-in instant. See `useSessionCheckIns`. */
+    checkInByPlayer?: Map<string, string>;
+  }
 ): LeaderboardRow[] {
-  const rows = Array.from(collectAppearances(matches, options.matchType).values()).map(summarize);
+  const rows = Array.from(collectAppearances(matches, options.matchType).values()).map((a) =>
+    summarize(a, options.checkInByPlayer?.get(a.playerId))
+  );
 
   // Points lead; form breaks ties. Both are shown, so the tiebreak is never
   // invisible — a reader can always see why one row sits above another.
+  //
+  // Check-in time is the final tiebreak, earliest first. Ranks are sequential,
+  // so two identical records must still be ordered somehow — and of the
+  // available answers this is the only one that rewards something the player
+  // actually did. Turning up first and playing all night is worth more than
+  // an alphabetical accident, and it quietly encourages the behaviour an
+  // organiser wants. Name only breaks a tie between two identical check-ins.
   const compare = (a: (typeof rows)[number], b: (typeof rows)[number]): number => {
     const primary =
       options.sort === "wins"
@@ -325,148 +372,166 @@ export function computeLeaderboard(
         : options.sort === "form"
         ? b.form - a.form
         : b.points - a.points;
-    return primary !== 0 ? primary : b.form - a.form || b.matchesPlayed - a.matchesPlayed;
+    return (
+      primary ||
+      b.form - a.form ||
+      b.matchesPlayed - a.matchesPlayed ||
+      a.checkInAt.localeCompare(b.checkInAt) ||
+      a.name.localeCompare(b.name)
+    );
   };
 
   const sorted = [...rows].sort(compare);
 
-  // Competition ranking (1, 2, 2, 4 — not 1, 2, 2, 3): a row shares the
-  // previous row's rank only on a genuine tie across every criterion.
-  const rankByPlayer = new Map<string, number>();
-  sorted.forEach((row, i) => {
-    if (i > 0 && compare(sorted[i - 1], row) === 0) {
-      rankByPlayer.set(row.playerId, rankByPlayer.get(sorted[i - 1].playerId)!);
-    } else {
-      rankByPlayer.set(row.playerId, i + 1);
-    }
-  });
-
-  const rankCounts = new Map<number, number>();
-  for (const rank of Array.from(rankByPlayer.values())) {
-    rankCounts.set(rank, (rankCounts.get(rank) ?? 0) + 1);
-  }
-
-  return sorted.map((row) => {
-    const rank = rankByPlayer.get(row.playerId)!;
-    return { ...row, rank, isTied: (rankCounts.get(rank) ?? 0) > 1 };
-  });
+  // Sequential throughout — 1, 2, 3, 4 — never shared places.
+  //
+  // Competition ranking was here first (1, 2, 2, 4, with a "T-" prefix on the
+  // joint rows), on the reasoning that manufacturing a split between identical
+  // records is a small lie. It was replaced because the cost landed on every
+  // reader instead: a column that is mostly plain numbers and occasionally
+  // "T-3" makes people stop and decode rather than scan, and that prefix now
+  // also reaches a printed sheet posted to people with no way to ask what it
+  // means. Identical records are separated by name in `compare` above, so the
+  // order is at least deterministic and explicable.
+  return sorted.map((row, i) => ({ ...row, rank: i + 1 }));
 }
 
-export type HonorKind = "upset" | "streak" | "onCourt" | "pair";
+export type HonorKind = "upset" | "streak" | "carry" | "onCourt" | "pair";
 
 export interface Honor {
   kind: HonorKind;
+  /** The award's name, e.g. "Giant Killer". */
   label: string;
   playerId: string;
   name: string;
   skillLevel: SkillLevel;
-  /** The fact itself, already formatted: "W4", "beat Tita & Karen", "6 matches". */
+  /** The fact itself, already formatted: "5 wins in a row", "9 matches played". */
   detail: string;
+  /** How far clear of the next-best player this is. See `selectHonors`. */
+  standout: number;
 }
 
-const MIN_HONOR_STREAK = 2;
-const MIN_HONOR_MATCHES = 2;
+/**
+ * Each award's value for one player, plus the floor it has to clear.
+ *
+ * The floor is what stops trivia winning a slot: one win is not a run of form,
+ * and one match is not an endurance record.
+ */
+const HONOR_DEFINITIONS: {
+  kind: HonorKind;
+  label: string;
+  minimum: number;
+  value: (row: LeaderboardRow) => number;
+  detail: (row: LeaderboardRow) => string;
+}[] = [
+  {
+    kind: "upset",
+    label: "Giant Killer",
+    minimum: 1,
+    value: (r) => r.bestUpset?.bonus ?? 0,
+    detail: (r) => `beat ${formatNames(r.bestUpset!.opponentNames)}`,
+  },
+  {
+    kind: "streak",
+    label: "On Fire",
+    // Three, matching the row chip. Two consecutive wins happens constantly in
+    // a session of four-match evenings; awarding "On Fire" for it would spend
+    // one of three slots on something unremarkable.
+    minimum: 3,
+    value: (r) => r.longestStreak,
+    detail: (r) => `${r.longestStreak} wins in a row`,
+  },
+  {
+    kind: "carry",
+    label: "The Carry",
+    minimum: 2,
+    value: (r) => r.carryWins,
+    detail: (r) => `${r.carryWins} wins with weaker partners`,
+  },
+  {
+    kind: "onCourt",
+    label: "The Android",
+    minimum: 2,
+    value: (r) => r.matchesPlayed,
+    detail: (r) => `${r.matchesPlayed} matches played`,
+  },
+  {
+    kind: "pair",
+    label: "The Duo",
+    minimum: 2,
+    value: (r) => r.bestPartner?.wins ?? 0,
+    detail: (r) => `${r.bestPartner!.wins} wins with ${r.bestPartner!.partnerName}`,
+  },
+];
+
+/** Order used only to break a tie between two equally unusual awards. */
+const HONOR_TIEBREAK: HonorKind[] = HONOR_DEFINITIONS.map((d) => d.kind);
 
 /**
- * Picks the honor slots that flank the podium.
+ * Picks the session's awards, most remarkable first.
  *
- * Two rules carry the design:
+ * **Ranked by how far clear the leader is, not by a fixed priority.** The first
+ * version walked a hardcoded list — upset, then streak, then matches — which
+ * meant a one-rung upset always outranked a six-match winning streak purely
+ * because of list position. That is backwards: the streak is plainly the more
+ * remarkable thing that happened.
  *
- * 1. **Anyone already on the podium is excluded.** The champion of a 5-0
- *    session also owns the longest streak by construction; awarding it to them
- *    would recognise four people where the layout has room for five. Dropping
- *    to the best streak outside the top three is what makes the apex five
- *    distinct names.
- * 2. **Honors come from a priority pool, and empty ones are skipped.** Suggested
- *    matchups are adjacency-constrained, so plenty of sessions produce no upset
- *    at all. Rather than render a slot with nothing in it, the next available
- *    honor takes its place.
+ * `standout` is the leader's value divided by the runner-up's, so it asks the
+ * same question of every award regardless of its units: *how far clear of the
+ * next person is this?* A 3-rung upset where nobody else managed one scores 3;
+ * a 6-match streak where the next best is 3 scores 2; the busiest player at 9
+ * matches with someone else on 8 scores 1.1. Dimensionless, so streaks and
+ * upsets and match counts compare directly, and the same relative reasoning as
+ * the long-match marker on the Matches page.
+ *
+ * The podium is eligible — see the note on the apex in `04-leaderboard.md`.
+ * One award per player still holds: two adjacent cards on the same name looks
+ * like a rendering fault rather than a tribute.
  */
-export function selectHonors(rows: LeaderboardRow[], slots: number, excludeIds: Set<string>): Honor[] {
-  const eligible = rows.filter((r) => !excludeIds.has(r.playerId));
+export function selectHonors(rows: LeaderboardRow[], slots: number): Honor[] {
+  const candidates: (Honor & { value: number })[] = [];
+
+  for (const def of HONOR_DEFINITIONS) {
+    const ranked = rows
+      .map((row) => ({ row, value: def.value(row) }))
+      .filter((c) => c.value >= def.minimum)
+      .sort((a, b) => b.value - a.value);
+
+    const leader = ranked[0];
+    if (!leader) continue;
+
+    // No runner-up means nobody else did this at all, so the leader's own
+    // value is the margin. Flooring at 1 keeps the ratio finite.
+    const runnerUp = ranked.find((c) => c.row.playerId !== leader.row.playerId)?.value ?? 0;
+    candidates.push({
+      kind: def.kind,
+      label: def.label,
+      playerId: leader.row.playerId,
+      name: leader.row.name,
+      skillLevel: leader.row.skillLevel,
+      detail: def.detail(leader.row),
+      standout: leader.value / Math.max(1, runnerUp),
+      value: leader.value,
+    });
+  }
+
+  candidates.sort(
+    (a, b) =>
+      b.standout - a.standout ||
+      HONOR_TIEBREAK.indexOf(a.kind) - HONOR_TIEBREAK.indexOf(b.kind)
+  );
+
   const honors: Honor[] = [];
   const claimed = new Set<string>();
-
-  const push = (honor: Honor | null) => {
-    if (!honor || claimed.has(honor.playerId) || honors.length >= slots) return;
-    claimed.add(honor.playerId);
+  for (const candidate of candidates) {
+    if (honors.length >= slots) break;
+    if (claimed.has(candidate.playerId)) continue;
+    claimed.add(candidate.playerId);
+    const { value: _value, ...honor } = candidate;
+    void _value;
     honors.push(honor);
-  };
-
-  const best = <T>(items: T[], score: (item: T) => number): T | null => {
-    let top: T | null = null;
-    let topScore = 0;
-    for (const item of items) {
-      const value = score(item);
-      if (value > topScore) {
-        top = item;
-        topScore = value;
-      }
-    }
-    return top;
-  };
-
-  const upsetRow = best(
-    eligible.filter((r) => !claimed.has(r.playerId)),
-    (r) => r.bestUpset?.bonus ?? 0
-  );
-  if (upsetRow?.bestUpset) {
-    push({
-      kind: "upset",
-      label: "Biggest upset",
-      playerId: upsetRow.playerId,
-      name: upsetRow.name,
-      skillLevel: upsetRow.skillLevel,
-      detail: `beat ${formatNames(upsetRow.bestUpset.opponentNames)}`,
-    });
   }
-
-  const streakRow = best(
-    eligible.filter((r) => !claimed.has(r.playerId) && r.longestStreak >= MIN_HONOR_STREAK),
-    (r) => r.longestStreak
-  );
-  if (streakRow) {
-    push({
-      kind: "streak",
-      label: "Longest streak",
-      playerId: streakRow.playerId,
-      name: streakRow.name,
-      skillLevel: streakRow.skillLevel,
-      detail: `${streakRow.longestStreak} wins in a row`,
-    });
-  }
-
-  const courtRow = best(
-    eligible.filter((r) => !claimed.has(r.playerId) && r.matchesPlayed >= MIN_HONOR_MATCHES),
-    (r) => r.matchesPlayed
-  );
-  if (courtRow) {
-    push({
-      kind: "onCourt",
-      label: "Most on court",
-      playerId: courtRow.playerId,
-      name: courtRow.name,
-      skillLevel: courtRow.skillLevel,
-      detail: `${courtRow.matchesPlayed} matches`,
-    });
-  }
-
-  const pairRow = best(
-    eligible.filter((r) => !claimed.has(r.playerId) && (r.bestPartner?.wins ?? 0) >= MIN_HONOR_MATCHES),
-    (r) => r.bestPartner?.wins ?? 0
-  );
-  if (pairRow?.bestPartner) {
-    push({
-      kind: "pair",
-      label: "Best pair",
-      playerId: pairRow.playerId,
-      name: pairRow.name,
-      skillLevel: pairRow.skillLevel,
-      detail: `${pairRow.bestPartner.wins} wins with ${pairRow.bestPartner.partnerName}`,
-    });
-  }
-
-  return honors.slice(0, slots);
+  return honors;
 }
 
 function formatNames(names: string[]): string {
@@ -480,18 +545,32 @@ function formatNames(names: string[]): string {
  *
  * Returns null rather than a generic filler when nothing specific is true —
  * an empty line reads better than "had a good session".
+ *
+ * The two suppression flags exist because the podium can now hold honors: if
+ * the champion also takes a card directly below this line, the line must not
+ * narrate the fact that card is already showing.
+ *
+ * `suppressStreak` covers both opening clauses, not just the obviously
+ * streak-shaped one. "Won all N" requires zero losses and zero draws, which
+ * means the record and the longest streak are the same number — so beside a
+ * card reading "5 wins in a row" it is the identical fact in different words.
  */
-export function championSummary(row: LeaderboardRow): string | null {
+export function championSummary(
+  row: LeaderboardRow,
+  options: { suppressUpset?: boolean; suppressStreak?: boolean } = {}
+): string | null {
   if (row.matchesPlayed === 0) return null;
 
   const parts: string[] = [];
-  if (row.losses === 0 && row.draws === 0 && row.wins > 1) {
-    parts.push(`Won all ${row.wins}`);
-  } else if (row.longestStreak >= 3) {
-    parts.push(`${row.longestStreak} straight at their best`);
+  if (!options.suppressStreak) {
+    if (row.losses === 0 && row.draws === 0 && row.wins > 1) {
+      parts.push(`Won all ${row.wins}`);
+    } else if (row.longestStreak >= 3) {
+      parts.push(`${row.longestStreak} straight at their best`);
+    }
   }
 
-  if (row.bestUpset && row.bestUpset.bonus > 0) {
+  if (row.bestUpset && row.bestUpset.bonus > 0 && !options.suppressUpset) {
     parts.push(`beat ${formatNames(row.bestUpset.opponentNames)} along the way`);
   } else if (row.bestPartner && row.bestPartner.wins >= 2) {
     parts.push(`${row.bestPartner.wins} of them with ${row.bestPartner.partnerName}`);

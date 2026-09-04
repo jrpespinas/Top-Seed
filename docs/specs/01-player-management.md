@@ -7,6 +7,46 @@ Both `/players` and the Dashboard's `AddPlayersModal` write into the same queue,
 
 ---
 
+## Roster overview
+
+A bento dashboard above the table (`RosterOverview.tsx`, stats in `src/lib/player-stats.ts`, covered by `player-stats.test.ts`).
+
+**There are no demographics in the data model** — no age, no location, no tenure — and no cross-session history to aggregate. The overview measures **composition and fairness** instead:
+
+| Cell | Shows | Source |
+|---|---|---|
+| Session | Headcount and completed matches, plus anyone missing a gender | roster, match log |
+| Collected | Settled / total, with a paid-vs-waived bar and what's still owed | `paymentStatus` |
+| Make-up | Skill mix and gender split, stacked — **both filter the table** | `skillLevel`, `gender` |
+| Rotation | Games-played histogram, a plain-language verdict, and the names of anyone behind | derived |
+| Average wait | Mean queue time now, plus a histogram of waits by minute and a flow verdict | `enteredQueueAt` |
+| Waiting longest | The longest current wait, with the next three beneath | `enteredQueueAt` |
+| Wait across the evening | Average queue wait plotted against clock time | sampled, `wait-trend.ts` |
+
+**Rotation is the one with a person behind it.** The queue exists to stop anyone sitting out and nothing has ever reported whether it worked. A player is flagged when they are `LAGGARD_GAP` (2) or more matches below the median — raw spread over-flags, since a late arrival always trails and that isn't the rotation failing. Below four players no verdict is given at all: the median is describing noise, not a field.
+
+**The wait distribution is a step line.** Fixed five-minute buckets with an open-ended `20+`, x = minutes waited, y = players. A *stairs* plot rather than a polyline through bucket midpoints: counts are binned, so there is no "2.5 players at 7.5 minutes" to interpolate, and a step holds each value flat across its own bucket while asserting nothing in between. It is also the only honest way to draw the open-ended `20+` bin, which has no centre for a line to pass through. Not a box plot either: a queue holds a handful of people, so quartiles would be describing noise while asking more reading literacy than the job needs — and a box plot beside the rotation histogram would be two visual languages for one idea. Buckets are fixed rather than derived because the chart updates every second, and axis labels that reshuffle under the reader are unreadable; fixed edges also make two sessions comparable.
+
+**"Too long" is one median match, not a constant.** A wait exceeding how long a match actually takes means that player sat through a full rotation cycle without being picked. Twelve minutes is fine where matches run 25 and bad where they run 8, so a fixed number can't answer the question — the threshold comes from `matchDurationMs` over the session's completed matches, falling back to `DEFAULT_LONG_WAIT_MS` (15m) before enough have finished to tell. Bars are flagged by whether they actually contain a stuck player rather than by whether their bounds straddle the line, so a threshold landing mid-bucket doesn't paint the whole bar late on behalf of someone who isn't.
+
+**The evening trend is a real line chart, and the only one here that should be.** Clock time is continuous, so the space between two samples genuinely means something — this is what shows waits creeping up after a court was lost, or settling once the queue thinned, which no snapshot can.
+
+It needs data the app never recorded, so `wait-trend.ts` samples the live queue's average wait once a minute into `localStorage`, keyed by session. **`WaitTrendRecorder` is mounted in `AppShell`, not on `/players`** — that page is not where a session is spent, and recording only while it was open would leave holes exactly when the queue was busiest. `appendSampleTo` refuses a sample taken within 55s of the last, which is what makes the recorder safe to mount more than once; `pruneStore` drops trends for sessions the app has forgotten and caps retention at 8 sessions and 480 samples each, so the store can't leak across months of play.
+
+**Its honest limit:** it only covers time the app was actually open. There is no background execution, and the caption says as much rather than implying a continuous record.
+
+**The two waiting cells appear only on the open session.** `enteredQueueAt` lives on a live `QueueEntry` alone — `BenchEntry` doesn't carry it and `closeSession` never writes it into `SessionPlayerSnapshot` — so a closed session has no waiting data preserved anywhere. The cells are absent rather than showing a zero the data never contained.
+
+Two exclusions, both structural. **Benched players don't count**: they opted out of the queue, so counting them would inflate the average with people who aren't asking for a game and could point the longest-wait callout at someone who doesn't want to be called. **Players on court don't count**: their `enteredQueueAt` is a stale timestamp from before they were pulled, so including them would report a wait that already ended. Times run off the shared `useTick` clock, so they update alongside every other `ElapsedTimer` instead of starting an interval of their own.
+
+**Segments drive the page's existing filters.** The unspecified-gender slice renders but is never clickable — there is no "no gender" filter behind it, and a segment that looks interactive and isn't is worse than one that plainly isn't. Stats always come from the unfiltered roster, or each chart would describe its own selection.
+
+**The roster table sits in a card** matching the bento cells, with a live **Waiting** column (open sessions only — a player on court or benched reads "—", not a stale figure), and **Games played as a number plus a proportional rule** against the busiest player, tinted `warning` for anyone the rotation left behind. Check-in and Notes hide below `xl:` so the interactive Payment toggle isn't squeezed; the mobile cards keep every field.
+
+The card uses `overflow-clip` and must never be switched to `overflow-hidden`: both clip the sticky header's square corners to the rounded border, but `hidden` also makes the card a scroll container, which stops the header pinning to the viewport.
+
+---
+
 ## Data Model (current, from `src/types/index.ts`)
 
 ```typescript

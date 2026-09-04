@@ -39,7 +39,10 @@ function buildMatchesSheet(matches: MatchRecord[]) {
 // Standings computed fresh from just this session's matches — consistent with
 // "no cross-session aggregation" (see docs/specs/08-sessions.md), not the
 // app's live all-time /leaderboard.
-function buildLeaderboardSheet(sessionMatches: MatchRecord[]) {
+function buildLeaderboardSheet(
+  sessionMatches: MatchRecord[],
+  players: SessionPlayerSnapshot[]
+) {
   const header = [
     "Rank",
     "Player",
@@ -58,9 +61,18 @@ function buildLeaderboardSheet(sessionMatches: MatchRecord[]) {
   // 3 a win + 1 a draw plus a bonus for beating stronger opposition; Form is
   // the shrunk win share used as the tiebreak. Result and bonus points are
   // split out so a reader can reconstruct the total rather than trust it.
-  const standings = computeLeaderboard(sessionMatches, { matchType: "ALL", sort: "points" });
+  // Same check-in tiebreak the app applies, so the sheet's order can't differ
+  // from what the organiser saw on screen.
+  const checkInByPlayer = new Map(
+    players.filter((p) => p.sessionJoinedAt).map((p) => [p.id, p.sessionJoinedAt!])
+  );
+  const standings = computeLeaderboard(sessionMatches, {
+    matchType: "ALL",
+    sort: "points",
+    checkInByPlayer,
+  });
   const rows = standings.map((row) => ({
-    Rank: row.isTied ? `T-${row.rank}` : row.rank,
+    Rank: row.rank,
     Player: row.name,
     "Matches Played": row.matchesPlayed,
     Wins: row.wins,
@@ -94,7 +106,7 @@ function buildPlayersSheet(players: SessionPlayerSnapshot[]) {
 export function buildSessionWorkbook(sessionMatches: MatchRecord[], players: SessionPlayerSnapshot[]) {
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, buildMatchesSheet(sessionMatches), "Matches");
-  XLSX.utils.book_append_sheet(wb, buildLeaderboardSheet(sessionMatches), "Leaderboard");
+  XLSX.utils.book_append_sheet(wb, buildLeaderboardSheet(sessionMatches, players), "Leaderboard");
   XLSX.utils.book_append_sheet(wb, buildPlayersSheet(players), "Players");
   return wb;
 }

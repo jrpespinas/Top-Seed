@@ -3,13 +3,18 @@
 import { useState, useMemo, useEffect } from "react";
 import { Search, X, ChevronUp, ChevronDown } from "lucide-react";
 import { SkillBadge } from "@/components/ui/SkillBadge";
+import { RosterOverview } from "./RosterOverview";
+import { computeRosterStats, computeWaitingStats } from "@/lib/player-stats";
+import { useTick } from "@/hooks/useTick";
+import { readWaitTrend, SAMPLE_INTERVAL_MS } from "@/lib/wait-trend";
+import { matchDurationMs, median as medianOf } from "@/lib/match-history";
 import { GenderIcon } from "@/components/ui/GenderIcon";
 import { PaymentToggle } from "@/components/ui/PaymentToggle";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { SessionSelect } from "@/components/ui/SessionSelect";
 import { PlayerModal } from "./PlayerModal";
 import { useToast, ToastViewport } from "@/components/ui/Toast";
-import { cn, SKILL_LABELS, SKILL_LABELS_SHORT } from "@/lib/utils";
+import { cn, SKILL_LABELS, SKILL_LABELS_SHORT, formatElapsedMs } from "@/lib/utils";
 import { useMatchLog } from "@/lib/match-log-store";
 import {
   useSessionOptions,
@@ -156,14 +161,53 @@ function StateCell({ source }: { source: Source }) {
   );
 }
 
+/**
+ * Games played, as a number and a proportional rule against the busiest player.
+ *
+ * The bar is what makes the column scannable: a column of bare integers has to
+ * be read one cell at a time, where sixty rules of varying length show the
+ * shape of the session's rotation at a glance — the same story the bento's
+ * histogram tells, per person.
+ */
+function GamesCell({ games, max, behind }: { games: number; max: number; behind: boolean }) {
+  return (
+    <div className="flex items-center gap-2 justify-end">
+      <span
+        className={cn(
+          "font-mono text-sm tabular-nums",
+          behind ? "text-warning font-semibold" : "text-muted"
+        )}
+      >
+        {games}
+      </span>
+      <span className="hidden xl:block w-10 h-1 rounded-full bg-surface-elevated overflow-hidden">
+        <span
+          className={cn("block h-full rounded-full", behind ? "bg-warning" : "bg-primary/50")}
+          style={{ width: `${(games / max) * 100}%` }}
+        />
+      </span>
+    </div>
+  );
+}
+
 function PlayerTableRow({
   row,
   gamesPlayed,
+  maxGames,
+  waitedMs,
+  behind,
+  showWaiting,
   onClick,
   onPaymentChange,
 }: {
   row: SessionPlayerRow;
   gamesPlayed: number;
+  maxGames: number;
+  /** Undefined when this player isn't queuing — on court, benched, or closed. */
+  waitedMs: number | undefined;
+  /** Well below the field on matches played. */
+  behind: boolean;
+  showWaiting: boolean;
   onClick: () => void;
   onPaymentChange: (status: PaymentStatus) => void;
 }) {
@@ -181,7 +225,7 @@ function PlayerTableRow({
       )}
     >
       {/* Name */}
-      <td className="pl-4 sm:pl-6 pr-3 py-3 min-w-[140px]">
+      <td className="pl-4 pr-3 py-3 min-w-[140px]">
         <span className="text-sm font-medium truncate text-ink">
           {player.name}
         </span>
@@ -217,23 +261,36 @@ function PlayerTableRow({
         {editable ? <StateCell source={row.source} /> : <span className="text-xs text-border">—</span>}
       </td>
 
+      {/* Waiting — live, and only meaningful while a session is open. A player
+          on court or on the bench isn't waiting, so they read "—" rather than a
+          stale number carried over from before they were pulled. */}
+      {showWaiting && (
+        <td className="px-3 py-3 w-[76px] text-right">
+          {waitedMs === undefined ? (
+            <span className="text-xs text-border">—</span>
+          ) : (
+            <span className="font-mono text-sm tabular-nums text-ink">
+              {formatElapsedMs(waitedMs)}
+            </span>
+          )}
+        </td>
+      )}
+
       {/* Games — scoped to this session */}
-      <td className="px-3 py-3 w-[60px] text-right">
-        <span className="font-mono text-sm tabular-nums text-muted">
-          {gamesPlayed}
-        </span>
+      <td className="px-3 py-3 w-[104px]">
+        <GamesCell games={gamesPlayed} max={maxGames} behind={behind} />
       </td>
 
       {/* Check-in time — "—" only for closed-session snapshots taken before
           this field was captured (see SessionPlayerSnapshot.sessionJoinedAt) */}
-      <td className="px-3 py-3 w-[88px] text-right">
+      <td className="hidden xl:table-cell px-3 py-3 w-[88px] text-right">
         <span className="font-mono text-sm tabular-nums text-muted">
           {formatCheckinTime(row.sessionJoinedAt)}
         </span>
       </td>
 
       {/* Notes */}
-      <td className="pl-3 pr-4 sm:pr-6 py-3 max-w-[140px]">
+      <td className="hidden xl:table-cell pl-3 pr-4 py-3 max-w-[140px]">
         {player.notes ? (
           <span className="block truncate text-xs text-muted" title={player.notes}>
             {player.notes}
@@ -268,11 +325,15 @@ function MetaLine({ items }: { items: React.ReactNode[] }) {
 function PlayerCard({
   row,
   gamesPlayed,
+  waitedMs,
+  behind,
   onClick,
   onPaymentChange,
 }: {
   row: SessionPlayerRow;
   gamesPlayed: number;
+  waitedMs: number | undefined;
+  behind: boolean;
   onClick: () => void;
   onPaymentChange: (status: PaymentStatus) => void;
 }) {
@@ -307,7 +368,18 @@ function PlayerCard({
         items={[
           player.gender && <GenderIcon gender={player.gender} />,
           editable ? <StateCell key="state" source={row.source} /> : null,
-          <span key="games" className="font-mono tabular-nums">{gamesPlayed} games</span>,
+          <span
+            key="games"
+            className={cn("font-mono tabular-nums", behind && "text-warning font-semibold")}
+          >
+            {gamesPlayed} games
+          </span>,
+          // Only for someone actually queuing: on court or benched isn't waiting.
+          waitedMs !== undefined && (
+            <span key="waiting" className="font-mono tabular-nums text-ink">
+              waiting {formatElapsedMs(waitedMs)}
+            </span>
+          ),
           row.sessionJoinedAt && <span key="checkin" className="font-mono tabular-nums">{formatCheckinTime(row.sessionJoinedAt)}</span>,
         ]}
       />
@@ -410,6 +482,79 @@ export function PlayersView() {
   const paidCount = useMemo(
     () => filteredAndSorted.filter((r) => r.player.paymentStatus === "PAID").length,
     [filteredAndSorted]
+  );
+
+  /**
+   * Built from the unfiltered roster on purpose.
+   *
+   * The bento's segments *are* the filter control, so computing it from the
+   * filtered rows would make the chart describe its own selection: click
+   * "Advanced" and the skill mix would collapse to 100% Advanced, destroying
+   * the very proportions you clicked. The overview always shows the whole
+   * night; the table below shows the slice.
+   */
+  const rosterStats = useMemo(
+    () => computeRosterStats(rows.map((r) => r.player), gamesPlayedMap),
+    [rows, gamesPlayedMap]
+  );
+
+  // Shared 1s clock, so this recomputes alongside every ElapsedTimer in the app
+  // rather than starting an interval of its own.
+  const now = useTick();
+
+  /**
+   * Live queue waits, or null for a closed session.
+   *
+   * `enteredQueueAt` exists only on a live `QueueEntry` — `closeSession` never
+   * writes it into the snapshot — so a closed session has no waiting data to
+   * report. Null rather than an empty result, so the cells can be absent
+   * instead of showing a zero the data never contained.
+   */
+  // The queue's own pace, used to decide what counts as a long wait. Null
+  // until matches have actually finished, where the stats module falls back to
+  // a constant rather than judging on no evidence.
+  const medianMatchMs = useMemo(() => {
+    const durations = sessionMatches
+      .filter((m) => m.status === "COMPLETED")
+      .map(matchDurationMs)
+      .filter((ms): ms is number => ms !== null);
+    return durations.length > 0 ? medianOf(durations) : null;
+  }, [sessionMatches]);
+
+  /**
+   * Re-read once a minute, not once a second: the recorder only writes on that
+   * cadence, so anything more often is work for an identical result.
+   *
+   * `sampleEpoch` is referenced rather than merely listed because it is a real
+   * dependency — the trend store changes outside React's knowledge, and this
+   * is what tells the memo a new sample may have landed.
+   */
+  const sampleEpoch = Math.floor(now / SAMPLE_INTERVAL_MS);
+  const waitTrend = useMemo(() => {
+    void sampleEpoch;
+    return isOpenSessionSelected ? readWaitTrend(selectedSessionId) : [];
+  }, [isOpenSessionSelected, selectedSessionId, sampleEpoch]);
+
+  const waitingStats = useMemo(
+    () => (isOpenSessionSelected ? computeWaitingStats(queue, now, medianMatchMs) : null),
+    [isOpenSessionSelected, queue, now, medianMatchMs]
+  );
+
+  /** Per-row lookups, so the table can say what the bento only aggregates. */
+  const waitByPlayer = useMemo(
+    () => new Map((waitingStats?.waiting ?? []).map((w) => [w.id, w.waitedMs])),
+    [waitingStats]
+  );
+
+  const laggardIds = useMemo(
+    () => new Set(rosterStats.rotation.laggards.map((p) => p.id)),
+    [rosterStats]
+  );
+
+  /** Busiest player this session — the yardstick each row's games bar reads against. */
+  const maxGames = useMemo(
+    () => Math.max(1, ...Array.from(gamesPlayedMap.values())),
+    [gamesPlayedMap]
   );
 
   function handleSort(key: SortKey) {
@@ -717,14 +862,47 @@ export function PlayersView() {
           </div>
         </div>
 
+        {/* ── Roster overview ──────────────────────────────────
+            Sits between the sticky filter bar and the table, and scrolls away
+            with the content: it is context for the roster, not a control the
+            reader needs pinned while scanning sixty rows. */}
+        <RosterOverview
+          stats={rosterStats}
+          waiting={waitingStats}
+          waitTrend={waitTrend}
+          matchesPlayed={sessionMatches.filter((m) => m.status === "COMPLETED").length}
+          skillFilter={skillFilter}
+          genderFilter={genderFilter}
+          onToggleSkill={toggleSkillFilter}
+          onToggleGender={toggleGenderFilter}
+        />
+
         {/* ── Table (lg+) / Cards (below lg) ───────────────────── */}
         {filteredAndSorted.length > 0 ? (
-          <>
+          /* A card, matching the bento cells above rather than running full
+             bleed — the roster reads as one more panel on the page instead of
+             the page's floor.
+
+             `overflow-clip`, never `overflow-hidden`. Both clip the sticky
+             header's square corners to the rounded card, but `hidden` also
+             makes the card a scroll container, which would capture the sticky
+             header and stop it pinning to the viewport. `clip` does no such
+             thing: it clips without scrolling, so the nearest scrollport stays
+             the page and the header still sticks.
+
+             Matching the head's resting background to the card isn't enough on
+             its own — `headerShadow` keys off window scroll, not this card's
+             position, so the head lifts to `surface-elevated` while the card's
+             top corner is very often still on screen. */
+          <div className="mx-4 sm:mx-6 mb-6 rounded-lg border border-border bg-surface overflow-clip">
           <table className="hidden lg:table w-full border-collapse" role="grid" aria-label="Players roster">
               {/* Sticky thead — sits directly below the 109px sticky header, plus
                   whatever the notch/status bar's safe-area inset adds on top
                   of that (0 on non-notched devices, so this is a no-op there). */}
-              <thead className={cn("sticky top-[calc(109px+env(safe-area-inset-top))] z-[var(--z-sticky)] transition-colors duration-200", headerShadow ? "bg-surface-elevated" : "bg-bg")}>
+              <thead className={cn("sticky top-[calc(109px+env(safe-area-inset-top))] z-[var(--z-sticky)] transition-colors duration-200", // Matches the card's own ground when at rest, so the head has nothing to
+                  // reveal at the card's rounded corners — which is what lets this stay
+                  // sticky without an `overflow-hidden` ancestor that would break it.
+                  headerShadow ? "bg-surface-elevated" : "bg-surface")}>
                 <tr className="border-b border-border">
                   <SortHeader
                     label="Name"
@@ -768,6 +946,11 @@ export function PlayersView() {
                     className="px-3 w-[84px]"
                     title="Queued or benched right now"
                   />
+                  {isOpenSessionSelected && (
+                    <th className="text-right text-xs font-medium text-muted px-3 py-2.5 w-[76px] whitespace-nowrap">
+                      Waiting
+                    </th>
+                  )}
                   <SortHeader
                     label="Games"
                     sortKey="gamesPlayed"
@@ -775,8 +958,8 @@ export function PlayersView() {
                     currentDir={sortDir}
                     onSort={handleSort}
                     align="right"
-                    className="px-3 w-[60px]"
-                    title="Games played this session"
+                    className="px-3 w-[104px]"
+                    title="Games played this session, against the busiest player"
                   />
                   <SortHeader
                     label="Check-in"
@@ -785,10 +968,10 @@ export function PlayersView() {
                     currentDir={sortDir}
                     onSort={handleSort}
                     align="right"
-                    className="px-3 w-[88px]"
+                    className="hidden xl:table-cell px-3 w-[88px]"
                     title="Time player checked into this session"
                   />
-                  <th className="text-left text-xs font-medium text-muted pl-3 pr-4 sm:pr-6 py-2.5 whitespace-nowrap">
+                  <th className="hidden xl:table-cell text-left text-xs font-medium text-muted pl-3 pr-4 py-2.5 whitespace-nowrap">
                     Notes
                   </th>
                 </tr>
@@ -799,6 +982,10 @@ export function PlayersView() {
                     key={row.key}
                     row={row}
                     gamesPlayed={gamesPlayedMap.get(row.player.id) ?? 0}
+                    maxGames={maxGames}
+                    waitedMs={waitByPlayer.get(row.player.id)}
+                    behind={laggardIds.has(row.player.id)}
+                    showWaiting={isOpenSessionSelected}
                     onClick={() => handleEdit(row)}
                     onPaymentChange={(status) => handlePaymentChange(row, status)}
                   />
@@ -808,18 +995,24 @@ export function PlayersView() {
 
           {/* Cards — below lg, replaces the table (and its hidden columns)
               with every field visible, stacked vertically. */}
-          <div className="lg:hidden" role="list" aria-label="Players roster">
+          <div
+            className="lg:hidden [&>*:last-child]:border-b-0"
+            role="list"
+            aria-label="Players roster"
+          >
             {filteredAndSorted.map((row) => (
               <PlayerCard
                 key={row.key}
                 row={row}
                 gamesPlayed={gamesPlayedMap.get(row.player.id) ?? 0}
+                waitedMs={waitByPlayer.get(row.player.id)}
+                behind={laggardIds.has(row.player.id)}
                 onClick={() => handleEdit(row)}
                 onPaymentChange={(status) => handlePaymentChange(row, status)}
               />
             ))}
           </div>
-          </>
+          </div>
         ) : (
           <div className="flex flex-col items-center justify-center py-24 px-4 text-center">
             {hasFilters ? (

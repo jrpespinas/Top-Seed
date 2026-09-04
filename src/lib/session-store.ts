@@ -613,6 +613,44 @@ export interface SessionOption {
  * `currentSession` into `archive` under the same id, so the selection stays
  * valid and the view doesn't jump out from under whoever's looking at it.
  */
+/**
+ * Player id → the ISO instant they first entered this session.
+ *
+ * The leaderboard's final tiebreak, and not derivable from the match log:
+ * `MatchRecord` embeds bare `Player` objects, while check-in time lives on the
+ * queue or bench *entry* that wraps them. Reading it means branching on whether
+ * the session is open (live queue and bench) or closed (the frozen snapshot),
+ * which is why this lives here rather than being duplicated at each call site.
+ *
+ * A player mid-match is still a queue entry (`isInMatch`), so queue + bench
+ * covers everyone. Snapshots taken before `sessionJoinedAt` existed simply
+ * won't appear — callers fall back rather than treating absence as an error.
+ */
+export function useSessionCheckIns(sessionId: string | null): Map<string, string> {
+  const currentSession = useCurrentSession();
+  const archive = useSessionArchive();
+  const queue = useQueueSnapshot();
+  const bench = useBenchSnapshot();
+
+  return useMemo(() => {
+    const checkIns = new Map<string, string>();
+    if (!sessionId) return checkIns;
+
+    if (currentSession?.id === sessionId) {
+      for (const entry of [...queue, ...bench]) {
+        checkIns.set(entry.player.id, entry.sessionJoinedAt);
+      }
+      return checkIns;
+    }
+
+    const record = archive.find((r) => r.id === sessionId);
+    for (const player of record?.players ?? []) {
+      if (player.sessionJoinedAt) checkIns.set(player.id, player.sessionJoinedAt);
+    }
+    return checkIns;
+  }, [sessionId, currentSession, archive, queue, bench]);
+}
+
 export function useSessionOptions(): {
   sessions: SessionOption[];
   selectedSessionId: string | null;

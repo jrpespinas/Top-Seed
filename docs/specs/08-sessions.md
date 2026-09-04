@@ -83,3 +83,21 @@ The `xlsx` import is dynamic (`await import("@/lib/export-session")` inside the 
 - ~~`/matches` and `/leaderboard` are not session-filtered.~~ Both are now session-scoped via the shared `SessionSelect` combobox and `useSessionOptions()` hook (`src/components/ui/SessionSelect.tsx`, `src/lib/session-store.ts`) — defaulting to the open session, or the most recent closed one if none is open. `/matches`' CSV export was removed in the same pass in favor of `SessionDetailView`'s existing per-session Excel export, which already covers matches/leaderboard/players for one session in one file.
 - ~~`/players` is not session-filtered.~~ Now scoped by the same shared `SessionSelect`/`useSessionOptions()` mechanism, staying in sync with `/matches` and `/leaderboard`. Viewing the open session is unchanged (live, editable). Viewing a closed session shows its frozen `SessionPlayerSnapshot[]` read-only — the same open-vs-closed branch `SessionDetailView` already used, now reused instead of duplicated (see `01-player-management.md`).
 - ~~Check-in time isn't preserved once a session closes.~~ `SessionPlayerSnapshot` gained an optional `sessionJoinedAt`, captured in `closeSession()` from each queue/bench entry. `/players` and `SessionDetailView` both show it for closed sessions now (snapshots taken before this field existed just show "—"), and it's in the Excel export's Players tab too.
+
+
+---
+
+## Session export
+
+Two exports, both on `/sessions/[id]`, and the share sheet also on the Leaderboard header:
+
+| Export | Format | For |
+|---|---|---|
+| **Excel** | `.xlsx`, three sheets (Matches, Leaderboard, Players) | Archival and reconciliation. Ordered by Points; result and bonus points split out so a reader can reconstruct the total. |
+| **Share sheet** | PNG download, or Print / Save as PDF | Posting to the group chat, or pinning to the gym noticeboard. |
+
+**The share sheet is one A4-proportioned component serving both outputs.** Fixed at 794px so print and capture geometry agree. The screen and the PNG carry the apex plus a top-ten table; the printed sheet continues onto a second page with the full field (`data-print-only`). It is built from the **whole session at the default ranking**, never from whatever is filtered or searched on screen — exporting "Doubles only, sorted by wins, filtered to Karl" because that is what the page happened to show would produce a standings sheet that quietly isn't the standings.
+
+PDF comes from `window.print()` and a print stylesheet rather than a PDF library: every browser's Save as PDF beats jsPDF, costs no bundle, and prints properly on top. The PNG needs `html-to-image` (dynamically imported on click, matching the `xlsx` pattern), and **must embed fonts before capture** or the sheet renders in the fallback stack.
+
+Disabled with a reason when the session has no completed matches, rather than hidden.

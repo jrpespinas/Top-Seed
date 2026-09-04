@@ -1,12 +1,15 @@
 "use client";
 
-import { useState, useMemo } from "react";
-import { Search, X, Zap, Flame, Timer, Users } from "lucide-react";
+import { useState, useMemo, useEffect } from "react";
+import { Search, X, Zap, Flame, Timer, Users, HandHelping, Share2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useMatchLog } from "@/lib/match-log-store";
-import { useSessionOptions } from "@/lib/session-store";
+import { useSessionOptions, useSessionCheckIns } from "@/lib/session-store";
 import { SessionSelect } from "@/components/ui/SessionSelect";
 import { SkillBadge } from "@/components/ui/SkillBadge";
+import { ExportSheetModal } from "./ExportSheetModal";
+import { computeSessionRecap } from "@/lib/match-history";
+import type { ShareSheetData } from "./ShareSheet";
 import {
   computeLeaderboard,
   selectHonors,
@@ -41,12 +44,71 @@ const SORT_LABELS: Record<LeaderboardSort, string> = {
 const HONOR_ICONS: Record<HonorKind, typeof Zap> = {
   upset: Zap,
   streak: Flame,
+  carry: HandHelping,
   onCourt: Timer,
   pair: Users,
 };
 
-/** Slots flanking the podium. Two keeps the apex to five recognised players. */
-const HONOR_SLOTS = 2;
+/**
+ * Awards computed per session. Podium winners wear theirs as a tag on their own
+ * card; only the rest become separate cards below, so this is a ceiling on
+ * people recognised, not on cards rendered. Three because there are five
+ * candidate awards — two left the deepest ones permanently unreachable.
+ */
+const HONOR_SLOTS = 3;
+
+/**
+ * Three, not two. A pair of wins happens constantly in a session of four-match
+ * evenings — a chip on half the field says nothing about any of them. Three
+ * consecutive wins is the point where a run is worth remarking on.
+ */
+const STREAK_CHIP_MINIMUM = 3;
+
+/** Longest of the crown animations (the numeral flare); classes come off after. */
+const CROWN_TOTAL_MS = 900;
+const CROWN_STORAGE_PREFIX = "topseed:crowned:";
+
+/**
+ * True only when the top of the table has changed since this browser last
+ * looked at this session.
+ *
+ * The animation is worth having *because* it is rare. An organiser opens the
+ * leaderboard repeatedly across a night; a celebration that replays on every
+ * mount stops reading as a celebration by the third viewing and becomes an
+ * obstacle between them and the standings. Gating it on an actual change turns
+ * the motion into information — "the lead changed" — which is the only kind of
+ * motion the product register asks for.
+ *
+ * Read in an effect, never during render: touching localStorage while
+ * rendering would desync the server and client markup. Wrapped because storage
+ * throws outright in some privacy modes, where the correct fallback is a
+ * leaderboard that simply doesn't animate.
+ */
+function useCrownReveal(sessionId: string | null, championKey: string | null): boolean {
+  const [reveal, setReveal] = useState(false);
+
+  useEffect(() => {
+    if (!sessionId || !championKey) return;
+    const key = `${CROWN_STORAGE_PREFIX}${sessionId}`;
+    let previous: string | null = null;
+    try {
+      previous = window.localStorage.getItem(key);
+    } catch {
+      return;
+    }
+    if (previous === championKey) return;
+    try {
+      window.localStorage.setItem(key, championKey);
+    } catch {
+      // Not fatal: the animation still plays, it just may play again later.
+    }
+    setReveal(true);
+    const id = setTimeout(() => setReveal(false), CROWN_TOTAL_MS);
+    return () => clearTimeout(id);
+  }, [sessionId, championKey]);
+
+  return reveal;
+}
 
 function PillGroup<T extends string>({
   options,
@@ -106,16 +168,32 @@ function record(row: LeaderboardRow): string {
 function Apex({
   champions,
   runnersUp,
-  honors,
+  honorByPlayer,
+  standaloneHonors,
+  championHoldsUpset,
+  championHoldsStreak,
+  reveal,
   sort,
 }: {
   champions: LeaderboardRow[];
   runnersUp: LeaderboardRow[];
-  honors: Honor[];
+  honorByPlayer: Map<string, Honor>;
+  standaloneHonors: Honor[];
+  championHoldsUpset: boolean;
+  championHoldsStreak: boolean;
+  /** A new name is on top. See `useCrownReveal`. */
+  reveal: boolean;
   sort: LeaderboardSort;
 }) {
   const lead = champions[0];
-  const summary = champions.length === 1 ? championSummary(lead) : null;
+  const championHonor = champions.length === 1 ? honorByPlayer.get(lead.playerId) ?? null : null;
+  const summary =
+    champions.length === 1
+      ? championSummary(lead, {
+          suppressUpset: championHoldsUpset,
+          suppressStreak: championHoldsStreak,
+        })
+      : null;
   const names =
     champions.length <= 2
       ? champions.map((c) => c.name).join(" & ")
@@ -126,51 +204,110 @@ function Apex({
       className="px-4 sm:px-6 pt-5 pb-6 border-b border-border"
       aria-label="Session highlights"
     >
-      <div className="grid grid-cols-2 gap-3 md:grid-cols-[1fr_1.5fr_1fr] md:items-end">
+      <div className="grid grid-cols-2 gap-3 items-end md:grid-cols-[1fr_1.5fr_1fr]">
         {/* Champion — full width on mobile, centre column on desktop. */}
         <div
           className={cn(
-            "col-span-2 md:col-span-1 md:order-2 animate-apex-rise motion-reduce:animate-none",
+            "col-span-2 md:col-span-1 md:order-2",
+            // `isolate` so the sheet's stacking stays inside this card, and
+            // `overflow-hidden` so the wipe is clipped to the rounded corners.
+            "relative isolate overflow-hidden",
             "rounded-lg bg-primary text-bg px-5 py-5 sm:py-6 flex flex-col"
           )}
         >
-          <div className="flex items-start gap-3">
-            <span className="font-mono text-3xl sm:text-4xl font-bold leading-none text-bg/55 tabular-nums">
-              1
-            </span>
-            {champions.length === 1 && (
-              <span className="ml-auto flex-shrink-0">
-                <SkillBadge level={lead.skillLevel} compact />
+          {reveal && (
+            <span
+              aria-hidden
+              // Resting state is fully retreated, so an unplayed animation
+              // leaves a finished blue card rather than a blank white one.
+              style={{ clipPath: "inset(0 0 0 100%)" }}
+              // Matches the runners-up ground, not plain white: the wipe's
+              // premise is that the card starts as one of them and the brand
+              // colour arrives. A white sheet would now start it as nothing.
+              className="absolute inset-0 z-10 bg-primary-tint animate-crown-wipe motion-reduce:animate-none"
+            />
+          )}
+          <div
+            className={cn(
+              "relative z-20 flex flex-col",
+              reveal && "animate-crown-content motion-reduce:animate-none"
+            )}
+          >
+            <div className="flex items-start gap-3">
+              {/* Solid colour plus `opacity-[0.55]` rather than `text-bg/55`:
+                  identical at rest, but opacity is what the flare animates,
+                  and it carries the text-shadow with it. */}
+              <span
+                className={cn(
+                  "crown-numeral font-mono text-3xl sm:text-4xl font-bold leading-none",
+                  "text-bg opacity-[0.55] tabular-nums",
+                  reveal && "animate-crown-glow motion-reduce:animate-none"
+                )}
+              >
+                1
               </span>
+              {champions.length === 1 && (
+                <span className="ml-auto flex-shrink-0">
+                  <SkillBadge level={lead.skillLevel} compact />
+                </span>
+              )}
+            </div>
+
+            <h2 className="mt-3 text-2xl sm:text-3xl font-bold tracking-tight text-balance break-words">
+              {names}
+            </h2>
+
+            <p className="mt-1.5 font-mono text-sm tabular-nums text-bg/80">
+              <span className="text-lg font-semibold text-bg">{lead.points}</span> pts
+              <span className="text-bg/40"> · </span>
+              {record(lead)}
+              <span className="text-bg/40"> · </span>
+              {Math.round(lead.form * 100)}% form
+            </p>
+
+            {summary && <p className="mt-2 text-sm text-bg/80 text-pretty">{summary}</p>}
+
+            {championHonor && (
+              <div className="mt-3 flex">
+                <AwardTag honor={championHonor} onBrand />
+              </div>
+            )}
+
+            {sort !== "points" && (
+              <p className="mt-2 text-[11px] text-bg/60">Leading on {SORT_LABELS[sort]}</p>
             )}
           </div>
-
-          <h2 className="mt-3 text-2xl sm:text-3xl font-bold tracking-tight text-balance break-words">
-            {names}
-          </h2>
-
-          <p className="mt-1.5 font-mono text-sm tabular-nums text-bg/80">
-            <span className="text-lg font-semibold text-bg">{lead.points}</span> pts
-            <span className="text-bg/40"> · </span>
-            {record(lead)}
-            <span className="text-bg/40"> · </span>
-            {Math.round(lead.form * 100)}% form
-          </p>
-
-          {summary && <p className="mt-2 text-sm text-bg/80 text-pretty">{summary}</p>}
-
-          {sort !== "points" && (
-            <p className="mt-2 text-[11px] text-bg/60">Leading on {SORT_LABELS[sort]}</p>
-          )}
         </div>
 
-        {runnersUp[0] && <RunnerUp row={runnersUp[0]} className="md:order-1" />}
-        {runnersUp[1] && <RunnerUp row={runnersUp[1]} className="md:order-3" />}
+        {runnersUp[0] && (
+          <RunnerUp
+            row={runnersUp[0]}
+            honor={honorByPlayer.get(runnersUp[0].playerId) ?? null}
+            reveal={reveal}
+            className="md:order-1"
+          />
+        )}
+        {runnersUp[1] && (
+          <RunnerUp
+            row={runnersUp[1]}
+            honor={honorByPlayer.get(runnersUp[1].playerId) ?? null}
+            reveal={reveal}
+            className="md:order-3"
+          />
+        )}
       </div>
 
-      {honors.length > 0 && (
-        <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-3">
-          {honors.map((honor) => (
+      {/* Only awards won from outside the top three. When the podium took them
+          all, this renders nothing rather than an empty row. */}
+      {standaloneHonors.length > 0 && (
+        <div
+          className={cn(
+            "mt-3 grid gap-3 grid-cols-1",
+            standaloneHonors.length === 2 && "sm:grid-cols-2",
+            standaloneHonors.length >= 3 && "sm:grid-cols-2 lg:grid-cols-3"
+          )}
+        >
+          {standaloneHonors.map((honor) => (
             <HonorSlot key={honor.kind} honor={honor} />
           ))}
         </div>
@@ -179,17 +316,39 @@ function Apex({
   );
 }
 
-function RunnerUp({ row, className }: { row: LeaderboardRow; className?: string }) {
+function RunnerUp({
+  row,
+  honor,
+  reveal,
+  className,
+}: {
+  row: LeaderboardRow;
+  honor: Honor | null;
+  /** Rises only when the champion is being crowned — see `useCrownReveal`. */
+  reveal: boolean;
+  className?: string;
+}) {
+  // A real podium steps down: the champion towers, second stands above third.
+  // Expressed as padding rather than a fixed height, so the extra room reads
+  // as a roomier card rather than a card with a gap in it — and so a long name
+  // wrapping to two lines still grows the box instead of overflowing it.
+  const isSecond = row.rank === 2;
   return (
     <div
       className={cn(
-        "rounded-lg bg-surface border border-primary/25 px-3.5 py-3.5 flex flex-col",
-        "animate-apex-rise motion-reduce:animate-none",
+        "rounded-lg bg-primary-tint border border-primary/20 flex flex-col",
+        isSecond ? "px-4 py-5" : "px-3.5 py-3.5",
+        reveal && "animate-apex-rise motion-reduce:animate-none",
         className
       )}
     >
       <div className="flex items-start gap-2">
-        <span className="font-mono text-xl font-bold leading-none text-primary/70 tabular-nums">
+        <span
+          className={cn(
+            "font-mono font-bold leading-none text-primary/70 tabular-nums",
+            isSecond ? "text-[26px]" : "text-xl"
+          )}
+        >
           {row.rank}
         </span>
         <span className="ml-auto flex-shrink-0">
@@ -202,7 +361,41 @@ function RunnerUp({ row, className }: { row: LeaderboardRow; className?: string 
         <span className="text-muted/50"> · </span>
         {record(row)}
       </p>
+      {honor && (
+        <div className="mt-2 flex">
+          <AwardTag honor={honor} />
+        </div>
+      )}
     </div>
+  );
+}
+
+/**
+ * An award worn on a podium card, rather than given its own card below.
+ *
+ * Compact by necessity — it rides inside a card that already carries a rank,
+ * a name, a points total and a record — so it shows the award's name and lets
+ * the tooltip carry the detail. Standalone `HonorSlot` cards, which have the
+ * room, print both.
+ */
+function AwardTag({ honor, onBrand = false }: { honor: Honor; onBrand?: boolean }) {
+  const Icon = HONOR_ICONS[honor.kind];
+  return (
+    <span
+      className={cn(
+        "inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[11px] font-semibold min-w-0",
+        onBrand
+          ? "bg-bg/15 text-bg"
+          // Sits on the runners-up tint now, so a neutral chip would read as
+          // a grey smudge on blue. White ground, brand text.
+          : "bg-surface text-primary border border-primary/20"
+      )}
+      title={`${honor.label} — ${honor.detail}`}
+    >
+      <Icon size={11} strokeWidth={2.5} className="flex-shrink-0" aria-hidden />
+      <span className="truncate">{honor.label}</span>
+      <span className="sr-only"> — {honor.detail}</span>
+    </span>
   );
 }
 
@@ -214,8 +407,10 @@ function RunnerUp({ row, className }: { row: LeaderboardRow; className?: string 
 function HonorSlot({ honor }: { honor: Honor }) {
   const Icon = HONOR_ICONS[honor.kind];
   return (
-    <div className="rounded-lg bg-surface border border-border px-3.5 py-3 flex items-center gap-3">
-      <span className="flex-shrink-0 w-8 h-8 rounded-md bg-surface-elevated flex items-center justify-center text-muted">
+    <div className="rounded-lg bg-primary-tint-soft border border-primary/15 px-3.5 py-3 flex items-center gap-3">
+      {/* White tile, not another tint: stacking two washes of the same hue
+          muddies both. A cut-out reads as a chip and keeps the icon crisp. */}
+      <span className="flex-shrink-0 w-8 h-8 rounded-md bg-surface flex items-center justify-center text-primary">
         <Icon size={15} strokeWidth={2} aria-hidden />
       </span>
       <div className="min-w-0 flex-1">
@@ -241,6 +436,7 @@ function rankClasses(rank: number): string {
 export function LeaderboardView() {
   const matches = useMatchLog();
   const { sessions, selectedSessionId, setSelectedSessionId } = useSessionOptions();
+  const checkInByPlayer = useSessionCheckIns(selectedSessionId);
   // Points, not a rate, is the default. A rate makes a 2-match record look
   // like a 20-match one, and the previous default — a Wilson lower bound —
   // over-corrected for that at session sample sizes, rendering a 5-0 as 57%.
@@ -250,6 +446,7 @@ export function LeaderboardView() {
   const [sort, setSort] = useState<LeaderboardSort>("points");
   const [matchType, setMatchType] = useState<MatchTypeFilter>("ALL");
   const [search, setSearch] = useState("");
+  const [isExportOpen, setIsExportOpen] = useState(false);
 
   const sessionMatches = useMemo(
     () => matches.filter((m) => m.sessionId === selectedSessionId),
@@ -257,8 +454,8 @@ export function LeaderboardView() {
   );
 
   const rankedRows = useMemo(
-    () => computeLeaderboard(sessionMatches, { sort, matchType }),
-    [sessionMatches, sort, matchType]
+    () => computeLeaderboard(sessionMatches, { sort, matchType, checkInByPlayer }),
+    [sessionMatches, sort, matchType, checkInByPlayer]
   );
 
   const rows = useMemo(() => {
@@ -272,17 +469,71 @@ export function LeaderboardView() {
     const podium = rankedRows.slice(0, 3);
     const champions = podium.filter((r) => r.rank === 1);
     const runnersUp = podium.filter((r) => r.rank !== 1);
-    const honors = selectHonors(
-      rankedRows,
-      HONOR_SLOTS,
-      new Set(podium.map((r) => r.playerId))
-    );
-    return { champions, runnersUp, honors };
+    const honors = selectHonors(rankedRows, HONOR_SLOTS);
+
+    // An award won by someone already on the podium belongs ON their card, not
+    // repeated as a separate one below it — the podium card is where that
+    // person is being recognised, and a second card carrying the same name
+    // reads as a duplicate rather than a second honour. Only awards won from
+    // outside the top three earn their own card, and when there are none the
+    // strip is not rendered at all rather than left as an empty row.
+    const podiumIds = new Set(podium.map((r) => r.playerId));
+    const honorByPlayer = new Map(honors.map((h) => [h.playerId, h]));
+    const standaloneHonors = honors.filter((h) => !podiumIds.has(h.playerId));
+
+    // The champion's summary line must not narrate a fact their own award tag
+    // is already showing a few pixels below it.
+    const championHolds = (kind: HonorKind) =>
+      champions.some((c) => honorByPlayer.get(c.playerId)?.kind === kind);
+
+    return {
+      champions,
+      runnersUp,
+      honorByPlayer,
+      standaloneHonors,
+      championHoldsUpset: championHolds("upset"),
+      championHoldsStreak: championHolds("streak"),
+    };
   }, [rankedRows]);
 
   // Search puts the reader in lookup mode, not recap mode — a podium above a
   // one-row result would be answering a question nobody asked.
+  // Joined, so a shared first place counts as one champion: the lead has only
+  // changed when the *set* of leaders changes.
+  const championKey = useMemo(
+    () => apex?.champions.map((c) => c.playerId).sort().join("+") ?? null,
+    [apex]
+  );
+  const crownReveal = useCrownReveal(selectedSessionId, championKey);
+
   const showApex = apex !== null && !search.trim();
+
+  /**
+   * Built from the full session and the default ranking, never from whatever
+   * is filtered or searched on screen. The sheet is the session's public
+   * record — exporting "Doubles only, sorted by wins, filtered to Karl"
+   * because that's what the page happened to be showing would produce a
+   * standings sheet that quietly isn't the standings.
+   */
+  const sheetData = useMemo((): ShareSheetData | null => {
+    const session = sessions.find((s) => s.id === selectedSessionId);
+    if (!session) return null;
+    const rows = computeLeaderboard(sessionMatches, {
+      matchType: "ALL",
+      sort: "points",
+      checkInByPlayer,
+    });
+    if (rows.length === 0) return null;
+    const recap = computeSessionRecap(sessionMatches);
+    return {
+      sessionName: session.label,
+      sessionDate: session.date,
+      rows,
+      honors: selectHonors(rows, HONOR_SLOTS),
+      matchesPlayed: recap.matchesPlayed,
+      totalCourtTimeMs: recap.totalCourtTimeMs,
+    };
+  }, [sessions, selectedSessionId, sessionMatches, checkInByPlayer]);
 
   const hasAnyCompletedMatches = useMemo(
     () => sessionMatches.some((m) => m.status === "COMPLETED"),
@@ -311,7 +562,17 @@ export function LeaderboardView() {
         <div className="flex items-center gap-2.5 px-4 sm:px-6 h-14 border-b border-border">
           <h1 className="text-lg font-semibold text-ink flex-shrink-0">Leaderboard</h1>
           <span className="font-mono text-xs text-muted tabular-nums hidden sm:inline">({rows.length})</span>
-          <div className="ml-auto">
+          <div className="ml-auto flex items-center gap-2">
+            <button
+              onClick={() => setIsExportOpen(true)}
+              disabled={!sheetData}
+              title={sheetData ? undefined : "No completed matches to export yet"}
+              className="flex items-center gap-1.5 text-xs text-muted hover:text-ink hover:bg-surface-elevated transition-colors px-2.5 py-1.5 rounded-md border border-border/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-border disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:text-muted disabled:hover:bg-transparent min-h-[36px]"
+              aria-label="Export this session as a shareable sheet"
+            >
+              <Share2 size={13} strokeWidth={2} aria-hidden />
+              <span className="hidden sm:inline">Export</span>
+            </button>
             <SessionSelect sessions={sessions} value={selectedSessionId} onChange={setSelectedSessionId} />
           </div>
         </div>
@@ -366,19 +627,13 @@ export function LeaderboardView() {
         <Apex
           champions={apex.champions}
           runnersUp={apex.runnersUp}
-          honors={apex.honors}
+          honorByPlayer={apex.honorByPlayer}
+          standaloneHonors={apex.standaloneHonors}
+          championHoldsUpset={apex.championHoldsUpset}
+          championHoldsStreak={apex.championHoldsStreak}
+          reveal={crownReveal}
           sort={sort}
         />
-      )}
-
-      {/* "T-" legend — the row-level title tooltip is mouse-only and never
-          fires on touch, the primary input here. Fires far less often since
-          points replaced a percentage: identical rates were common, identical
-          point totals with identical form much less so. */}
-      {rows.some((r) => r.isTied) && (
-        <p className="px-4 sm:px-6 py-1.5 text-[10px] text-muted bg-surface-elevated/40 border-b border-border/60">
-          T- = tied with another player on every ranking criterion
-        </p>
       )}
 
       {/* Table */}
@@ -430,12 +685,7 @@ export function LeaderboardView() {
                 className="border-b border-border/50 hover:bg-surface-elevated/40 transition-colors"
               >
                 <td className="pl-4 sm:pl-6 pr-3 py-3">
-                  <span
-                    className={rankClasses(row.rank)}
-                    title={row.isTied ? "Tied on every ranking criterion" : undefined}
-                  >
-                    {row.isTied ? `T-${row.rank}` : row.rank}
-                  </span>
+                  <span className={rankClasses(row.rank)}>{row.rank}</span>
                 </td>
                 <td className="px-3 py-3 min-w-[140px]">
                   <div className="flex items-center gap-2 min-w-0">
@@ -443,7 +693,7 @@ export function LeaderboardView() {
                     {/* The narrative the old eight columns had no room for.
                         Chips only appear when they're true, so a row without
                         them reads as ordinary rather than as missing data. */}
-                    {row.currentStreak >= 2 && (
+                    {row.currentStreak >= STREAK_CHIP_MINIMUM && (
                       <span
                         className="flex-shrink-0 inline-flex items-center gap-0.5 font-mono text-[10px] font-semibold tabular-nums text-primary bg-primary/[0.08] border border-primary/20 rounded-sm px-1 py-0.5"
                         title={`On a ${row.currentStreak}-match winning streak`}
@@ -496,6 +746,12 @@ export function LeaderboardView() {
           onClearSearch={() => setSearch("")}
         />
       )}
+
+      <ExportSheetModal
+        isOpen={isExportOpen}
+        onClose={() => setIsExportOpen(false)}
+        data={sheetData}
+      />
     </div>
   );
 }
