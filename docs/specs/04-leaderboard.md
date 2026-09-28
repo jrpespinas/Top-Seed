@@ -100,7 +100,9 @@ Three to six players recognised in one composition, with the first holding the c
 2. **Runners-up** — outlined in the same blue, roughly a third of the champion's presence, flanking it at `md:` and paired beneath on mobile.
 3. **Awards** — neutral, quietest. Podium winners wear theirs as a tag on their own card; only non-podium winners get a card here. An award recognises a moment, not a placing.
 
-**Ranks 1–2–3 deliberately do not use gold / silver / bronze.** That ladder is already spoken for: `SkillBadge` runs Bronze → Silver → Gold → Platinum for Casual → Beginner → Intermediate → Advanced, and those badges render *inside* these slots. A gold rank-1 frame beside a gold Intermediate badge would be one visual system saying two unrelated things. Hierarchy runs on the brand blue, size, and position instead.
+**Places 1–2–3 show medals (🥇 🥈 🥉) in place of their numerals**, on the podium cards, in the field table and on the export sheet (shared via `medals.tsx`). Frames and fills still never go gold, silver or bronze. `SkillBadge` runs Bronze → Platinum for Casual → Advanced inside these same slots, so a gold *frame* would read as a tier. An emoji medal reads as placing. Ranks 4 and down keep plain numerals. Each medal carries `role="img"` with a spoken place ("1st place"), because emoji names are announced inconsistently.
+
+**Awards share one ⭐ emblem** in place of the earlier per-kind icons, so special awards read as their own family, separate from the podium's medals.
 
 ### Awards (`selectHonors`)
 

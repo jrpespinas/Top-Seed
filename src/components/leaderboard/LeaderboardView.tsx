@@ -1,13 +1,14 @@
 "use client";
 
 import { useState, useMemo, useEffect } from "react";
-import { Search, X, Zap, Flame, Timer, Users, HandHelping, Share2 } from "lucide-react";
+import { Search, X, Zap, Flame, Share2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useMatchLog } from "@/lib/match-log-store";
 import { useSessionOptions, useSessionCheckIns } from "@/lib/session-store";
 import { SessionSelect } from "@/components/ui/SessionSelect";
 import { SkillBadge } from "@/components/ui/SkillBadge";
 import { ExportSheetModal } from "./ExportSheetModal";
+import { Medal, AwardStar, hasMedal } from "./medals";
 import { computeSessionRecap } from "@/lib/match-history";
 import type { ShareSheetData } from "./ShareSheet";
 import {
@@ -39,14 +40,6 @@ const SORT_LABELS: Record<LeaderboardSort, string> = {
   form: "Form",
   wins: "Wins",
   matchesPlayed: "Matches",
-};
-
-const HONOR_ICONS: Record<HonorKind, typeof Zap> = {
-  upset: Zap,
-  streak: Flame,
-  carry: HandHelping,
-  onCourt: Timer,
-  pair: Users,
 };
 
 /**
@@ -234,18 +227,13 @@ function Apex({
             )}
           >
             <div className="flex items-start gap-3">
-              {/* Solid colour plus `opacity-[0.55]` rather than `text-bg/55`:
-                  identical at rest, but opacity is what the flare animates,
-                  and it carries the text-shadow with it. */}
-              <span
+              <Medal
+                rank={1}
                 className={cn(
-                  "crown-numeral font-mono text-3xl sm:text-4xl font-bold leading-none",
-                  "text-bg opacity-[0.55] tabular-nums",
-                  reveal && "animate-crown-glow motion-reduce:animate-none"
+                  "crown-medal inline-block text-4xl sm:text-5xl",
+                  reveal && "animate-medal-flare motion-reduce:animate-none"
                 )}
-              >
-                1
-              </span>
+              />
               {champions.length === 1 && (
                 <span className="ml-auto flex-shrink-0">
                   <SkillBadge level={lead.skillLevel} compact />
@@ -343,14 +331,13 @@ function RunnerUp({
       )}
     >
       <div className="flex items-start gap-2">
-        <span
-          className={cn(
-            "font-mono font-bold leading-none text-primary/70 tabular-nums",
-            isSecond ? "text-[26px]" : "text-xl"
-          )}
-        >
-          {row.rank}
-        </span>
+        {hasMedal(row.rank) ? (
+          <Medal rank={row.rank} className={isSecond ? "text-[28px]" : "text-[22px]"} />
+        ) : (
+          <span className="font-mono font-bold leading-none text-primary/70 tabular-nums text-xl">
+            {row.rank}
+          </span>
+        )}
         <span className="ml-auto flex-shrink-0">
           <SkillBadge level={row.skillLevel} compact dense />
         </span>
@@ -379,7 +366,6 @@ function RunnerUp({
  * room, print both.
  */
 function AwardTag({ honor, onBrand = false }: { honor: Honor; onBrand?: boolean }) {
-  const Icon = HONOR_ICONS[honor.kind];
   return (
     <span
       className={cn(
@@ -392,7 +378,7 @@ function AwardTag({ honor, onBrand = false }: { honor: Honor; onBrand?: boolean 
       )}
       title={`${honor.label} — ${honor.detail}`}
     >
-      <Icon size={11} strokeWidth={2.5} className="flex-shrink-0" aria-hidden />
+      <AwardStar className="text-[11px] flex-shrink-0" />
       <span className="truncate">{honor.label}</span>
       <span className="sr-only"> — {honor.detail}</span>
     </span>
@@ -405,13 +391,12 @@ function AwardTag({ honor, onBrand = false }: { honor: Honor; onBrand?: boolean 
  * built to express.
  */
 function HonorSlot({ honor }: { honor: Honor }) {
-  const Icon = HONOR_ICONS[honor.kind];
   return (
     <div className="rounded-lg bg-primary-tint-soft border border-primary/15 px-3.5 py-3 flex items-center gap-3">
       {/* White tile, not another tint: stacking two washes of the same hue
           muddies both. A cut-out reads as a chip and keeps the icon crisp. */}
-      <span className="flex-shrink-0 w-8 h-8 rounded-md bg-surface flex items-center justify-center text-primary">
-        <Icon size={15} strokeWidth={2} aria-hidden />
+      <span className="flex-shrink-0 w-8 h-8 rounded-md bg-surface flex items-center justify-center">
+        <AwardStar className="text-base" />
       </span>
       <div className="min-w-0 flex-1">
         <p className="text-[11px] font-medium text-muted uppercase tracking-wide">{honor.label}</p>
@@ -427,11 +412,8 @@ function HonorSlot({ honor }: { honor: Honor }) {
   );
 }
 
-function rankClasses(rank: number): string {
-  if (rank === 1) return "text-base font-bold text-primary tabular-nums";
-  if (rank <= 3) return "text-sm font-semibold text-primary/80 tabular-nums";
-  return "text-sm font-medium text-muted tabular-nums";
-}
+/** Numeral styling for ranks 4 and below. The podium places show a medal instead. */
+const RANK_NUMERAL = "text-sm font-medium text-muted tabular-nums";
 
 export function LeaderboardView() {
   const matches = useMatchLog();
@@ -685,7 +667,11 @@ export function LeaderboardView() {
                 className="border-b border-border/50 hover:bg-surface-elevated/40 transition-colors"
               >
                 <td className="pl-4 sm:pl-6 pr-3 py-3">
-                  <span className={rankClasses(row.rank)}>{row.rank}</span>
+                  {hasMedal(row.rank) ? (
+                    <Medal rank={row.rank} className="text-lg" />
+                  ) : (
+                    <span className={RANK_NUMERAL}>{row.rank}</span>
+                  )}
                 </td>
                 <td className="px-3 py-3 min-w-[140px]">
                   <div className="flex items-center gap-2 min-w-0">

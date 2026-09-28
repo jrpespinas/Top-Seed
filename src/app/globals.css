@@ -260,31 +260,41 @@
 }
 .animate-crown-content { animation: crown-content 700ms cubic-bezier(0.22, 1, 0.36, 1); }
 
-/* The rank numeral flares as the champion is crowned, then settles.
+/* Emoji render from the platform's colour font. The explicit stack keeps them
+   from falling back to a monochrome glyph in a web font that happens to cover
+   the codepoint, and gives the PNG export a named family to render. */
+.emoji {
+  font-family: "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", sans-serif;
+  font-style: normal;
+  font-weight: normal;
+}
+
+/* The champion's medal flares as they're crowned, then settles.
    ─────────────────────────────────────────────────────────────────────────
-   `.crown-numeral` carries the RESTING glow — faint, permanent, and the
-   animation's own final frame, so nothing needs animation-fill-mode and an
-   unplayed animation still leaves the numeral correctly lit.
+   Replaced a glow on the "1" numeral. That one rested at 55% opacity, which
+   suits a numeral but would leave a colour emoji looking washed out, so the
+   medal rests at full strength and flares with scale and a drop-shadow.
+   `drop-shadow` rather than `text-shadow`, because a filter follows the
+   glyph's painted shape and a text-shadow on a colour emoji renders as a
+   blurred grey copy of it.
 
-   A continuous pulse was the obvious move and is the wrong one: this page is
-   opened repeatedly across a night, and a number throbbing on every visit is
-   the same fatigue the crown reveal is gated to avoid. The flare rides the
-   crowning and is otherwise still.
-
-   Glow is already a sanctioned material here (see DESIGN.md's Elevation
-   rule — a diffuse glow on a focused primary element, in a palette colour and
-   never a grey shadow). This is that rule inverted: the page's own near-white
-   glowing on the brand ground rather than the brand glowing on white. */
-.crown-numeral {
-  text-shadow: 0 0 10px oklch(var(--color-bg-raw) / 0.25);
+   `.crown-medal` carries the RESTING halo, which is also the animation's final
+   frame. No animation-fill-mode is needed, so an unplayed animation still
+   leaves the medal lit. It fires only on a crowning, never on every visit:
+   see useCrownReveal. */
+.crown-medal {
+  filter: drop-shadow(0 0 6px oklch(var(--color-bg-raw) / 0.3));
 }
 
-@keyframes crown-glow {
-  0%   { opacity: 0.55; text-shadow: 0 0 0 oklch(var(--color-bg-raw) / 0); }
-  40%  { opacity: 1;    text-shadow: 0 0 24px oklch(var(--color-bg-raw) / 0.8); }
-  100% { opacity: 0.55; text-shadow: 0 0 10px oklch(var(--color-bg-raw) / 0.25); }
+@keyframes medal-flare {
+  0%   { transform: scale(0.85); filter: drop-shadow(0 0 0 oklch(var(--color-bg-raw) / 0)); }
+  40%  { transform: scale(1.12); filter: drop-shadow(0 0 14px oklch(var(--color-bg-raw) / 0.85)); }
+  100% { transform: scale(1);    filter: drop-shadow(0 0 6px oklch(var(--color-bg-raw) / 0.3)); }
 }
-.animate-crown-glow { animation: crown-glow 900ms cubic-bezier(0.22, 1, 0.36, 1); }
+.animate-medal-flare {
+  animation: medal-flare 900ms cubic-bezier(0.22, 1, 0.36, 1);
+  transform-origin: center;
+}
 /* ─── Theme switching transition (JS-triggered, ~250ms window) ────────────── */
 html.theme-switching *,
 html.theme-switching *::before,

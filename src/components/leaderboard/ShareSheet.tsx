@@ -1,21 +1,13 @@
-import { Zap, Flame, Timer, Users, HandHelping } from "lucide-react";
 import { cn, SKILL_LABELS_SHORT } from "@/lib/utils";
 import { formatDurationMs } from "@/lib/match-history";
-import { championSummary, type Honor, type HonorKind, type LeaderboardRow } from "@/lib/leaderboard";
+import { championSummary, type Honor, type LeaderboardRow } from "@/lib/leaderboard";
+import { Medal, AwardStar, hasMedal } from "./medals";
 
 /** A4 at 96dpi. Fixed, so print geometry and capture geometry are the same. */
 export const SHEET_WIDTH_PX = 794;
 
 /** How many standings rows the on-screen sheet and the PNG carry. */
 export const SHEET_VISIBLE_ROWS = 10;
-
-const HONOR_ICONS: Record<HonorKind, typeof Zap> = {
-  upset: Zap,
-  streak: Flame,
-  carry: HandHelping,
-  onCourt: Timer,
-  pair: Users,
-};
 
 export interface ShareSheetData {
   sessionName: string;
@@ -135,9 +127,7 @@ export function ShareSheet({ data }: { data: ShareSheetData }) {
       <section className="px-10 pt-7 pb-6">
         <div className="rounded-lg bg-primary text-bg px-6 py-5">
           <div className="flex items-baseline gap-4">
-            <span className="font-mono text-[46px] leading-none font-bold text-bg/55 tabular-nums">
-              1
-            </span>
+            <Medal rank={1} className="text-[44px]" />
             <div className="min-w-0 flex-1">
               <h2 className="text-[30px] leading-[1.1] font-bold tracking-tight truncate">
                 {championNames}
@@ -181,14 +171,13 @@ export function ShareSheet({ data }: { data: ShareSheetData }) {
                 )}
               >
                 <div className="flex items-baseline gap-2.5">
-                  <span
-                    className={cn(
-                      "font-mono leading-none font-bold text-primary/40 tabular-nums",
-                      isSecond ? "text-[26px]" : "text-[20px]"
-                    )}
-                  >
-                    {row.rank}
-                  </span>
+                  {hasMedal(row.rank) ? (
+                    <Medal rank={row.rank} className={isSecond ? "text-[28px]" : "text-[22px]"} />
+                  ) : (
+                    <span className="font-mono leading-none font-bold text-primary/40 tabular-nums text-[20px]">
+                      {row.rank}
+                    </span>
+                  )}
                   <span className="text-[17px] font-semibold text-ink truncate flex-1 min-w-0">
                     {row.name}
                   </span>
@@ -288,14 +277,11 @@ function StandingsTable({ rows }: { rows: LeaderboardRow[] }) {
         {rows.map((row) => (
           <tr key={row.playerId} className="border-b border-border/50">
             <td className="py-[7px]">
-              <span
-                className={cn(
-                  "font-mono text-[14px] tabular-nums",
-                  row.rank <= 3 ? "font-bold text-primary" : "text-muted"
-                )}
-              >
-                {row.rank}
-              </span>
+              {hasMedal(row.rank) ? (
+                <Medal rank={row.rank} className="text-[16px]" />
+              ) : (
+                <span className="font-mono text-[14px] tabular-nums text-muted">{row.rank}</span>
+              )}
             </td>
             <td className="py-[7px] pr-3">
               <span className="text-[14px] text-ink truncate block max-w-[300px]">{row.name}</span>
@@ -326,7 +312,6 @@ function SheetAward({
   /** Riding the champion's filled ground rather than a light tint. */
   onBrand?: boolean;
 }) {
-  const Icon = HONOR_ICONS[honor.kind];
   return (
     <span
       className={cn(
@@ -337,7 +322,7 @@ function SheetAward({
         compact ? "px-1.5 py-0.5 text-[11px]" : "px-2 py-1 text-[12px]"
       )}
     >
-      <Icon size={compact ? 11 : 13} strokeWidth={2.5} aria-hidden />
+      <AwardStar className={compact ? "text-[11px]" : "text-[13px]"} />
       {honor.label}
     </span>
   );
