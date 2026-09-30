@@ -1,4 +1,5 @@
 import type { Court, MatchResult } from "@/types";
+import type { MenuPoint, PlayerMenuTarget } from "./PlayerMenu";
 import type { CourtSlotAddress } from "./DashboardClient";
 import type { Endpoint } from "@/lib/roster-swap";
 import { CourtCard } from "./CourtCard";
@@ -19,6 +20,7 @@ interface Props {
   onEndpointDrop?: (from: Endpoint, to: Endpoint) => void;
   onCourtSlotTap?: (courtId: string, side: "A" | "B", index: number) => void;
   onCancelSelection?: () => void;
+  onOpenPlayerMenu?: (target: PlayerMenuTarget, point: MenuPoint) => void;
 }
 
 export function CourtsSection({
@@ -36,6 +38,7 @@ export function CourtsSection({
   onEndpointDrop,
   onCourtSlotTap,
   onCancelSelection,
+  onOpenPlayerMenu,
 }: Props) {
   return (
     <section
@@ -91,6 +94,11 @@ export function CourtsSection({
                     armedCourtSlot={armedCourtSlot}
                     onEndpointDrop={onEndpointDrop}
                     onSlotTap={onCourtSlotTap}
+                    onOpenPlayerMenu={
+                      onOpenPlayerMenu
+                        ? (playerId, point) => onOpenPlayerMenu({ where: "court", playerId }, point)
+                        : undefined
+                    }
                     onCancelSelection={onCancelSelection}
                   />
                 </div>
@@ -126,6 +134,11 @@ export function CourtsSection({
                 armedCourtSlot={armedCourtSlot}
                 onEndpointDrop={onEndpointDrop}
                 onSlotTap={onCourtSlotTap}
+                    onOpenPlayerMenu={
+                      onOpenPlayerMenu
+                        ? (playerId, point) => onOpenPlayerMenu({ where: "court", playerId }, point)
+                        : undefined
+                    }
                 onCancelSelection={onCancelSelection}
                 variant="wide"
               />

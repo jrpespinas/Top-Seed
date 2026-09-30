@@ -1,6 +1,7 @@
 "use client";
 
 import { motion, AnimatePresence, MotionConfig } from "motion/react";
+import type { MenuPoint, PlayerMenuTarget } from "./PlayerMenu";
 import type { Court, PlanningCard, MatchType, Player } from "@/types";
 import { PlanningCard as PlanningCardComponent } from "./PlanningCard";
 import type { SlotAddress } from "./DashboardClient";
@@ -17,6 +18,7 @@ interface Props {
   onCardDragStart: (cardId: string) => void;
   onCardDragEnd: () => void;
   onRemovePlayerFromCard: (cardId: string, side: "A" | "B", index: number) => void;
+  onOpenPlayerMenu?: (target: PlayerMenuTarget, point: MenuPoint) => void;
   onAddCard: () => void;
   onSuggestCard: () => void;
   onResuggestCard: (cardId: string) => void;
@@ -43,6 +45,7 @@ export function MatchupColumn({
   onCardDragStart,
   onCardDragEnd,
   onRemovePlayerFromCard,
+  onOpenPlayerMenu,
   onAddCard,
   onSuggestCard,
   onResuggestCard,
@@ -133,6 +136,15 @@ export function MatchupColumn({
                       onCourtsAssign={(courtId) => onCardAssign(card.id, courtId)}
                       onRemovePlayer={(side, index) =>
                         onRemovePlayerFromCard(card.id, side, index)
+                      }
+                      onOpenPlayerMenu={
+                        onOpenPlayerMenu
+                          ? (playerId, side, index, point) =>
+                              onOpenPlayerMenu(
+                                { where: "card", playerId, cardId: card.id, side, index },
+                                point
+                              )
+                          : undefined
                       }
                       onDragStart={() => onCardDragStart(card.id)}
                       onDragEnd={onCardDragEnd}

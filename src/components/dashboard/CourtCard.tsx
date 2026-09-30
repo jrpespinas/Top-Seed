@@ -11,6 +11,7 @@ import { GenderIcon } from "@/components/ui/GenderIcon";
 import { ElapsedTimer } from "@/components/ui/ElapsedTimer";
 import { Plus, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { usePlayerMenuTrigger, PlayerMoreButton, NO_TOUCH_CALLOUT, type MenuPoint } from "./PlayerMenu";
 
 type ConfirmMode = "end" | "void" | "delete" | null;
 type Slot = { side: "A" | "B"; index: number };
@@ -32,6 +33,7 @@ function PlayerRow({
   isDragOver,
   wide = false,
   onClick,
+  onOpenMenu,
   onDragStart,
   onDragOver,
   onDragLeave,
@@ -45,17 +47,30 @@ function PlayerRow({
   // across a gym, and it fills the width a full-span court card actually has.
   wide?: boolean;
   onClick?: () => void;
+  onOpenMenu?: (point: MenuPoint) => void;
   onDragStart: (e: React.DragEvent) => void;
   onDragOver: (e: React.DragEvent) => void;
   onDragLeave: (e: React.DragEvent) => void;
   onDrop: (e: React.DragEvent) => void;
 }) {
+  const { triggerProps, cancel } = usePlayerMenuTrigger(onOpenMenu ?? (() => {}));
+  // The ⋯ is a sibling in a flex row rather than overlaid, because on the
+  // 176px tablet strip an overlaid button would sit on top of the gender icon.
+  // Its slot is reserved even while it's hover-hidden, so rows don't shift.
   return (
+    <span className={cn("group/courtrow flex min-w-0", wide ? "items-start" : "items-center")}>
+    {/* Balances the ⋯ slot on the other side, so a wide card's centred name
+        stays centred on the column rather than 10px left of it. */}
+    {wide && onOpenMenu && <span className="w-5 flex-shrink-0" aria-hidden />}
     <span
       data-tutorial-target="court-player-row"
       draggable
       onClick={onClick}
-      onDragStart={onDragStart}
+      {...(onOpenMenu ? triggerProps : {})}
+      onDragStart={(e) => {
+        cancel();
+        onDragStart(e);
+      }}
       onDragOver={onDragOver}
       onDragLeave={onDragLeave}
       onDrop={onDrop}
@@ -75,7 +90,8 @@ function PlayerRow({
           : `Select ${player.name} to swap`
       }
       className={cn(
-        "min-w-0 rounded-sm transition-colors cursor-grab active:cursor-grabbing",
+        "flex-1 min-w-0 rounded-sm transition-colors cursor-grab active:cursor-grabbing",
+        NO_TOUCH_CALLOUT,
         "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50",
         wide
           ? "flex flex-col items-center gap-0.5 px-1.5 py-1 text-center"
@@ -109,6 +125,15 @@ function PlayerRow({
         </>
       )}
     </span>
+    {onOpenMenu && (
+      <PlayerMoreButton
+        playerName={player.name}
+        groupName="courtrow"
+        onOpen={onOpenMenu}
+        className={cn("flex-shrink-0", wide && "mt-0.5")}
+      />
+    )}
+    </span>
   );
 }
 
@@ -124,6 +149,7 @@ interface CourtCardProps {
   onEndpointDrop?: (from: Endpoint, to: Endpoint) => void;
   onSlotTap?: (courtId: string, side: "A" | "B", index: number) => void;
   onCancelSelection?: () => void;
+  onOpenPlayerMenu?: (playerId: string, point: MenuPoint) => void;
   // "wide" sets the two sides as half-columns either side of a VS divider
   // instead of stacking them — the default everywhere the card gets at least
   // ~300px. "compact" survives only for the tablet strip, whose cards are
@@ -144,6 +170,7 @@ export function CourtCard({
   onEndpointDrop,
   onSlotTap,
   onCancelSelection,
+  onOpenPlayerMenu,
   variant = "compact",
 }: CourtCardProps) {
   const { id: courtId, number, status, activeMatch } = court;
@@ -301,6 +328,7 @@ export function CourtCard({
                 isDragOver={dragOverSlot?.side === side && dragOverSlot?.index === i}
                 wide={variant === "wide"}
                 onClick={() => onSlotTap?.(courtId, side, i)}
+                onOpenMenu={onOpenPlayerMenu ? (point) => onOpenPlayerMenu(p.id, point) : undefined}
                 onDragStart={(e) => writeEndpointPayload(e, { kind: "court", courtId, side, index: i })}
                 onDragOver={(e) => handleRowDragOver(e, { side, index: i })}
                 onDragLeave={handleRowDragLeave}

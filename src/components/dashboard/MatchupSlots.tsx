@@ -10,6 +10,7 @@ import { GenderIcon } from "@/components/ui/GenderIcon";
 import { ElapsedTimer } from "@/components/ui/ElapsedTimer";
 import { cn } from "@/lib/utils";
 import { X } from "lucide-react";
+import { usePlayerMenuTrigger, PlayerMoreButton, NO_TOUCH_CALLOUT, type MenuPoint } from "./PlayerMenu";
 
 export type SlotRef = { side: "A" | "B"; index: number };
 
@@ -28,6 +29,7 @@ export function MatchupSlots({
   selectedName,
   onSlotTap,
   onRemovePlayer,
+  onOpenPlayerMenu,
   onEndpointDrop,
   waitingSince,
   gamesPlayed,
@@ -39,6 +41,8 @@ export function MatchupSlots({
   selectedName?: string;
   onSlotTap: (side: "A" | "B", index: number) => void;
   onRemovePlayer?: (side: "A" | "B", index: number) => void;
+  /** Right-click, long-press or ⋯ on a placed player. */
+  onOpenPlayerMenu?: (playerId: string, side: "A" | "B", index: number, point: MenuPoint) => void;
   onEndpointDrop?: (from: Endpoint, to: Endpoint) => void;
   /** playerId -> QueueEntry.enteredQueueAt. Waiting time lives on the queue
    * entry, not on Player, and a carded player keeps theirs (placement never
@@ -104,6 +108,9 @@ export function MatchupSlots({
             isDragOver={isDragOver}
             onClick={() => onSlotTap(side, i)}
             onRemove={onRemovePlayer ? () => onRemovePlayer(side, i) : undefined}
+            onOpenMenu={
+              onOpenPlayerMenu ? (point) => onOpenPlayerMenu(player.id, side, i, point) : undefined
+            }
             onDragStart={(e) => {
               e.stopPropagation();
               writeEndpointPayload(e, { kind: "card", cardId: card.id, side, index: i });
@@ -158,6 +165,7 @@ function PlayerChip({
   isDragOver,
   onClick,
   onRemove,
+  onOpenMenu,
   onDragStart,
   onDragOver,
   onDragLeave,
@@ -171,20 +179,27 @@ function PlayerChip({
   isDragOver: boolean;
   onClick: () => void;
   onRemove?: () => void;
+  onOpenMenu?: (point: MenuPoint) => void;
   onDragStart: (e: React.DragEvent) => void;
   onDragOver: (e: React.DragEvent) => void;
   onDragLeave: (e: React.DragEvent) => void;
   onDrop: (e: React.DragEvent) => void;
 }) {
+  const { triggerProps, cancel } = usePlayerMenuTrigger(onOpenMenu ?? (() => {}));
   return (
     <div
       data-tutorial-target="placed-chip"
       className={cn(
-        "relative group/chip rounded-sm cursor-grab active:cursor-grabbing transition-shadow",
+        "relative group/chip flex items-center rounded-sm cursor-grab active:cursor-grabbing transition-shadow",
+        NO_TOUCH_CALLOUT,
         isDragOver && "ring-1 ring-primary/60 bg-primary/15"
       )}
       draggable
-      onDragStart={onDragStart}
+      {...(onOpenMenu ? triggerProps : {})}
+      onDragStart={(e) => {
+        cancel();
+        onDragStart(e);
+      }}
       onDragOver={onDragOver}
       onDragLeave={onDragLeave}
       onDrop={onDrop}
@@ -192,7 +207,7 @@ function PlayerChip({
       <button
         onClick={onClick}
         className={cn(
-          "flex items-center gap-1.5 w-full min-h-[30px] rounded-sm px-1.5 py-1 text-left transition-all duration-100 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary/50",
+          "flex items-center gap-1.5 flex-1 min-w-0 min-h-[30px] rounded-sm px-1.5 py-1 text-left transition-all duration-100 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary/50",
           isSelected
             ? "bg-primary/12 ring-1 ring-primary/40"
             : "hover:bg-surface-elevated active:bg-surface-elevated"
@@ -224,6 +239,11 @@ function PlayerChip({
           )}
         </span>
       </button>
+      {/* A sibling of the select button, not inside it: a button nested in a
+          button is invalid and would also trigger the swap selection. */}
+      {onOpenMenu && (
+        <PlayerMoreButton playerName={player.name} groupName="chip" onOpen={onOpenMenu} className="mr-0.5" />
+      )}
       {onRemove && (
         <button
           onClick={(e) => {

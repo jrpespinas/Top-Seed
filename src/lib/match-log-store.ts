@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import type { MatchRecord } from "@/types";
 import { migrateSkillLevelsDeep } from "./skill-level";
+import { renameInMatches } from "./player-edit";
 
 const STORAGE_KEY = "top-seed:match-log";
 
@@ -63,6 +64,19 @@ export function updateMatchRecord(id: string, patch: Partial<MatchRecord>) {
   writeStoredMatches(
     readStoredMatches().map((m) => (m.id === id ? { ...m, ...patch } : m))
   );
+  notifyListeners();
+}
+
+/**
+ * Corrects a player's name on every finished match they appear in. Name only;
+ * recorded skill levels stay as they were (see renameInMatches). Skips the
+ * write and the listener fan-out when nothing actually changed.
+ */
+export function renamePlayerInMatchLog(playerId: string, name: string) {
+  const current = readStoredMatches();
+  const next = renameInMatches(current, playerId, name);
+  if (next === current) return;
+  writeStoredMatches(next);
   notifyListeners();
 }
 

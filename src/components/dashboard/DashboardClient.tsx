@@ -3,6 +3,7 @@
 import { useState, useCallback, useMemo, useRef, useEffect } from "react";
 import type {
   ActiveMatch,
+  BenchEntry,
   Court,
   QueueEntry,
   PlanningCard,
@@ -17,7 +18,13 @@ import { CourtsSection } from "./CourtsSection";
 import { MatchupColumn } from "./MatchupColumn";
 import { PlayerPoolColumn } from "./PlayerPoolColumn";
 import type { NewPlayerInput } from "./AddPlayersModal";
-import { addMatchRecord, removeMatchRecord, useGamesPlayedMap, useMatchLog } from "@/lib/match-log-store";
+import {
+  addMatchRecord,
+  removeMatchRecord,
+  renamePlayerInMatchLog,
+  useGamesPlayedMap,
+  useMatchLog,
+} from "@/lib/match-log-store";
 import {
   useSessionQueue,
   useSessionBench,
@@ -27,7 +34,27 @@ import {
   useSmartMatchupRoundsSinceServed,
   appendSortedByCheckIn,
   buildDefaultPlanningCards,
+  removeQueueEntry,
+  removeBenchEntry,
+  restoreQueueEntry,
+  restoreBenchEntry,
 } from "@/lib/session-store";
+import {
+  patchEntries,
+  patchCards,
+  patchCourts,
+  locatePlayer,
+  playerOf,
+  type PlayerDetailsPatch,
+} from "@/lib/player-edit";
+import { PlayerModal } from "@/components/players/PlayerModal";
+import {
+  PlayerMenu,
+  type MenuPoint,
+  type PlayerMenuItem,
+  type PlayerMenuTarget,
+} from "./PlayerMenu";
+import { Pencil, Coffee, ListPlus, UserMinus, CornerUpLeft } from "lucide-react";
 import { suggestMatchup, type LockedPlacement } from "@/lib/smart-matchup";
 import {
   resolveSwap,
@@ -528,6 +555,154 @@ export function DashboardClient({ sessionId, onTutorialCheck }: Props) {
     [setPlanningCards]
   );
 
+  // ── Player menu and editing ─────────────────────────────────────────────
+  // One menu and one edit form for every place a player appears: the player
+  // column, a matchup card, or a live court. They used to be editable only
+  // from the column, and that edit only reached the queue entry.
+  const [playerMenu, setPlayerMenu] = useState<{ target: PlayerMenuTarget; point: MenuPoint } | null>(null);
+  const [editingPlayerId, setEditingPlayerId] = useState<string | null>(null);
+  const [isEditOpen, setIsEditOpen] = useState(false);
+
+  const openPlayerMenu = useCallback((target: PlayerMenuTarget, point: MenuPoint) => {
+    setPlayerMenu({ target, point });
+  }, []);
+
+  const openEditPlayer = useCallback((playerId: string) => {
+    setEditingPlayerId(playerId);
+    setIsEditOpen(true);
+  }, []);
+
+  const closeEditPlayer = useCallback(() => {
+    setIsEditOpen(false);
+    // Kept until the close transition finishes, so the form doesn't empty mid-fade.
+    setTimeout(() => setEditingPlayerId(null), 220);
+  }, []);
+
+  // Re-derived from live state on every render, so the form always shows the
+  // player's current details even if they move from the queue to a court
+  // while it's open.
+  const editingLocation = useMemo(
+    () =>
+      editingPlayerId ? locatePlayer(editingPlayerId, queue, bench, courts, planningCards) : null,
+    [editingPlayerId, queue, bench, courts, planningCards]
+  );
+
+  /**
+   * Applies an edit to every live copy of the player at once: their queue or
+   * bench entry, any matchup card holding them, and a live court match. A
+   * name change also corrects finished matches; a skill change deliberately
+   * doesn't, so past upset bonuses stay as they were earned. See player-edit.ts.
+   */
+  const handleEditSave = useCallback(
+    (data: { name: string; skillLevel: Player["skillLevel"]; gender?: Player["gender"]; notes: string }) => {
+      if (!editingPlayerId) return;
+      const before = editingLocation ? playerOf(editingLocation) : null;
+      const patch: PlayerDetailsPatch = {
+        name: data.name,
+        skillLevel: data.skillLevel,
+        gender: data.gender,
+        notes: data.notes || undefined,
+      };
+      setQueue((prev) => patchEntries(prev, editingPlayerId, patch));
+      setBench((prev) => patchEntries(prev, editingPlayerId, patch));
+      setPlanningCards((prev) => patchCards(prev, editingPlayerId, patch));
+      setCourts((prev) => patchCourts(prev, editingPlayerId, patch));
+      if (before && before.name !== data.name) renamePlayerInMatchLog(editingPlayerId, data.name);
+    },
+    [editingPlayerId, editingLocation, setQueue, setBench, setPlanningCards, setCourts]
+  );
+
+  const removeFromSession = useCallback(
+    (playerId: string) => {
+      const loc = locatePlayer(playerId, queue, bench, courts, planningCards);
+      if (!loc || (loc.where !== "queue" && loc.where !== "bench")) return;
+      const removed = loc.where === "queue" ? removeQueueEntry(loc.entry.id) : removeBenchEntry(loc.entry.id);
+      if (!removed) return;
+      // A removed player can't stay in a matchup card, or the card would send
+      // someone no longer in the session onto a court.
+      setPlanningCards((prev) => clearPlayerFromCards(prev, playerId));
+      showToast(
+        `Removed ${removed.player.name.split(" ")[0]} from the session`,
+        () =>
+          loc.where === "queue"
+            ? restoreQueueEntry(removed as QueueEntry)
+            : restoreBenchEntry(removed as BenchEntry),
+        "Undo remove from session"
+      );
+    },
+    [queue, bench, courts, planningCards, setPlanningCards, showToast]
+  );
+
+  /**
+   * The menu's actions depend on where the player was when it opened. Edit is
+   * always first. A player on court has nothing else here: swapping already
+   * works by tap, and removing someone mid-match would orphan the match.
+   */
+  const playerMenuItems = useMemo((): PlayerMenuItem[] => {
+    if (!playerMenu) return [];
+    const { target } = playerMenu;
+    const edit: PlayerMenuItem = {
+      key: "edit",
+      label: "Edit player",
+      icon: Pencil,
+      onSelect: () => openEditPlayer(target.playerId),
+    };
+    if (target.where === "court") return [edit];
+    if (target.where === "card") {
+      return [
+        edit,
+        {
+          key: "uncard",
+          label: "Take out of card",
+          icon: CornerUpLeft,
+          onSelect: () => handleRemovePlayerFromCard(target.cardId, target.side, target.index),
+        },
+      ];
+    }
+    const loc = locatePlayer(target.playerId, queue, bench, courts, planningCards);
+    const remove: PlayerMenuItem = {
+      key: "remove",
+      label: "Remove from session",
+      icon: UserMinus,
+      danger: true,
+      onSelect: () => removeFromSession(target.playerId),
+    };
+    if (loc?.where === "queue") {
+      const entryId = loc.entry.id;
+      return [
+        edit,
+        { key: "rest", label: "Rest on bench", icon: Coffee, onSelect: () => handleMoveToBench(entryId) },
+        remove,
+      ];
+    }
+    if (loc?.where === "bench") {
+      const entryId = loc.entry.id;
+      return [
+        edit,
+        { key: "queue", label: "Back to queue", icon: ListPlus, onSelect: () => handleBenchReturnToQueue(entryId) },
+        remove,
+      ];
+    }
+    return [edit];
+  }, [
+    playerMenu,
+    queue,
+    bench,
+    courts,
+    planningCards,
+    openEditPlayer,
+    handleRemovePlayerFromCard,
+    handleMoveToBench,
+    handleBenchReturnToQueue,
+    removeFromSession,
+  ]);
+
+  const playerMenuTitle = useMemo(() => {
+    if (!playerMenu) return "";
+    const loc = locatePlayer(playerMenu.target.playerId, queue, bench, courts, planningCards);
+    return loc ? playerOf(loc).name : "Player";
+  }, [playerMenu, queue, bench, courts, planningCards]);
+
   const handleCardAssign = useCallback(
     (cardId: string, courtId: string) => {
       const targetCourt = courts.find((c) => c.id === courtId);
@@ -959,6 +1134,7 @@ export function DashboardClient({ sessionId, onTutorialCheck }: Props) {
             armedCourtSlot={selectedCourtSlot}
             onEndpointDrop={applySwap}
             onCourtSlotTap={handleCourtSlotTap}
+            onOpenPlayerMenu={openPlayerMenu}
             onCancelSelection={() => setSelection(null)}
           />
         </div>
@@ -978,6 +1154,7 @@ export function DashboardClient({ sessionId, onTutorialCheck }: Props) {
             armedCourtSlot={selectedCourtSlot}
             onEndpointDrop={applySwap}
             onCourtSlotTap={handleCourtSlotTap}
+            onOpenPlayerMenu={openPlayerMenu}
             onCancelSelection={() => setSelection(null)}
           />
         </div>
@@ -1004,7 +1181,8 @@ export function DashboardClient({ sessionId, onTutorialCheck }: Props) {
             onSelectPlayer={handlePoolRowActivate}
             armedCourtSlot={selectedCourtSlot}
             onEndpointDrop={applySwap}
-            showToast={showToast}
+            onEditPlayer={openEditPlayer}
+            onOpenPlayerMenu={openPlayerMenu}
           />
         </div>
 
@@ -1022,6 +1200,7 @@ export function DashboardClient({ sessionId, onTutorialCheck }: Props) {
             onCardDragStart={setDraggingCardId}
             onCardDragEnd={() => setDraggingCardId(null)}
             onRemovePlayerFromCard={handleRemovePlayerFromCard}
+            onOpenPlayerMenu={openPlayerMenu}
             onAddCard={handleAddCard}
             onSuggestCard={handleSuggestCard}
             onResuggestCard={handleResuggestCard}
@@ -1037,6 +1216,27 @@ export function DashboardClient({ sessionId, onTutorialCheck }: Props) {
           />
         </div>
       </div>
+
+      <PlayerMenu
+        point={playerMenu?.point ?? null}
+        title={playerMenuTitle}
+        items={playerMenuItems}
+        onClose={() => setPlayerMenu(null)}
+      />
+
+      <PlayerModal
+        isOpen={isEditOpen}
+        editingPlayer={editingLocation ? playerOf(editingLocation) : null}
+        onClose={closeEditPlayer}
+        onSave={handleEditSave}
+        // Only queue and bench players can be removed from here. A player on a
+        // court has to finish, be voided, or be swapped out first.
+        onRemove={
+          editingLocation && (editingLocation.where === "queue" || editingLocation.where === "bench")
+            ? () => editingPlayerId && removeFromSession(editingPlayerId)
+            : undefined
+        }
+      />
 
       <ToastViewport toast={toast} onDismissAndUndo={dismissAndUndo} />
     </>

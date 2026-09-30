@@ -211,3 +211,27 @@ Two exceptions with no toast/undo: bench removal and bench→queue return — bo
 1. **Court numbering has no gap-preservation** — deleting a court always renumbers everything contiguously; there's no concept of a stable court identity independent of its display number beyond the `id` field itself.
 
 Resolved since this file was first written, kept here only so the history isn't lost: match history now IS written (`match-log-store.ts`, real `MatchRecord`s); voided matches are correctly excluded from `gamesPlayed`; the Dashboard's queue/bench and `/players` are the same live `session-store.ts` data, not separate datasets; **automatic matchup suggestion is now wired up** — "Suggest" calls the live algorithm in `07-smart-matchup.md`, it is not a disabled stub. See `docs/specs/08-sessions.md` for the one gap this created — `MatchRecord.sessionId` exists but the Matches/Leaderboard pages aren't session-filtered yet.
+
+
+---
+
+## Player menu and editing
+
+Every player can be edited wherever they appear: the player column, a matchup card, or a live court. They all go through one menu (`PlayerMenu.tsx`) and one edit form (the dashboard's `PlayerModal`).
+
+**Three ways in.** Right-click with a mouse and long-press (450 ms) on touch are shortcuts. The way people actually find it is a small **⋯** button on each matchup chip and court row. It's always visible on touch screens, where there's no hover, and appears on hover with a mouse. Plain tap wasn't available: it already selects a player for swapping. After a long-press opens the menu, the tap that ends it is swallowed so it doesn't also select the player. A drag that starts mid-hold cancels the long-press. The player column rows take right-click and long-press but get no ⋯, because they already show Edit, Rest and × buttons.
+
+**Actions depend on where the player is.**
+
+| Where | Menu |
+|---|---|
+| Queue | Edit player · Rest on bench · Remove from session |
+| Bench | Edit player · Back to queue · Remove from session |
+| Matchup card | Edit player · Take out of card |
+| Court | Edit player |
+
+A player on court can't be removed from the menu or the form: they have to finish, be voided, or be swapped out first, or the live match would be left missing a player.
+
+**An edit reaches every copy of the player.** During a session a player is stored as up to three separate copies: the queue or bench entry, a copy inside any matchup card holding them, and a copy inside a live court match (the queue entry is removed when a match starts). The Edit button used to update only the first, so a corrected name stayed wrong on the card and was carried onto the court. `player-edit.ts` applies the change to all of them in one save, returning inputs unchanged when a player isn't in them so a no-op edit doesn't re-render the dashboard.
+
+**History: names everywhere, skill level forward only.** A name change also corrects every finished match in the match log (`renamePlayerInMatchLog`), because a name is identity and a typo fix should fix the Matches page too. A skill change applies to the live match and everything after it, but never to finished matches. Past upset bonuses and awards were earned against the level a player had at the time, and rewriting it would quietly change who won them.

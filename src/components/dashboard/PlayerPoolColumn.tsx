@@ -3,7 +3,7 @@
 import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { motion, AnimatePresence, MotionConfig } from "motion/react";
-import type { QueueEntry, BenchEntry, Player, SkillLevel, Gender } from "@/types";
+import type { QueueEntry, BenchEntry, Player, SkillLevel } from "@/types";
 import { canDrop, type Endpoint } from "@/lib/roster-swap";
 import {
   dragEndpointKind,
@@ -15,16 +15,13 @@ import { SkillBadge } from "@/components/ui/SkillBadge";
 import { GenderIcon } from "@/components/ui/GenderIcon";
 import { ElapsedTimer } from "@/components/ui/ElapsedTimer";
 import { AddPlayersModal, type NewPlayerInput } from "./AddPlayersModal";
-import { PlayerModal } from "@/components/players/PlayerModal";
-import { cn, SKILL_LABELS, SKILL_LABELS_SHORT } from "@/lib/utils";
 import {
-  updateQueuePlayer,
-  updateBenchPlayer,
-  removeQueueEntry,
-  removeBenchEntry,
-  restoreQueueEntry,
-  restoreBenchEntry,
-} from "@/lib/session-store";
+  usePlayerMenuTrigger,
+  NO_TOUCH_CALLOUT,
+  type MenuPoint,
+  type PlayerMenuTarget,
+} from "./PlayerMenu";
+import { cn, SKILL_LABELS, SKILL_LABELS_SHORT } from "@/lib/utils";
 import {
   GripVertical,
   Clock,
@@ -267,10 +264,9 @@ interface Props {
   // destination for them, so rows advertise themselves as swap targets.
   armedCourtSlot?: CourtSlotAddress | null;
   onEndpointDrop?: (from: Endpoint, to: Endpoint) => void;
-  // Threaded through to DashboardClient's single shared toast instance rather
-  // than this column owning its own ToastViewport — two independent toasts
-  // would stack at the same fixed bottom-center position.
-  showToast: (message: string, onUndo?: () => void, undoLabel?: string) => void;
+  /** Opens the dashboard's single edit form, shared with cards and courts. */
+  onEditPlayer: (playerId: string) => void;
+  onOpenPlayerMenu?: (target: PlayerMenuTarget, point: MenuPoint) => void;
 }
 
 const EASE: [number, number, number, number] = [0.25, 1, 0.5, 1];
@@ -296,6 +292,7 @@ function PlayerRow({
   onRemove,
   onEdit,
   onSelect,
+  onOpenMenu,
   onDragStart,
   onDragEnd,
 }: {
@@ -318,9 +315,12 @@ function PlayerRow({
   onReturnToQueue?: () => void;
   onRemove?: () => void;
   onSelect?: () => void;
+  /** Right-click or long-press. No ⋯ here: this row already shows its actions. */
+  onOpenMenu?: (point: MenuPoint) => void;
   onDragStart: () => void;
   onDragEnd: () => void;
 }) {
+  const { triggerProps, cancel } = usePlayerMenuTrigger(onOpenMenu ?? (() => {}));
   const [isDragging, setIsDragging] = useState(false);
   const [isDragOver, setIsDragOver] = useState(false);
   const [confirmRemove, setConfirmRemove] = useState(false);
@@ -332,7 +332,9 @@ function PlayerRow({
     <div
       draggable={!isInMatch}
       onClick={!isInMatch ? onSelect : undefined}
+      {...(onOpenMenu ? triggerProps : {})}
       onDragStart={(e) => {
+        cancel();
         writeEndpointPayload(e, endpoint);
         setIsDragging(true);
         onDragStart();
@@ -364,6 +366,7 @@ function PlayerRow({
       }}
       className={cn(
         "flex items-start gap-1.5 px-2 py-2 rounded-md border border-border bg-surface-elevated/25 transition-colors group",
+        NO_TOUCH_CALLOUT,
         !isInMatch && "hover:bg-surface-elevated/50 hover:border-border/80 active:bg-surface-elevated/70 cursor-grab active:cursor-grabbing",
         isDragging && "opacity-40",
         dimmed && "opacity-50",
@@ -539,7 +542,8 @@ export function PlayerPoolColumn({
   onSelectPlayer,
   armedCourtSlot,
   onEndpointDrop,
-  showToast,
+  onEditPlayer,
+  onOpenPlayerMenu,
 }: Props) {
   const isCourtPlayerArmed = !!armedCourtSlot;
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
@@ -610,69 +614,6 @@ export function PlayerPoolColumn({
 
   const hasActiveSort = sortKey !== "position";
   const hasActiveFilters = skillFilter.size > 0;
-
-  // Edit modal — reuses PlayerModal verbatim (same component /players opens
-  // in edit mode), a second entry point onto the same shared save/remove
-  // logic rather than a parallel implementation. Tracked by entryId+source
-  // (not the Player object itself) so the modal always reflects the live
-  // queue/bench props, not a stale snapshot taken when it was opened.
-  const [editingEntry, setEditingEntry] = useState<{ entryId: string; source: "queue" | "bench" } | null>(null);
-  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
-
-  const editingPlayer = editingEntry
-    ? (editingEntry.source === "queue"
-        ? queue.find((e) => e.id === editingEntry.entryId)?.player
-        : bench.find((e) => e.id === editingEntry.entryId)?.player) ?? null
-    : null;
-
-  function handleEditPlayer(entryId: string, source: "queue" | "bench") {
-    setEditingEntry({ entryId, source });
-    setIsEditModalOpen(true);
-  }
-
-  function handleEditModalClose() {
-    setIsEditModalOpen(false);
-    setTimeout(() => setEditingEntry(null), 220);
-  }
-
-  function handleEditSave(data: { name: string; skillLevel: SkillLevel; gender?: Gender; notes: string }) {
-    if (!editingEntry) return;
-    const patch = {
-      name: data.name,
-      skillLevel: data.skillLevel,
-      gender: data.gender,
-      notes: data.notes || undefined,
-    };
-    if (editingEntry.source === "queue") {
-      updateQueuePlayer(editingEntry.entryId, patch);
-    } else {
-      updateBenchPlayer(editingEntry.entryId, patch);
-    }
-  }
-
-  function handleEditRemove() {
-    if (!editingEntry) return;
-    const { entryId, source } = editingEntry;
-    if (source === "queue") {
-      const removed = removeQueueEntry(entryId);
-      if (removed) {
-        showToast(
-          `Removed ${removed.player.name.split(" ")[0]} from the session`,
-          () => restoreQueueEntry(removed),
-          "Undo remove from session"
-        );
-      }
-    } else {
-      const removed = removeBenchEntry(entryId);
-      if (removed) {
-        showToast(
-          `Removed ${removed.player.name.split(" ")[0]} from the session`,
-          () => restoreBenchEntry(removed),
-          "Undo remove from session"
-        );
-      }
-    }
-  }
 
   return (
     <MotionConfig reducedMotion="user">
@@ -763,7 +704,8 @@ export function PlayerPoolColumn({
                           peerMedianEnteredAt={peerMedianEnteredAt}
                           onMoveToBench={() => onMoveToBench(entry.id)}
                           onRemove={() => onQueueRemove(entry.id)}
-                          onEdit={() => handleEditPlayer(entry.id, "queue")}
+                          onEdit={() => onEditPlayer(entry.player.id)}
+                          onOpenMenu={(point) => onOpenPlayerMenu?.({ where: "pool", playerId: entry.player.id }, point)}
                           onSelect={() => onSelectPlayer(entry.player)}
                           onDragStart={() => onPlayerDragStart(entry.player.id)}
                           onDragEnd={onPlayerDragEnd}
@@ -830,7 +772,8 @@ export function PlayerPoolColumn({
                         gamesPlayed={gamesPlayedMap.get(entry.player.id)}
                         onReturnToQueue={() => onBenchReturnToQueue(entry.id)}
                         onRemove={() => onBenchRemove(entry.id)}
-                        onEdit={() => handleEditPlayer(entry.id, "bench")}
+                        onEdit={() => onEditPlayer(entry.player.id)}
+                        onOpenMenu={(point) => onOpenPlayerMenu?.({ where: "pool", playerId: entry.player.id }, point)}
                         onSelect={() => onSelectPlayer(entry.player)}
                         onDragStart={() => onPlayerDragStart(entry.player.id)}
                         onDragEnd={onPlayerDragEnd}
@@ -858,13 +801,6 @@ export function PlayerPoolColumn({
         existingPlayerNames={existingPlayerNames}
       />
 
-      <PlayerModal
-        isOpen={isEditModalOpen}
-        editingPlayer={editingPlayer}
-        onClose={handleEditModalClose}
-        onSave={handleEditSave}
-        onRemove={handleEditRemove}
-      />
     </MotionConfig>
   );
 }

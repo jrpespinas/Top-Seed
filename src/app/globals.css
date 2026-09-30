@@ -212,6 +212,16 @@
 }
 .animate-toast { animation: toast-in 200ms cubic-bezier(0.22, 1, 0.36, 1); }
 
+/* Popover entrance (tutorial menu, queue sort panel, player menu). All three
+   used this class before it was defined, so they appeared abruptly. No
+   fill-mode: the resting style is the visible one, so a skipped animation
+   still shows the popover. */
+@keyframes popover-in {
+  from { opacity: 0; transform: translateY(-4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.animate-tutorial-in { animation: popover-in 140ms cubic-bezier(0.22, 1, 0.36, 1); }
+
 @keyframes suggest-pulse {
   0%, 100% { box-shadow: 0 0 0 0 oklch(var(--color-primary-raw) / 0); }
   50%      { box-shadow: 0 0 16px 2px oklch(var(--color-primary-raw) / 0.45); }

@@ -28,7 +28,8 @@ interface PlayerModalProps {
   editingPlayer: Player | null;
   onClose: () => void;
   onSave: (data: PlayerFormData) => void;
-  onRemove: () => void;
+  /** Omit to hide Remove, e.g. for a player mid-match on a court. */
+  onRemove?: () => void;
 }
 
 export function PlayerModal({
@@ -157,7 +158,7 @@ export function PlayerModal({
   };
 
   const handleRemove = () => {
-    onRemove();
+    onRemove?.();
     onClose();
   };
 
@@ -322,8 +323,10 @@ export function PlayerModal({
             />
           </div>
 
-          {/* Remove from session — edit mode only */}
-          {editingPlayer && (
+          {/* Remove from session. Edit mode only, and only where removal is
+              allowed: a player mid-match on court has to finish or be swapped
+              out first. */}
+          {editingPlayer && onRemove && (
             <div className="pt-5 border-t border-border">
               <div className="flex items-start justify-between gap-4">
                 <div>

@@ -6,6 +6,7 @@ import type { Court, PlanningCard, MatchType, Player } from "@/types";
 import type { SlotAddress } from "./DashboardClient";
 import type { Endpoint } from "@/lib/roster-swap";
 import { MatchupSlots } from "./MatchupSlots";
+import type { MenuPoint } from "./PlayerMenu";
 import { SkillBadge } from "@/components/ui/SkillBadge";
 import { cn } from "@/lib/utils";
 import { X, GripVertical, RotateCcw } from "lucide-react";
@@ -20,6 +21,7 @@ interface Props {
   onMatchTypeChange: (type: MatchType) => void;
   onCourtsAssign: (courtId: string) => void;
   onRemovePlayer?: (side: "A" | "B", index: number) => void;
+  onOpenPlayerMenu?: (playerId: string, side: "A" | "B", index: number, point: MenuPoint) => void;
   onDragStart: () => void;
   onDragEnd: () => void;
   isDraggingAny: boolean;
@@ -45,6 +47,7 @@ export function PlanningCard({
   onMatchTypeChange,
   onCourtsAssign,
   onRemovePlayer,
+  onOpenPlayerMenu,
   onDragStart,
   onDragEnd,
   isDraggingAny,
@@ -211,6 +214,7 @@ export function PlanningCard({
           selectedName={selectedName}
           onSlotTap={onSlotTap}
           onRemovePlayer={onRemovePlayer}
+          onOpenPlayerMenu={onOpenPlayerMenu}
           onEndpointDrop={onEndpointDrop}
           waitingSince={waitingSince}
           gamesPlayed={gamesPlayed}
