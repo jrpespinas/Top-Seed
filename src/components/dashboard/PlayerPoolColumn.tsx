@@ -26,7 +26,6 @@ import {
   restoreBenchEntry,
 } from "@/lib/session-store";
 import {
-  ChevronRight,
   GripVertical,
   Clock,
   Coffee,
@@ -544,10 +543,6 @@ export function PlayerPoolColumn({
 }: Props) {
   const isCourtPlayerArmed = !!armedCourtSlot;
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
-  // Collapsed by default: the point of moving these players out of QUEUE is a
-  // shorter list. The group exists so they're findable and still actionable,
-  // not so they're in the way.
-  const [showMatched, setShowMatched] = useState(false);
 
   // Sort/filter is display-only and queue-scoped (bench is unaffected, always
   // shown in its existing unordered form). Not persisted across reloads.
@@ -777,6 +772,13 @@ export function PlayerPoolColumn({
                     ))}
                   </AnimatePresence>
                 </ul>
+              ) : waitingCount === 0 ? (
+                // Everyone waiting is already placed in a matchup card or on
+                // court. That's a healthy state, not an empty filter, so there's
+                // nothing to clear.
+                <p className="py-5 px-4 text-center text-xs text-muted">
+                  Everyone&rsquo;s in a matchup or on court
+                </p>
               ) : (
                 <div className="flex flex-col items-center justify-center py-6 px-4 text-center">
                   <p className="text-xs text-muted">No players match this filter</p>
@@ -791,62 +793,11 @@ export function PlayerPoolColumn({
             </>
           )}
 
-          {/* In a matchup — players held by a planning card. Out of QUEUE so the
-              waiting list means only "waiting", but still reachable: Rest and
-              Remove both scrub them from their card on the way out. */}
-          {matchedQueue.length > 0 && (
-            <>
-              <button
-                onClick={() => setShowMatched((v) => !v)}
-                aria-expanded={showMatched}
-                className="w-full px-3 pt-3 pb-1 flex items-center gap-2 border-t border-border/40 mt-1 text-left hover:bg-surface-elevated/40 transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-border"
-              >
-                <ChevronRight
-                  size={11}
-                  strokeWidth={2.5}
-                  className={cn("text-muted transition-transform", showMatched && "rotate-90")}
-                  aria-hidden
-                />
-                <span className="text-[10px] font-medium text-muted uppercase tracking-wide">
-                  In a matchup
-                </span>
-                <span className="font-mono text-[10px] text-muted/60 tabular-nums">
-                  {matchedQueue.length}
-                </span>
-              </button>
-              {showMatched && (
-                <ul role="list" aria-label="Players in a matchup" className="flex flex-col gap-1.5 px-2 pt-1">
-                  <AnimatePresence initial={false}>
-                    {matchedQueue.map((entry) => (
-                      <motion.li
-                        key={entry.id}
-                        layout="position"
-                        initial={{ opacity: 0, y: -6 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0, x: -12, transition: { duration: 0.15, ease: EASE } }}
-                        transition={{ duration: 0.2, ease: EASE }}
-                      >
-                        <PlayerRow
-                          player={entry.player}
-                          isSelected={selectedPlayerId === entry.player.id}
-                          gamesPlayed={gamesPlayedMap.get(entry.player.id)}
-                          waitingSinceISO={entry.enteredQueueAt}
-                          peerMedianEnteredAt={peerMedianEnteredAt}
-                          onMoveToBench={() => onMoveToBench(entry.id)}
-                          onRemove={() => onQueueRemove(entry.id)}
-                          onEdit={() => handleEditPlayer(entry.id, "queue")}
-                          onSelect={() => onSelectPlayer(entry.player)}
-                          onDragStart={() => onPlayerDragStart(entry.player.id)}
-                          onDragEnd={onPlayerDragEnd}
-                          endpoint={{ kind: "queue", playerId: entry.player.id }}
-                        />
-                      </motion.li>
-                    ))}
-                  </AnimatePresence>
-                </ul>
-              )}
-            </>
-          )}
+          {/* No "In a matchup" list: a player placed in a card is already visible
+              in that card, and a second copy here read as two different people
+              or a bug. They are still queue entries underneath, so taking them
+              out of the card (its × button) brings them straight back into the
+              Queue list above with their wait time and seniority intact. */}
 
           {/* Bench section */}
           {bench.length > 0 && (
