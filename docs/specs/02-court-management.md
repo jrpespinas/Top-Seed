@@ -102,3 +102,12 @@ Handled inside match actions:
 - **"Reset All to Available" with no In Use courts**: no-op; toast shows "All courts already available"
 - **All courts deleted**: empty state with a single "Add Court" button
 - **Court deleted mid-session**: `Match.courtName` snapshot ("Court 3") preserved in match history; queue and payments unaffected
+
+
+---
+
+## Dashboard court card (built)
+
+Courts live on the Dashboard as `CourtCard`. The standalone courts page, status badges and "View Match" link described above are not built.
+
+Each card opens with a **scoreboard band** carrying the court number at the card's largest size, the match clock, and the status as the band's colour: **near-black while a match is on, light blue while the court is free**. It replaced a small violet "In Use" pill after organisers said the court number was hard to spot and the card looked like the other cards. A court with a match on can't be deleted; its delete button is shown disabled until the match ends. See DESIGN.md › CourtCard for colours and contrast.

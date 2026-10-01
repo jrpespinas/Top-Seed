@@ -279,11 +279,22 @@ The active sidebar item gets a blue fill block (`bg-primary text-bg`), making it
 
 ### CourtCard
 
-The highest-stakes card in the application. Two root states: **Available** and **In Use**. Both use `bg-surface border border-border rounded-lg` with no shadow at rest.
+The highest-stakes card in the application. Two root states, **Available** and **In Use**, both `bg-surface border border-border rounded-lg` with no shadow at rest. Both open with a **scoreboard band**.
 
-**Available state**: Header shows court number + StatusBadge. Body contains a full-width "New Match" primary button (`min-h-[44px]`). Drop-target state during planning card drag: `ring-2 ring-primary/50 bg-primary/12 border-primary/30`. Blocked state (another card dragging, court in use): `opacity-40 cursor-not-allowed`.
+**Scoreboard band.** Organisers reported two problems: the court number was hard to spot, and the court card read as one more white card beside the matchup cards. The band fixes both. It carries a small tracked "COURT" label over the number in JetBrains Mono bold (32px on wide cards, 26px on the 176px tablet strip), so the number is the largest thing on the card. On the right it shows the match clock and "In use · Doubles", or "Open". The band's ground is the status:
 
-**In Use state**: Header shows court number + "In Use" badge. Body shows Side A players, "vs" divider text, Side B players (each as full name + SkillBadge + Gender Icon). Footer has elapsed timer (JetBrains Mono, `text-muted`) + End and Void buttons. The elapsed timer is the only continuously updating element in the interface — it uses a client-side interval, no server polling.
+| State | Band | Number | Contrast |
+|---|---|---|---|
+| In Use | `bg-ink` (near-black) | `text-bg` | ~18:1 |
+| Available | `bg-primary-tint` (light blue) | `text-primary` | ~11:1 |
+
+Free courts can be counted from across the room by counting light bands. The in-use band uses the ink colour rather than brand blue on purpose: blue stays reserved for things you can press, such as End Match. It replaced the violet "In Use" pill (`StatusBadge`), which said the same thing less visibly. No other card in the app has a band, which is what stops courts blending in. Chosen over a numeral tile and a green court-mat body after comparing all three with a blur test simulating distance.
+
+**The match clock lives in the band**, not the footer, like a scoreboard clock. On the dark ground `ElapsedTimer` runs with `tone="dark"`: near-white normally, and `text-warning-bright` (oklch 0.80 0.13 65) once a match passes 20 minutes. The regular brass `warning` and grey `muted` are tuned for white and fall to 3.5:1 and 2.8:1 on the band. The bright amber's hue is pushed toward orange to stay clear of the Intermediate badge's gold (ΔE ≈ 0.064).
+
+**Available state**: band in light blue with "Open"; body holds the "New Match" button. Drop-target state during planning card drag: `ring-2 ring-primary/50 bg-primary/12 border-primary/30`. Blocked state (another card dragging, court in use): `opacity-40 cursor-not-allowed`. Delete sits at the band's right edge; on an in-use court it's shown disabled ("End the match first").
+
+**In Use state**: body shows Side A players, the VS divider, Side B players (each as full name + SkillBadge + Gender Icon, plus a ⋯ player menu button). Footer holds End Match and Void, right-aligned. The clock is the only continuously updating element in the interface, driven by the shared `useTick` interval, with no server polling.
 
 **Substitution target state**: each player row is a live drag/tap target for swapping someone in, styled identically to an occupied PlanningCard chip's swap-target treatment — `ring-1 ring-primary/60 bg-primary/15` while a valid drag hovers it, `cursor-pointer hover:bg-surface-elevated` when armed by a tap selection but not actively dragging. Idle (no `selectedPlayer`/`selectedChip` active) rows carry no special styling at all — this state only activates when something's already selected, exactly like PlanningCard's empty-slot invite treatment.
 

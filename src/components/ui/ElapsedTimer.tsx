@@ -22,6 +22,7 @@ export function ElapsedTimer({
   className,
   ariaLabel,
   peerMedianStartedAtISO,
+  tone = "light",
 }: {
   startedAtISO: string;
   className?: string;
@@ -33,6 +34,10 @@ export function ElapsedTimer({
   // Defaults to match-duration phrasing; pass a custom formatter for other
   // contexts (e.g. queue waiting time) so screen readers get accurate text.
   ariaLabel?: (elapsed: string, isLong: boolean) => string;
+  /** "dark" for a timer sitting on a dark ground, such as the court card's
+   * scoreboard band, where the grey and brass tuned for white fall below a
+   * readable contrast. */
+  tone?: "light" | "dark";
 }) {
   const now = useTick();
   const elapsedMs = now - new Date(startedAtISO).getTime();
@@ -52,7 +57,16 @@ export function ElapsedTimer({
   return (
     <time
       dateTime={startedAtISO}
-      className={cn(className, isLong ? "text-warning font-semibold" : "text-muted")}
+      className={cn(
+        className,
+        tone === "dark"
+          ? isLong
+            ? "text-warning-bright font-semibold"
+            : "text-bg"
+          : isLong
+          ? "text-warning font-semibold"
+          : "text-muted"
+      )}
       aria-label={label}
     >
       {elapsed}

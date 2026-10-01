@@ -42,6 +42,11 @@
   --color-accent-raw:             0.480 0.140 305;
   --color-success-raw:            0.460 0.120 150;
   --color-warning-raw:            0.520 0.130 62;    /* darkened off bronze, and read as text */
+  /* "Running long" on the court card's dark scoreboard band. The regular
+     warning is a dark brass tuned for white and reads at only 3.5:1 on the
+     band; this lighter amber reads at about 10:1. Hue 65, pushed toward orange
+     so it stays clearly apart from the Intermediate badge's gold (H92). */
+  --color-warning-bright-raw:     0.800 0.130 65;
   --color-error-raw:              0.460 0.185 22;
 
   /* Gender markers. Deliberately low-chroma and deliberately NOT primary or
@@ -87,6 +92,7 @@
   --color-accent:           oklch(var(--color-accent-raw));
   --color-success:          oklch(var(--color-success-raw));
   --color-warning:          oklch(var(--color-warning-raw));
+  --color-warning-bright:   oklch(var(--color-warning-bright-raw));
   --color-error:            oklch(var(--color-error-raw));
   --color-gender-m:         oklch(var(--color-gender-m-raw));
   --color-gender-f:         oklch(var(--color-gender-f-raw));

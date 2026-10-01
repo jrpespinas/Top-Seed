@@ -22,6 +22,7 @@ const config: Config = {
         accent:               "oklch(var(--color-accent-raw) / <alpha-value>)",
         success:              "oklch(var(--color-success-raw) / <alpha-value>)",
         warning:              "oklch(var(--color-warning-raw) / <alpha-value>)",
+        "warning-bright":     "oklch(var(--color-warning-bright-raw) / <alpha-value>)",
         error:                "oklch(var(--color-error-raw) / <alpha-value>)",
         "gender-m":           "oklch(var(--color-gender-m-raw) / <alpha-value>)",
         "gender-f":           "oklch(var(--color-gender-f-raw) / <alpha-value>)",

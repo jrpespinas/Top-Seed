@@ -5,7 +5,6 @@ import type { Court, Player, MatchResult } from "@/types";
 import type { CourtSlotAddress } from "./DashboardClient";
 import { dragEndpointKind, readEndpointPayload, writeEndpointPayload } from "./DashboardClient";
 import { canDrop, type Endpoint } from "@/lib/roster-swap";
-import { StatusBadge } from "@/components/ui/StatusBadge";
 import { SkillBadge } from "@/components/ui/SkillBadge";
 import { GenderIcon } from "@/components/ui/GenderIcon";
 import { ElapsedTimer } from "@/components/ui/ElapsedTimer";
@@ -174,6 +173,7 @@ export function CourtCard({
   variant = "compact",
 }: CourtCardProps) {
   const { id: courtId, number, status, activeMatch } = court;
+  const inUse = status === "IN_USE";
   const [confirmMode, setConfirmMode] = useState<ConfirmMode>(null);
   const [isDragOver, setIsDragOver] = useState(false);
   const [dragOverSlot, setDragOverSlot] = useState<Slot | null>(null);
@@ -236,48 +236,85 @@ export function CourtCard({
         isBlocked && "opacity-40 cursor-not-allowed"
       )}
     >
-      {/* Header */}
-      <div className="flex items-center justify-between px-2.5 pt-2.5 pb-1.5">
-        <div>
-          <span className="text-[13px] font-semibold text-ink">Court {number}</span>
-          {status === "IN_USE" && activeMatch && (
-            <span className="block text-[11px] text-muted leading-tight">
-              {activeMatch.matchType === "DOUBLES" ? "Doubles" : "Singles"}
-            </span>
+      {/* Scoreboard band. Organisers couldn't spot the court number, and the
+          card read as one more white card beside the matchup cards. The band
+          fixes both: the number is the largest thing on the card, and its
+          ground says the status from across the room. Near-black while a match
+          is on, light blue while the court is free, so free courts can be
+          counted at a glance. It uses the ink colour rather than brand blue on
+          purpose: blue stays reserved for things you can press. The violet
+          "In Use" pill this replaced said the same thing less visibly. */}
+      <div
+        className={cn(
+          "flex items-center gap-2.5 px-3 py-2",
+          inUse ? "bg-ink text-bg" : "bg-primary-tint text-primary"
+        )}
+      >
+        <div className="flex flex-col leading-none flex-shrink-0">
+          <span
+            className={cn(
+              "text-[10px] font-semibold uppercase tracking-[0.14em]",
+              inUse ? "text-bg/65" : "text-primary/70"
+            )}
+          >
+            Court
+          </span>
+          <span
+            className={cn(
+              "font-mono font-bold tabular-nums mt-0.5",
+              variant === "wide" ? "text-[32px]" : "text-[26px]"
+            )}
+          >
+            {number}
+          </span>
+        </div>
+
+        <div className="ml-auto flex flex-col items-end gap-0.5 min-w-0 text-right">
+          {inUse && activeMatch ? (
+            <>
+              <ElapsedTimer
+                startedAtISO={activeMatch.startedAt}
+                tone="dark"
+                className={cn(
+                  "font-mono tabular-nums font-medium leading-none",
+                  variant === "wide" ? "text-lg" : "text-[15px]"
+                )}
+              />
+              <span className="text-[11px] text-bg/70 truncate max-w-full">
+                In use · {activeMatch.matchType === "DOUBLES" ? "Doubles" : "Singles"}
+              </span>
+            </>
+          ) : (
+            <span className="text-[11px] font-medium text-muted">Open</span>
           )}
         </div>
 
-        <div className="flex items-center gap-1.5">
-          <StatusBadge status={status === "AVAILABLE" ? "available" : "in-use"} />
-
-          {/* Delete button — hidden during delete confirm (confirm UI is already showing) */}
-          {confirmMode !== "delete" && (
-            status === "IN_USE" ? (
-              <button
-                aria-disabled
-                tabIndex={-1}
-                title="End the match first"
-                className="p-3 text-muted/35 cursor-not-allowed focus-visible:outline-none"
-                aria-label="Cannot delete a court with an active match"
-              >
-                <Trash2 size={13} strokeWidth={1.75} aria-hidden />
-              </button>
-            ) : (
-              <button
-                onClick={() => setConfirmMode("delete")}
-                className="p-3 text-muted hover:text-error transition-colors rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-error/40"
-                aria-label={`Delete Court ${number}`}
-              >
-                <Trash2 size={13} strokeWidth={1.75} aria-hidden />
-              </button>
-            )
-          )}
-        </div>
+        {/* Delete. Hidden during delete confirm, since the confirm UI is showing. */}
+        {confirmMode !== "delete" &&
+          (inUse ? (
+            <button
+              aria-disabled
+              tabIndex={-1}
+              title="End the match first"
+              className="-mr-1 p-2 text-bg/30 cursor-not-allowed focus-visible:outline-none"
+              aria-label="Cannot delete a court with an active match"
+            >
+              <Trash2 size={13} strokeWidth={1.75} aria-hidden />
+            </button>
+          ) : (
+            <button
+              onClick={() => setConfirmMode("delete")}
+              className="-mr-1 p-2 text-primary/60 hover:text-error transition-colors rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-error/40"
+              aria-label={`Delete Court ${number}`}
+            >
+              <Trash2 size={13} strokeWidth={1.75} aria-hidden />
+            </button>
+          ))}
       </div>
 
       {/* Body */}
       {status === "AVAILABLE" ? (
-        <div className="flex-1 flex flex-col justify-end p-2.5 pt-1">
+        <div className="flex-1 flex flex-col justify-end p-2.5">
           {confirmMode === "delete" ? (
             <div className="flex flex-col gap-2">
               <span className="text-xs text-muted">Delete Court {number}?</span>
@@ -314,7 +351,7 @@ export function CourtCard({
           )}
         </div>
       ) : activeMatch ? (
-        <div className="flex-1 flex flex-col px-2.5 pb-2.5 gap-1.5">
+        <div className="flex-1 flex flex-col px-2.5 pt-2.5 pb-2.5 gap-1.5">
           {/* Players. Compact stacks both sides with a "vs" between; wide sets
               them as half-columns across a centre divider, which is what makes
               a match readable at a glance from a few metres away. */}
@@ -385,11 +422,7 @@ export function CourtCard({
 
           {/* Footer — normal or confirmation */}
           {confirmMode === null ? (
-            <div className="flex items-center justify-between pt-1.5 border-t border-border mt-auto gap-2">
-              <ElapsedTimer
-                startedAtISO={activeMatch.startedAt}
-                className="font-mono text-[13px] tabular-nums"
-              />
+            <div className="flex items-center justify-end pt-1.5 border-t border-border mt-auto gap-2">
               <div className="flex gap-1">
                 <button
                   onClick={() => setConfirmMode("end")}
