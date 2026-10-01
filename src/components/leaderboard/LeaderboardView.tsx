@@ -6,20 +6,17 @@ import { cn } from "@/lib/utils";
 import { useMatchLog } from "@/lib/match-log-store";
 import { useSessionOptions, useSessionCheckIns } from "@/lib/session-store";
 import { SessionSelect } from "@/components/ui/SessionSelect";
-import { SkillBadge } from "@/components/ui/SkillBadge";
 import { ExportSheetModal } from "./ExportSheetModal";
-import { Medal, AwardStar, hasMedal } from "./medals";
+import { RankTab, AwardChip, isPodium } from "./broadcast";
 import { computeSessionRecap } from "@/lib/match-history";
 import type { ShareSheetData } from "./ShareSheet";
 import {
   computeLeaderboard,
   selectHonors,
-  championSummary,
   type LeaderboardRow,
   type LeaderboardSort,
   type MatchTypeFilter,
   type Honor,
-  type HonorKind,
 } from "@/lib/leaderboard";
 
 const SORT_OPTIONS: { key: LeaderboardSort; label: string }[] = [
@@ -43,10 +40,9 @@ const SORT_LABELS: Record<LeaderboardSort, string> = {
 };
 
 /**
- * Awards computed per session. Podium winners wear theirs as a tag on their own
- * card; only the rest become separate cards below, so this is a ceiling on
- * people recognised, not on cards rendered. Three because there are five
- * candidate awards — two left the deepest ones permanently unreachable.
+ * Awards computed per session, shown as one row of coloured tags under the
+ * podium. Three because there are five candidate awards, and two left the
+ * deepest ones permanently unreachable.
  */
 const HONOR_SLOTS = 3;
 
@@ -57,7 +53,7 @@ const HONOR_SLOTS = 3;
  */
 const STREAK_CHIP_MINIMUM = 3;
 
-/** Longest of the crown animations (the numeral flare); classes come off after. */
+/** Longest of the crown animations (the gold tab's flare); classes come off after. */
 const CROWN_TOTAL_MS = 900;
 const CROWN_STORAGE_PREFIX = "topseed:crowned:";
 
@@ -145,274 +141,139 @@ function record(row: LeaderboardRow): string {
 }
 
 /**
- * The apex.
+ * The podium, in the Broadcast style.
  *
- * Three tiers of recognition in one composition, each a visibly different
- * object rather than the same card at three sizes: the champion on a filled
- * brand ground, runners-up outlined in the same blue, honors neutral and
- * quietest. Five people are named; the first one holds the centre.
+ * The earlier version was a stepped three-card composition. On a wide screen
+ * it left large empty areas above 2nd and 3rd and spread the award strip's
+ * name and detail ~1,600px apart. The Broadcast layout stacks instead: one
+ * full-width champion bar, the runners-up as a pair of bars beneath it, then
+ * every award as a coloured tag. Nothing on the page is a void.
  *
- * Ranks deliberately do NOT use gold / silver / bronze. That ladder is already
- * spoken for — `SkillBadge` runs Bronze → Platinum for Casual → Advanced, and
- * those badges sit inside these very slots. A gold rank-1 frame beside a gold
- * Intermediate badge would be one visual system saying two unrelated things.
- * Hierarchy runs on the brand blue, size, and position instead.
+ * Colour goes where people look for it: gold, silver and bronze rank tabs for
+ * the top three, and one colour per award. That reverses an earlier rule that
+ * podium frames must never use the metals, which existed only because skill
+ * badges (also metals) sat inside the podium cards. The podium no longer shows
+ * skill badges, so a gold tab can only mean 1st place here.
  */
 function Apex({
   champions,
   runnersUp,
-  honorByPlayer,
-  standaloneHonors,
-  championHoldsUpset,
-  championHoldsStreak,
+  honors,
   reveal,
   sort,
 }: {
   champions: LeaderboardRow[];
   runnersUp: LeaderboardRow[];
-  honorByPlayer: Map<string, Honor>;
-  standaloneHonors: Honor[];
-  championHoldsUpset: boolean;
-  championHoldsStreak: boolean;
+  honors: Honor[];
   /** A new name is on top. See `useCrownReveal`. */
   reveal: boolean;
   sort: LeaderboardSort;
 }) {
   const lead = champions[0];
-  const championHonor = champions.length === 1 ? honorByPlayer.get(lead.playerId) ?? null : null;
-  const summary =
-    champions.length === 1
-      ? championSummary(lead, {
-          suppressUpset: championHoldsUpset,
-          suppressStreak: championHoldsStreak,
-        })
-      : null;
   const names =
     champions.length <= 2
       ? champions.map((c) => c.name).join(" & ")
       : `${champions.length}-way tie`;
 
   return (
-    <section
-      className="px-4 sm:px-6 pt-5 pb-6 border-b border-border"
-      aria-label="Session highlights"
-    >
-      <div className="grid grid-cols-2 gap-3 items-end md:grid-cols-[1fr_1.5fr_1fr]">
-        {/* Champion — full width on mobile, centre column on desktop. */}
+    <section className="px-4 sm:px-6 pt-4 pb-4 border-b border-border" aria-label="Session highlights">
+      {/* Champion bar. `isolate overflow-hidden` keeps the crown wipe inside the
+          bar's own slanted shape. */}
+      <div className="relative isolate overflow-hidden bc-slant [--slant:24px] bg-primary text-bg">
+        {reveal && (
+          <span
+            aria-hidden
+            // Resting state is fully retreated, so an unplayed animation
+            // leaves a finished bar rather than a blank one.
+            style={{ clipPath: "inset(0 0 0 100%)" }}
+            className="absolute inset-0 z-10 bg-primary-tint animate-crown-wipe motion-reduce:animate-none"
+          />
+        )}
         <div
           className={cn(
-            "col-span-2 md:col-span-1 md:order-2",
-            // `isolate` so the sheet's stacking stays inside this card, and
-            // `overflow-hidden` so the wipe is clipped to the rounded corners.
-            "relative isolate overflow-hidden",
-            "rounded-lg bg-primary text-bg px-5 py-5 sm:py-6 flex flex-col"
+            "relative z-20 flex items-stretch gap-3 sm:gap-4 pr-9 sm:pr-11",
+            reveal && "animate-crown-content motion-reduce:animate-none"
           )}
         >
-          {reveal && (
-            <span
-              aria-hidden
-              // Resting state is fully retreated, so an unplayed animation
-              // leaves a finished blue card rather than a blank white one.
-              style={{ clipPath: "inset(0 0 0 100%)" }}
-              // Matches the runners-up ground, not plain white: the wipe's
-              // premise is that the card starts as one of them and the brand
-              // colour arrives. A white sheet would now start it as nothing.
-              className="absolute inset-0 z-10 bg-primary-tint animate-crown-wipe motion-reduce:animate-none"
-            />
-          )}
-          <div
+          <RankTab
+            rank={1}
             className={cn(
-              "relative z-20 flex flex-col",
-              reveal && "animate-crown-content motion-reduce:animate-none"
+              "[--slant:12px] text-[40px] sm:text-[48px] pl-4 pr-6 sm:pl-5 sm:pr-7",
+              reveal && "animate-tab-flare motion-reduce:animate-none"
             )}
-          >
-            <div className="flex items-start gap-3">
-              <Medal
-                rank={1}
-                className={cn(
-                  "crown-medal inline-block text-4xl sm:text-5xl",
-                  reveal && "animate-medal-flare motion-reduce:animate-none"
-                )}
-              />
-              {champions.length === 1 && (
-                <span className="ml-auto flex-shrink-0">
-                  <SkillBadge level={lead.skillLevel} compact />
-                </span>
-              )}
-            </div>
-
-            <h2 className="mt-3 text-2xl sm:text-3xl font-bold tracking-tight text-balance break-words">
+          />
+          <div className="min-w-0 py-3 sm:py-3.5 self-center">
+            <h2 className="font-display italic font-extrabold uppercase leading-none text-[26px] sm:text-[34px] truncate">
               {names}
             </h2>
-
-            <p className="mt-1.5 font-mono text-sm tabular-nums text-bg/80">
-              <span className="text-lg font-semibold text-bg">{lead.points}</span> pts
-              <span className="text-bg/40"> · </span>
-              {record(lead)}
-              <span className="text-bg/40"> · </span>
-              {Math.round(lead.form * 100)}% form
+            <p className="font-display font-bold uppercase tracking-[0.06em] text-[13px] text-bg/75 mt-1.5">
+              {record(lead)} · {Math.round(lead.form * 100)}% form
+              {sort !== "points" && <> · Leading on {SORT_LABELS[sort]}</>}
             </p>
-
-            {summary && <p className="mt-2 text-sm text-bg/80 text-pretty">{summary}</p>}
-
-            {championHonor && (
-              <div className="mt-3 flex">
-                <AwardTag honor={championHonor} onBrand />
-              </div>
-            )}
-
-            {sort !== "points" && (
-              <p className="mt-2 text-[11px] text-bg/60">Leading on {SORT_LABELS[sort]}</p>
-            )}
+          </div>
+          <div className="ml-auto self-center text-right leading-none flex-shrink-0">
+            <span className="font-display italic font-extrabold text-[40px] sm:text-[48px] text-podium-gold tabular-nums">
+              {lead.points}
+            </span>
+            <span className="block font-display font-bold text-[11px] tracking-[0.14em] text-bg/70 mt-0.5">
+              PTS
+            </span>
           </div>
         </div>
-
-        {runnersUp[0] && (
-          <RunnerUp
-            row={runnersUp[0]}
-            honor={honorByPlayer.get(runnersUp[0].playerId) ?? null}
-            reveal={reveal}
-            className="md:order-1"
-          />
-        )}
-        {runnersUp[1] && (
-          <RunnerUp
-            row={runnersUp[1]}
-            honor={honorByPlayer.get(runnersUp[1].playerId) ?? null}
-            reveal={reveal}
-            className="md:order-3"
-          />
-        )}
       </div>
 
-      {/* Only awards won from outside the top three. When the podium took them
-          all, this renders nothing rather than an empty row. */}
-      {standaloneHonors.length > 0 && (
-        <div
-          className={cn(
-            "mt-3 grid gap-3 grid-cols-1",
-            standaloneHonors.length === 2 && "sm:grid-cols-2",
-            standaloneHonors.length >= 3 && "sm:grid-cols-2 lg:grid-cols-3"
-          )}
-        >
-          {standaloneHonors.map((honor) => (
-            <HonorSlot key={honor.kind} honor={honor} />
+      {runnersUp.length > 0 && (
+        // `items-end` plus extra padding on 2nd keeps the podium step: second
+        // stands a little taller than third.
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-2 sm:items-end">
+          {runnersUp.map((row) => (
+            <RunnerBar key={row.playerId} row={row} reveal={reveal} />
           ))}
         </div>
+      )}
+
+      {/* Every award as one coloured tag naming its winner, including awards
+          won by the podium. One row instead of tags on cards plus separate
+          award cards, which is most of the space this layout saves. */}
+      {honors.length > 0 && (
+        <ul className="flex flex-wrap gap-1.5 mt-2.5" aria-label="Awards">
+          {honors.map((honor) => (
+            <li key={honor.kind}>
+              <AwardChip honor={honor} className="text-[13px]" />
+            </li>
+          ))}
+        </ul>
       )}
     </section>
   );
 }
 
-function RunnerUp({
-  row,
-  honor,
-  reveal,
-  className,
-}: {
-  row: LeaderboardRow;
-  honor: Honor | null;
-  /** Rises only when the champion is being crowned — see `useCrownReveal`. */
-  reveal: boolean;
-  className?: string;
-}) {
-  // A real podium steps down: the champion towers, second stands above third.
-  // Expressed as padding rather than a fixed height, so the extra room reads
-  // as a roomier card rather than a card with a gap in it — and so a long name
-  // wrapping to two lines still grows the box instead of overflowing it.
+function RunnerBar({ row, reveal }: { row: LeaderboardRow; reveal: boolean }) {
   const isSecond = row.rank === 2;
   return (
     <div
       className={cn(
-        "rounded-lg bg-primary-tint border border-primary/20 flex flex-col",
-        isSecond ? "px-4 py-5" : "px-3.5 py-3.5",
-        reveal && "animate-apex-rise motion-reduce:animate-none",
-        className
+        "bc-slant [--slant:16px] bg-primary-tint text-navy-deep flex items-stretch gap-3 pr-7",
+        reveal && "animate-apex-rise motion-reduce:animate-none"
       )}
     >
-      <div className="flex items-start gap-2">
-        {hasMedal(row.rank) ? (
-          <Medal rank={row.rank} className={isSecond ? "text-[28px]" : "text-[22px]"} />
-        ) : (
-          <span className="font-mono font-bold leading-none text-primary/70 tabular-nums text-xl">
-            {row.rank}
-          </span>
-        )}
-        <span className="ml-auto flex-shrink-0">
-          <SkillBadge level={row.skillLevel} compact dense />
-        </span>
+      <RankTab rank={row.rank} className="[--slant:10px] text-[26px] pl-3 pr-5" />
+      <div className={cn("min-w-0 self-center", isSecond ? "py-3" : "py-2")}>
+        <p className="font-display italic font-extrabold uppercase leading-none text-[20px] truncate">
+          {row.name}
+        </p>
+        <p className="font-display font-bold uppercase tracking-[0.06em] text-[11px] text-muted mt-1">
+          {record(row)}
+        </p>
       </div>
-      <p className="mt-2 text-sm font-semibold text-ink truncate">{row.name}</p>
-      <p className="mt-0.5 font-mono text-xs tabular-nums text-muted">
-        <span className="text-ink font-semibold">{row.points}</span> pts
-        <span className="text-muted/50"> · </span>
-        {record(row)}
-      </p>
-      {honor && (
-        <div className="mt-2 flex">
-          <AwardTag honor={honor} />
-        </div>
-      )}
-    </div>
-  );
-}
-
-/**
- * An award worn on a podium card, rather than given its own card below.
- *
- * Compact by necessity — it rides inside a card that already carries a rank,
- * a name, a points total and a record — so it shows the award's name and lets
- * the tooltip carry the detail. Standalone `HonorSlot` cards, which have the
- * room, print both.
- */
-function AwardTag({ honor, onBrand = false }: { honor: Honor; onBrand?: boolean }) {
-  return (
-    <span
-      className={cn(
-        "inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[11px] font-semibold min-w-0",
-        onBrand
-          ? "bg-bg/15 text-bg"
-          // Sits on the runners-up tint now, so a neutral chip would read as
-          // a grey smudge on blue. White ground, brand text.
-          : "bg-surface text-primary border border-primary/20"
-      )}
-      title={`${honor.label} — ${honor.detail}`}
-    >
-      <AwardStar className="text-[11px] flex-shrink-0" />
-      <span className="truncate">{honor.label}</span>
-      <span className="sr-only"> — {honor.detail}</span>
-    </span>
-  );
-}
-
-/**
- * Quietest of the three tiers on purpose. An honor recognises a moment, not a
- * placing — giving it podium weight would flatten the hierarchy the apex is
- * built to express.
- */
-function HonorSlot({ honor }: { honor: Honor }) {
-  return (
-    <div className="rounded-lg bg-primary-tint-soft border border-primary/15 px-3.5 py-3 flex items-center gap-3">
-      {/* White tile, not another tint: stacking two washes of the same hue
-          muddies both. A cut-out reads as a chip and keeps the icon crisp. */}
-      <span className="flex-shrink-0 w-8 h-8 rounded-md bg-surface flex items-center justify-center">
-        <AwardStar className="text-base" />
+      <span className="ml-auto self-center font-display italic font-extrabold text-[26px] tabular-nums leading-none">
+        {row.points}
       </span>
-      <div className="min-w-0 flex-1">
-        <p className="text-[11px] font-medium text-muted uppercase tracking-wide">{honor.label}</p>
-        <p className="text-sm font-semibold text-ink truncate">{honor.name}</p>
-      </div>
-      <p
-        className="text-xs text-muted text-right flex-shrink-0 max-w-[45%] truncate"
-        title={honor.detail}
-      >
-        {honor.detail}
-      </p>
     </div>
   );
 }
 
-/** Numeral styling for ranks 4 and below. The podium places show a medal instead. */
+/** Numeral styling for ranks 4 and below. The top three show a metal rank tab. */
 const RANK_NUMERAL = "text-sm font-medium text-muted tabular-nums";
 
 export function LeaderboardView() {
@@ -449,32 +310,10 @@ export function LeaderboardView() {
   const apex = useMemo(() => {
     if (rankedRows.length === 0) return null;
     const podium = rankedRows.slice(0, 3);
-    const champions = podium.filter((r) => r.rank === 1);
-    const runnersUp = podium.filter((r) => r.rank !== 1);
-    const honors = selectHonors(rankedRows, HONOR_SLOTS);
-
-    // An award won by someone already on the podium belongs ON their card, not
-    // repeated as a separate one below it — the podium card is where that
-    // person is being recognised, and a second card carrying the same name
-    // reads as a duplicate rather than a second honour. Only awards won from
-    // outside the top three earn their own card, and when there are none the
-    // strip is not rendered at all rather than left as an empty row.
-    const podiumIds = new Set(podium.map((r) => r.playerId));
-    const honorByPlayer = new Map(honors.map((h) => [h.playerId, h]));
-    const standaloneHonors = honors.filter((h) => !podiumIds.has(h.playerId));
-
-    // The champion's summary line must not narrate a fact their own award tag
-    // is already showing a few pixels below it.
-    const championHolds = (kind: HonorKind) =>
-      champions.some((c) => honorByPlayer.get(c.playerId)?.kind === kind);
-
     return {
-      champions,
-      runnersUp,
-      honorByPlayer,
-      standaloneHonors,
-      championHoldsUpset: championHolds("upset"),
-      championHoldsStreak: championHolds("streak"),
+      champions: podium.filter((r) => r.rank === 1),
+      runnersUp: podium.filter((r) => r.rank !== 1),
+      honors: selectHonors(rankedRows, HONOR_SLOTS),
     };
   }, [rankedRows]);
 
@@ -605,14 +444,15 @@ export function LeaderboardView() {
         </div>
       </div>
 
+      {/* Content stops at 1,040px. Full-bleed, a wide screen put a player's
+          points ~1,600px from their name, and the podium filled the extra
+          width with empty space. */}
+      <div className="w-full max-w-[1040px] mx-auto">
       {showApex && apex && (
         <Apex
           champions={apex.champions}
           runnersUp={apex.runnersUp}
-          honorByPlayer={apex.honorByPlayer}
-          standaloneHonors={apex.standaloneHonors}
-          championHoldsUpset={apex.championHoldsUpset}
-          championHoldsStreak={apex.championHoldsStreak}
+          honors={apex.honors}
           reveal={crownReveal}
           sort={sort}
         />
@@ -634,26 +474,26 @@ export function LeaderboardView() {
               notch height on ones that have it — matching the wrapper above. */}
           <thead className="sticky top-[calc(161px+env(safe-area-inset-top))] sm:top-[calc(117px+env(safe-area-inset-top))] z-[var(--z-sticky)] bg-bg">
             <tr className="border-b border-border">
-              <th className="text-left text-xs font-medium text-muted pl-4 sm:pl-6 pr-3 py-2.5 w-[52px]">
+              <th className="text-left text-xs font-medium text-muted pl-4 sm:pl-6 pr-3 py-2 w-[52px]">
                 Rank
               </th>
-              <th className="text-left text-xs font-medium text-muted px-3 py-2.5">Player</th>
-              <th className="text-right text-xs font-medium text-muted px-3 py-2.5 w-[76px]">
+              <th className="text-left text-xs font-medium text-muted px-3 py-2">Player</th>
+              <th className="text-right text-xs font-medium text-muted px-3 py-2 w-[76px]">
                 <abbr title="Wins–Draws–Losses" className="no-underline">
                   W–D–L
                 </abbr>
               </th>
-              <th className="hidden md:table-cell text-right text-xs font-medium text-muted px-3 py-2.5 w-[70px]">
+              <th className="hidden md:table-cell text-right text-xs font-medium text-muted px-3 py-2 w-[70px]">
                 Matches
               </th>
               <th
-                className="hidden sm:table-cell text-right text-xs font-medium text-muted px-3 py-2.5 w-[70px]"
+                className="hidden sm:table-cell text-right text-xs font-medium text-muted px-3 py-2 w-[70px]"
                 title="Win share with two pseudo-matches added — everyone starts the day 1–1, so an unproven record can't out-rank a real one"
               >
                 Form
               </th>
               <th
-                className="text-right text-xs font-medium text-muted pl-3 pr-4 sm:pr-6 py-2.5 w-[72px]"
+                className="text-right text-xs font-medium text-muted pl-3 pr-4 sm:pr-6 py-2 w-[72px]"
                 title="3 points a win, 1 a draw, plus a bonus for beating stronger opposition"
               >
                 Points
@@ -666,14 +506,14 @@ export function LeaderboardView() {
                 key={row.playerId}
                 className="border-b border-border/50 hover:bg-surface-elevated/40 transition-colors"
               >
-                <td className="pl-4 sm:pl-6 pr-3 py-3">
-                  {hasMedal(row.rank) ? (
-                    <Medal rank={row.rank} className="text-lg" />
+                <td className="pl-4 sm:pl-6 pr-3 py-2">
+                  {isPodium(row.rank) ? (
+                    <RankTab rank={row.rank} className="[--slant:5px] w-7 h-5 pr-1 text-[15px]" />
                   ) : (
                     <span className={RANK_NUMERAL}>{row.rank}</span>
                   )}
                 </td>
-                <td className="px-3 py-3 min-w-[140px]">
+                <td className="px-3 py-2 min-w-[140px]">
                   <div className="flex items-center gap-2 min-w-0">
                     <span className="text-sm font-medium text-ink truncate">{row.name}</span>
                     {/* The narrative the old eight columns had no room for.
@@ -681,35 +521,35 @@ export function LeaderboardView() {
                         them reads as ordinary rather than as missing data. */}
                     {row.currentStreak >= STREAK_CHIP_MINIMUM && (
                       <span
-                        className="flex-shrink-0 inline-flex items-center gap-0.5 font-mono text-[10px] font-semibold tabular-nums text-primary bg-primary/[0.08] border border-primary/20 rounded-sm px-1 py-0.5"
+                        className="flex-shrink-0 bc-slant [--slant:4px] inline-flex items-center gap-0.5 font-display font-bold text-[12px] leading-none tabular-nums text-ink bg-award-fire pl-1 pr-2 py-0.5"
                         title={`On a ${row.currentStreak}-match winning streak`}
                       >
-                        <Flame size={9} strokeWidth={2.5} aria-hidden />W{row.currentStreak}
+                        <Flame size={10} strokeWidth={2.5} aria-hidden />W{row.currentStreak}
                       </span>
                     )}
                     {row.bestUpset && (
                       <span
-                        className="flex-shrink-0 inline-flex items-center text-muted"
-                        title={`Beat ${row.bestUpset.opponentNames.join(" & ")} — stronger opposition`}
+                        className="flex-shrink-0 bc-slant [--slant:4px] inline-flex items-center text-ink bg-award-giant pl-1 pr-2 py-0.5"
+                        title={`Beat ${row.bestUpset.opponentNames.join(" & ")}, stronger opposition`}
                         aria-label="Beat stronger opposition"
                       >
-                        <Zap size={11} strokeWidth={2.5} aria-hidden />
+                        <Zap size={10} strokeWidth={2.5} aria-hidden />
                       </span>
                     )}
                   </div>
                 </td>
-                <td className="px-3 py-3 text-right">
-                  <span className="font-mono text-sm tabular-nums text-muted">{record(row)}</span>
+                <td className="px-3 py-2 text-right">
+                  <span className="font-mono text-sm tabular-nums text-muted whitespace-nowrap">{record(row)}</span>
                 </td>
-                <td className="hidden md:table-cell px-3 py-3 text-right">
+                <td className="hidden md:table-cell px-3 py-2 text-right">
                   <span className="font-mono text-sm tabular-nums text-muted">{row.matchesPlayed}</span>
                 </td>
-                <td className="hidden sm:table-cell px-3 py-3 text-right">
+                <td className="hidden sm:table-cell px-3 py-2 text-right">
                   <span className="font-mono text-sm tabular-nums text-muted">
                     {Math.round(row.form * 100)}%
                   </span>
                 </td>
-                <td className="pl-3 pr-4 sm:pr-6 py-3 text-right">
+                <td className="pl-3 pr-4 sm:pr-6 py-2 text-right">
                   <span
                     className="font-mono text-sm font-semibold tabular-nums text-ink"
                     title={
@@ -732,6 +572,7 @@ export function LeaderboardView() {
           onClearSearch={() => setSearch("")}
         />
       )}
+      </div>
 
       <ExportSheetModal
         isOpen={isExportOpen}

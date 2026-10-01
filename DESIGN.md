@@ -164,6 +164,8 @@ A restrained light palette anchored by one deep blue accent. Neutrals are white 
 
 **The Monospace Conviction Rule.** Every number that carries meaning — a queue position, a win rate, a payment amount, a match count — is set in JetBrains Mono. Sans numerals are for incidental text only (e.g., "3 players"). If the number is data, it gets the data voice. A stat in Space Grotesk is a bug.
 
+**The Broadcast exception: a third voice, on results only.** Barlow Condensed (600/700/800, roman and italic) is the `font-display` family, and it appears in exactly four places: the Leaderboard apex, award tags, the A4 share sheet and the Instagram story. It is the face of TV sports graphics, condensed so a long name fits a bar and set in italic capitals so the result reads as an announcement. Podium points are set in it too, which bends the Monospace Conviction Rule on purpose: on a broadcast graphic the condensed numeral *is* the scoreboard. The field table underneath keeps JetBrains Mono, because there the numbers are data to compare down a column rather than a result to announce. Never use the display face on an operational page; it would make every screen shout.
+
 ## 4. Elevation
 
 Top Seed is flat by default. Tonal separation across the dark scale (Void Black → Charcoal Panel → Lifted Surface) provides all the depth the interface needs. No box-shadows on cards, list rows, or panels at rest.
@@ -436,37 +438,41 @@ The navigable table row on `/sessions` — a different interaction model from Pl
 
 ### Leaderboard Apex
 
-The one surface that trades operational restraint for a result worth screenshotting. Every other page is used mid-session — standing, under gym lights, where restraint is load-bearing. This one is read *afterwards*, and Design Principle 4 already licenses the difference: dense during a session, spacious between them. Color strategy is **Committed at the apex, Restrained below** — the champion block carries the brand blue as a real surface, the table beneath returns to normal.
+The one surface that trades operational restraint for a result worth screenshotting, and since the Broadcast redesign, worth posting. Every other page is used mid-session, standing under gym lights, where restraint is load-bearing. This one is read *afterwards*, and Design Principle 4 already licenses the difference. It was redesigned because the earlier version was too spaced out to read as a result and nothing it exported fit an Instagram story.
 
-**Three tiers, three different objects** — not one card at three sizes, which would be an identical-card grid with extra steps:
+**The look borrows from TV sports graphics.** Bars, rank tabs and award tags have their right edge cut on a diagonal (`.bc-slant`, the cut set by `--slant`). Names are condensed italic capitals in the display face. The pieces live in `broadcast.tsx` (`RankTab`, `AwardChip`, `AWARD_LOOK`) and are shared by the page, the A4 sheet and the story, so the three can't drift apart.
 
 | Tier | Treatment |
 |---|---|
-| Champion | Filled `bg-primary`, `text-bg`, centre column at `md:` and full width below. Largest type on the page. |
-| Runners-up | `bg-primary-tint`, rank numeral in `text-primary/70`, about a third the presence. **Stepped**: second is taller than third, as a real podium is. |
-| Honors | `bg-surface border-border`, neutral icon in a `surface-elevated` tile, quietest of the three. |
+| Champion | One full-width slanted bar in `bg-primary`: a gold rank tab, the name at 26/34px, record and form, and the points in `text-podium-gold`. |
+| Runners-up | Slanted bars in `bg-primary-tint` with `text-navy-deep`, side by side from `sm:`, with silver and bronze tabs. **Stepped**: second is taller than third, as a real podium is. |
+| Awards | One row of coloured tags, every award including those won on the podium. |
 
-**Colour intensity encodes placing.** Three grounds stepping down from the champion — `bg-primary` (L 0.317 / C 0.202), `bg-primary-tint` on the runners-up (0.945 / 0.030), `bg-primary-tint-soft` on the awards (0.972 / 0.016), over a page at 0.995 / 0.002. Lightness descends and chroma climbs together as the placings go up, so the two channels agree and the blue *is* the hierarchy rather than decoration laid over it.
+**Colour goes to the two things people look for: placing and awards.** Navy carries the bars. Gold, silver and bronze go on the *rank tabs* of the top three (`podium-gold`, `podium-silver`, `podium-bronze`), on the podium and in the field table. Each award has its own colour and icon, like an achievement in a game, so over a few sessions people learn which award someone won from the colour alone:
 
-They are real tokens, not alpha over white. Stacked transparency makes contrast unpredictable and is the usual sign of an incomplete palette; both tints clear 5.8:1 for muted text and 16:1 for ink. The awards' icon tile is white rather than a third tint — stacking two washes of one hue muddies both, where a cut-out reads as a chip and keeps the icon crisp. For the same reason an award tag riding a runners-up card is a white chip with brand text, since a neutral one would read as a grey smudge on blue.
+| Award | Token | Icon |
+|---|---|---|
+| On Fire | `award-fire` (orange) | 🔥 |
+| Giant Killer | `award-giant` (red) | ⚡ |
+| The Android | `award-android` (cyan) | ⏱️ |
+| The Carry | `award-carry` (green) | 🤝 |
+| The Duo | `award-duo` (violet) | 👥 |
 
-The 60-row field below stays neutral. The apex is the coloured object; a table that joined it would dissolve the boundary the whole layout is built on.
+Award tags carry ink text and the gold tab carries navy, all at 7:1 or better. The row chips in the field use the same colours: the `W{n}` streak chip in fire orange and the upset bolt in giant red.
 
-**Places 1–2–3 wear medals (🥇 🥈 🥉); their frames never go gold, silver or bronze.** The metals ladder is already taken: `SkillBadge` runs Bronze → Silver → Gold → Platinum for Casual → Beginner → Intermediate → Advanced, and those badges render *inside* these slots. A gold rank-1 frame would read as a tier, so card colour and hierarchy stay on the brand blue, size and position. An emoji medal is the exception because it reads as a medal, which means placing. The medal replaced the rank numeral on the podium and on ranks 1–3 in the field table, via the shared `medals.tsx`, so the page and the export sheet can't drift. Ranks 4 and down stay as plain muted numerals, which keeps the medals scarce enough to mean something.
+**This reverses the old "frames never go gold" rule, and that is why the podium dropped its skill badges.** Gold, silver and bronze were kept off the podium because `SkillBadge` already uses metals for skill tiers, and a gold frame beside a gold *Int* badge would read as a tier. The Broadcast podium shows no skill badges at all, so the metals mean placing and nothing else. The field table keeps its skill badges, where the metal tabs on ranks 1–3 are small and sit in their own column.
 
-The one residual clash is a 🥇 sitting near a gold *Int* badge in the same card. It's accepted: the medal's shape does the separating that a flat gold fill couldn't.
+**Award colours are allowed on results surfaces only.** Orange, red and green sit close to the warning, error and success status colours. On the leaderboard, the share sheet and the story there are no statuses to confuse them with. Anywhere else they would read as alerts.
 
-**Awards share a single ⭐ emblem**, replacing the per-kind icons (bolt, flame and so on). Medals say *placing* and the star says *special award*, so the two families read as separate at a glance. The award's name already says which kind it is.
+**One award row instead of tags on cards plus separate award cards.** Most of the space the redesign saves comes from this. An award recognises a moment, not a placing, so the awards still sit below the podium rather than competing with it. There are five named awards: **Giant Killer**, **On Fire**, **The Carry**, **The Android** and **The Duo**. They are ranked by how far clear of the next player the leader is, not by a fixed priority list, which used to make a one-rung upset outrank a six-match streak purely because of position.
 
-**Awards are the third tier for a reason.** They recognise a moment, not a placing; giving one podium weight would flatten the hierarchy the apex exists to express. Five named awards — **Giant Killer**, **On Fire**, **The Carry**, **The Android**, **The Duo** — ranked by how far clear of the next player the leader is, not by a fixed priority list. That list made a one-rung upset outrank a six-match streak purely because of position.
+**Density.** The apex and table share a centred `max-w-[1040px]` column, and table rows use `py-2`. The page now shows the podium, every award and the first rows of the field without scrolling on a laptop.
 
-**A podium winner wears their award as a tag on their own card**, not as a separate card below: the podium card is already where that person is being recognised, and a second card with the same name reads as a duplicate. Only awards won from outside the top three become cards, and when there are none the strip is not rendered at all rather than left as an empty row. One award per player, and the champion's summary line stays silent about whatever their own tag already says.
+**Motion: the crowning.** A sheet in the runners-up's tint lies over the champion's blue bar and retreats to the right (`crown-wipe`, 520ms, `ease-out-expo`), so the bar starts as one of them and the brand colour *arrives*. `isolate overflow-hidden` keeps the wipe inside the bar's slanted shape. Runners-up rise beneath it (`apex-rise`, 320ms), the champion's content fades in behind the sheet (`crown-content`, 700ms), and the gold tab flares, scaling to 1.08 and brightening before settling (`tab-flare`, 900ms, ending exactly at rest).
 
-**Motion — the crowning.** A sheet in the runners-up's own tint lies over the champion's blue ground and retreats to the right (`crown-wipe`, 520ms, `ease-out-expo`), so the card literally starts as one of them and the brand colour *arrives*. The blue is the only thing separating first place from second, which makes its arrival the one gesture here that carries meaning rather than decorating a box that was already there. Runners-up rise beneath it (`apex-rise`, 320ms); the champion's content fades in behind the sheet (`crown-content`, 700ms).
+**It plays only when the top of the table changes**, remembered per session in `localStorage`. The animation is worth having *because* it is rare: an organiser opens this page repeatedly across a night, and a celebration that replays on every mount stops reading as one by the third viewing. Gating it on a real change turns the motion into information ("the lead changed"), which is the only kind of motion the product register asks for. Storage is read in an effect, never during render, and wrapped: it throws outright in some privacy modes, where the correct fallback is a leaderboard that simply doesn't animate.
 
-**It plays only when the top of the table changes**, remembered per session in `localStorage`. The animation is worth having *because* it is rare: an organiser opens this page repeatedly across a night, and a celebration that replays on every mount stops reading as one by the third viewing. Gating it on a real change turns the motion into information — "the lead changed" — which is the only kind of motion the product register asks for. Storage is read in an effect, never during render, and wrapped: it throws outright in some privacy modes, where the correct fallback is a leaderboard that simply doesn't animate.
-
-**The champion's medal flares and settles** (`medal-flare`, 900ms): it scales up and blooms a near-white halo, then settles at full size with a faint permanent one. It replaced a glow on the "1" numeral, which rested at 55% opacity. That suits a numeral but would leave a colour emoji looking washed out. The flare uses `filter: drop-shadow` rather than `text-shadow`, because a filter follows the glyph's painted shape while a text-shadow on a colour emoji renders as a blurred grey copy of it. A continuous pulse was rejected for the same reason as before: this page is opened repeatedly across a night. `.crown-medal` carries the resting halo, which is also the final frame, so nothing needs `fill-mode`. Emoji get an explicit colour-font stack (`.emoji`) so they can't fall back to a monochrome glyph in a web font.
+Emoji get an explicit colour-font stack (`.emoji`) so they can't fall back to a monochrome glyph in a web font.
 
 Two rules hold the whole thing up:
 
@@ -483,21 +489,31 @@ The printable / postable artifact (`ShareSheet.tsx`), reached from an Export but
 
 **Fixed at 794px — A4 at 96dpi — not fluid.** That single decision is what lets one component be two artifacts: the print path lands edge-correct on A4 and Letter, and `html-to-image` captures the same node at 2× for a chat-legible PNG. A responsive sheet would need testing at every width and would still capture at whatever width the viewport happened to be.
 
-**The same palette as the live apex.** Filled `bg-primary` champion, `bg-primary-tint` runners-up, `bg-primary-tint-soft` awards. The sheet was built white-with-blue-rules first to spare a gym printer's cartridge; that was overruled, on the grounds that a sheet which doesn't look like the app it came from is a worse outcome than an expensive print — and the PNG, which costs nothing to render in colour, is the artifact people actually see.
+**Built from the same Broadcast pieces as the live apex**: the slanted champion bar, metal rank tabs, the coloured award row, and the display face for the masthead. The sheet was built white-with-blue-rules first to spare a gym printer's cartridge. That was overruled, on the grounds that a sheet which doesn't look like the app it came from is a worse outcome than an expensive print, and the PNG, which costs nothing to render in colour, is the artifact people actually see.
 
 **That carries a hard dependency:** browsers drop background colours when printing unless told otherwise, so the print block sets `print-color-adjust: exact` on the `[data-print-root]` subtree only. Without it the filled champion prints as bare paper with near-white text on it — invisible, and strictly worse than never having filled it. Scoped to the sheet so nothing else in the app starts printing its backgrounds.
 
-Two things the sheet still declines to copy: the numeral's glow, because a text-shadow prints as a grey smudge and captures as one, and filled `SkillBadge` metals, which render as bordered mono text instead.
+Like the podium it copies, the sheet shows no skill badges, so its gold, silver and bronze mean placing only. `clip-path` survives both print and capture, so the slants come through in both.
 
 **One component, two audiences.** `data-screen-only` and `data-print-only` hide different halves: screen and PNG carry the top ten, the printed sheet continues onto a second page with the full field. A chat thumbnail with sixty rows is unreadable; a noticeboard sheet missing fifty people is useless. Splitting inside one component means the two can't drift.
 
 **A scoring footnote, not decoration.** The sheet is posted to people who weren't looking over the organiser's shoulder — "why is Mira above Karen" is the first reply in the thread, so one line answers it before it's asked.
 
-**Preview, then choose.** The Export button opens the sheet itself with Download image and Print beneath, not a format dropdown. The sheet must be in the DOM to be captured at all, so previewing costs nothing, and it turns the format question from a blind decision into a consequence of seeing the thing.
+**Preview, then choose.** The Export button opens a live preview with a **Story / Sheet** toggle above it and the outputs beneath. Story is the default, because Instagram is where most of these end up. Print appears only for Sheet. The chosen layout must be in the DOM to be captured at all, so previewing costs nothing, and seeing it beats choosing blind.
 
 **Print isolation is scoped with `:has()`.** `body:has([data-print-root]) * { visibility: hidden }` engages only while a sheet is open; unscoped, printing any other page in the app would hide everything and reveal nothing — a blank sheet of paper. `visibility` rather than `display` because the sheet is portaled inside a modal, and collapsing its ancestors would take it with them.
 
 **The capture's real failure mode is fonts.** Cloned nodes don't inherit the document's loaded `@font-face` rules, so a capture without `getFontEmbedCSS` renders the whole sheet in the fallback stack. It fails silently and looks almost right, which is what makes it the standard way this feature ships broken.
+
+### Instagram Story
+
+`StoryCard.tsx`: a 9:16 story of the session result, in the same Broadcast style on a `navy-deep` ground with faint diagonal pinstripes.
+
+**Laid out at 360 × 640 and captured at `pixelRatio: 3`**, so the download is exactly 1080 × 1920 and the layout is written in sizes that are easy to reason about. Width and height are both constants passed to `toPng`, never measured, for the same reason as the sheet. Files are named `<session>-<date>-story.png`.
+
+**Content stays inside Instagram's safe area.** The top 13% sits under the profile bar and the bottom 18% under the reply box, so only background goes there. Inside it, from the top: a meta line (session, date, player count), "Session Results" in display italic 800, a white champion bar with a gold tab, the next places as navy bars, the award tags, and the TOP SEED mark (the slot a club logo will take).
+
+**A story isn't a resized sheet.** It is read as a phone-sized thumbnail, so it carries the podium and the next few places at a size that reads at a glance; the full standings stay on the sheet. Five places follow the champion when there are two awards or fewer. Each award beyond two costs one place, down to a floor of the podium itself, so even a five-award night with long names stays clear of the reply box. This was checked by rendering one.
 
 ### Toast / Undo Notification
 

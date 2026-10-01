@@ -5,9 +5,42 @@ import { createPortal } from "react-dom";
 import { X, ImageDown, Printer } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ShareSheet, SHEET_WIDTH_PX, type ShareSheetData } from "./ShareSheet";
+import { StoryCard, STORY_CAPTURE_SCALE, STORY_HEIGHT_PX, STORY_WIDTH_PX } from "./StoryCard";
 
-/** Capture at 2x so the PNG stays sharp when a chat client scales it up. */
-const CAPTURE_SCALE = 2;
+type ExportFormat = "story" | "sheet";
+
+/**
+ * Each format's capture geometry. Width (and the story's height) are
+ * constants, never measured, so the preview's layout can't leak into the file.
+ */
+const FORMATS: Record<
+  ExportFormat,
+  {
+    label: string;
+    width: number;
+    height: number | null;
+    pixelRatio: number;
+    suffix: string;
+  }
+> = {
+  // 360 × 640 at 3x is exactly Instagram's 1080 × 1920.
+  story: {
+    label: "Story",
+    width: STORY_WIDTH_PX,
+    height: STORY_HEIGHT_PX,
+    pixelRatio: STORY_CAPTURE_SCALE,
+    suffix: "-story",
+  },
+  // 2x so the PNG stays sharp when a chat client scales it up. Height follows
+  // the content, since the sheet grows with the number of awards.
+  sheet: {
+    label: "Sheet",
+    width: SHEET_WIDTH_PX,
+    height: null,
+    pixelRatio: 2,
+    suffix: "",
+  },
+};
 
 /** Breathing room around the preview, subtracted before computing the scale. */
 const FRAME_PADDING_PX = 16;
@@ -25,10 +58,11 @@ function fileStem(data: ShareSheetData): string {
 /**
  * Preview first, then choose an output.
  *
- * Deliberately not a format dropdown. The sheet has to be in the DOM to be
- * captured at all, so previewing it costs nothing — and it turns "PNG or PDF?"
- * from a decision made blind into a consequence of seeing the thing you're
- * about to post to thirty people.
+ * Two layouts, because they are posted to different places: a 9:16 story for
+ * Instagram, which is where most of these end up and so is the default, and
+ * the A4 sheet for group chats and the noticeboard, which is also the only
+ * one that prints. Whichever is chosen is previewed live, because it has to
+ * be in the DOM to be captured anyway, and seeing it beats picking blind.
  */
 export function ExportSheetModal({
   isOpen,
@@ -42,6 +76,7 @@ export function ExportSheetModal({
   const [mounted, setMounted] = useState(false);
   const [isCapturing, setIsCapturing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [format, setFormat] = useState<ExportFormat>("story");
   const [scale, setScale] = useState(1);
   const [sheetHeight, setSheetHeight] = useState(0);
   const dialogRef = useRef<HTMLDivElement>(null);
@@ -59,15 +94,17 @@ export function ExportSheetModal({
     return () => clearTimeout(id);
   }, [isOpen]);
 
-  // The sheet is a fixed 794px so print and capture geometry agree; the preview
-  // scales it down to whatever the viewport allows. Capture always reads the
-  // unscaled node, so the transform here never reaches the output.
+  const { width } = FORMATS[format];
+
+  // Both layouts are fixed-width so capture geometry is predictable; the
+  // preview scales them down to whatever the viewport allows. Capture always
+  // reads the unscaled node, so the transform here never reaches the output.
   useEffect(() => {
     if (!isOpen) return;
     const measure = () => {
-      // clientWidth includes the frame's own padding, which the sheet can't use.
-      const available = (frameRef.current?.clientWidth ?? SHEET_WIDTH_PX) - FRAME_PADDING_PX * 2;
-      setScale(Math.min(1, Math.max(0.1, available / SHEET_WIDTH_PX)));
+      // clientWidth includes the frame's own padding, which the layout can't use.
+      const available = (frameRef.current?.clientWidth ?? width) - FRAME_PADDING_PX * 2;
+      setScale(Math.min(1, Math.max(0.1, available / width)));
       setSheetHeight(sheetRef.current?.offsetHeight ?? 0);
     };
     measure();
@@ -80,7 +117,7 @@ export function ExportSheetModal({
       observer.disconnect();
       window.removeEventListener("resize", measure);
     };
-  }, [isOpen, data]);
+  }, [isOpen, data, width]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -90,9 +127,7 @@ export function ExportSheetModal({
       const el = dialogRef.current;
       if (!el) return;
       const focusable = Array.from(
-        el.querySelectorAll<HTMLElement>(
-          "button:not([disabled]), [tabindex]:not([tabindex='-1'])"
-        )
+        el.querySelectorAll<HTMLElement>("button:not([disabled]), [tabindex]:not([tabindex='-1'])")
       );
       if (focusable.length === 0) return;
       const first = focusable[0];
@@ -114,6 +149,7 @@ export function ExportSheetModal({
   const handleDownloadImage = useCallback(async () => {
     const node = sheetRef.current;
     if (!node || !data || isCapturing) return;
+    const spec = FORMATS[format];
     setIsCapturing(true);
     setError(null);
     try {
@@ -125,11 +161,11 @@ export function ExportSheetModal({
       // single most common way this feature ships silently broken.
       const fontEmbedCSS = await getFontEmbedCSS(node);
       const dataUrl = await toPng(node, {
-        pixelRatio: CAPTURE_SCALE,
-        // The sheet's own constant, never a measured width. Measuring reads
+        pixelRatio: spec.pixelRatio,
+        // The layout's own constant, never a measured width. Measuring reads
         // whatever the preview's layout happened to impose on this node.
-        width: SHEET_WIDTH_PX,
-        height: node.offsetHeight,
+        width: spec.width,
+        height: spec.height ?? node.offsetHeight,
         backgroundColor: "#ffffff",
         fontEmbedCSS,
         // The preview's scale lives on an ancestor, but be explicit — a
@@ -137,17 +173,21 @@ export function ExportSheetModal({
         style: { transform: "none", transformOrigin: "top left" },
       });
       const link = document.createElement("a");
-      link.download = `${fileStem(data)}.png`;
+      link.download = `${fileStem(data)}${spec.suffix}.png`;
       link.href = dataUrl;
       link.click();
     } catch {
       // Never fail to a blank download — say so and leave the modal open so
       // Print is still reachable as a way out.
-      setError("Couldn't build the image. Try Print instead, or reload and retry.");
+      setError(
+        format === "sheet"
+          ? "Couldn't build the image. Try Print instead, or reload and retry."
+          : "Couldn't build the image. Reload and retry, or switch to Sheet and print it."
+      );
     } finally {
       setIsCapturing(false);
     }
-  }, [data, isCapturing]);
+  }, [data, isCapturing, format]);
 
   if (!mounted || !data) return null;
 
@@ -173,7 +213,7 @@ export function ExportSheetModal({
           ref={dialogRef}
           role="dialog"
           aria-modal="true"
-          aria-label="Export session sheet"
+          aria-label="Share session results"
           aria-hidden={!isOpen}
           className={cn(
             "w-full max-w-3xl max-h-[90vh] bg-surface border border-border rounded-lg flex flex-col",
@@ -182,7 +222,30 @@ export function ExportSheetModal({
           )}
         >
           <div className="flex items-center gap-2 px-5 h-14 border-b border-border flex-shrink-0">
-            <h2 className="text-base font-semibold text-ink flex-1 truncate">Session sheet</h2>
+            <h2 className="text-base font-semibold text-ink flex-1 truncate">Share results</h2>
+            <div className="flex items-center gap-1" role="group" aria-label="Layout">
+              {(Object.keys(FORMATS) as ExportFormat[]).map((key) => {
+                const active = format === key;
+                return (
+                  <button
+                    key={key}
+                    onClick={() => setFormat(key)}
+                    disabled={isCapturing}
+                    aria-pressed={active}
+                    className={cn(
+                      "h-9 px-2.5 flex items-center rounded-md text-xs font-medium whitespace-nowrap",
+                      "transition-all duration-150 disabled:opacity-40",
+                      "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50",
+                      active
+                        ? "bg-surface-elevated text-primary border border-primary/40"
+                        : "text-muted hover:bg-surface-elevated hover:text-ink"
+                    )}
+                  >
+                    {FORMATS[key].label}
+                  </button>
+                );
+              })}
+            </div>
             <button
               ref={closeBtnRef}
               onClick={onClose}
@@ -199,18 +262,21 @@ export function ExportSheetModal({
             className="flex-1 overflow-auto bg-surface-elevated/40"
             style={{ padding: FRAME_PADDING_PX }}
           >
-            {/* Reserves the scaled sheet's footprint. Without it the transform
-                would visually shrink the sheet while its ancestor still
-                occupied the full 794px, leaving a large dead gap below. */}
+            {/* Reserves the scaled layout's footprint. Without it the transform
+                would visually shrink it while its ancestor still occupied the
+                full width, leaving a large dead gap below. */}
             <div
               style={{
-                width: SHEET_WIDTH_PX * scale,
+                width: width * scale,
                 height: sheetHeight ? sheetHeight * scale : undefined,
                 margin: "0 auto",
               }}
             >
               <div
-                style={{ transform: `scale(${scale})`, transformOrigin: "top left" }}
+                style={{
+                  transform: `scale(${scale})`,
+                  transformOrigin: "top left",
+                }}
                 className="shadow-lg"
               >
                 {/* Only mounted while open. Left in the DOM permanently it
@@ -223,8 +289,9 @@ export function ExportSheetModal({
                     *scaled* width — the sheet would overflow it, and the
                     capture, which measures this node, would crop to the
                     preview's zoom level instead of the sheet's true size. */}
-                <div ref={sheetRef} style={{ width: SHEET_WIDTH_PX }}>
-                  {isOpen && <ShareSheet data={data} />}
+                <div ref={sheetRef} style={{ width }}>
+                  {isOpen &&
+                    (format === "story" ? <StoryCard data={data} /> : <ShareSheet data={data} />)}
                 </div>
               </div>
             </div>
@@ -250,17 +317,21 @@ export function ExportSheetModal({
                 <ImageDown size={15} strokeWidth={2} aria-hidden />
                 {isCapturing ? "Building image…" : "Download image"}
               </button>
-              <button
-                onClick={() => window.print()}
-                disabled={isCapturing}
-                className="flex items-center justify-center gap-2 text-sm font-medium text-ink bg-surface-elevated hover:bg-surface-elevated/70 border border-border transition-colors px-4 py-2.5 rounded-md min-h-[44px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-border disabled:opacity-40"
-              >
-                <Printer size={15} strokeWidth={2} aria-hidden />
-                Print / Save as PDF
-              </button>
+              {format === "sheet" && (
+                <button
+                  onClick={() => window.print()}
+                  disabled={isCapturing}
+                  className="flex items-center justify-center gap-2 text-sm font-medium text-ink bg-surface-elevated hover:bg-surface-elevated/70 border border-border transition-colors px-4 py-2.5 rounded-md min-h-[44px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-border disabled:opacity-40"
+                >
+                  <Printer size={15} strokeWidth={2} aria-hidden />
+                  Print / Save as PDF
+                </button>
+              )}
             </div>
             <p className="text-[11px] text-muted mt-2.5">
-              The image carries the top 10; the printed sheet carries everyone.
+              {format === "story"
+                ? "1080 × 1920 for Instagram stories: the top places and every award, sized to read on a phone."
+                : "The image carries the top 10; the printed sheet carries everyone."}
             </p>
           </div>
         </div>

@@ -94,15 +94,15 @@ Matches are sorted chronologically before any of this runs — the match log han
 
 ### The apex
 
-Three to six players recognised in one composition, with the first holding the centre — more when the awards fall outside the podium, fewer when the podium earned them. Three tiers, each a visibly different object rather than the same card at three sizes:
+The apex uses the **Broadcast** look, borrowed from TV sports graphics. Bars, rank tabs and award tags are cut on a diagonal, and names are condensed italic capitals (Barlow Condensed, `font-display`). The shared pieces live in `broadcast.tsx`, so the page, the A4 sheet and the Instagram story can't drift apart. Full rationale in DESIGN.md, *Leaderboard Apex*.
 
-1. **Champion** — filled brand blue, largest, centre column on desktop and full width on mobile. Carries the rank numeral, name, points, record, form, and one generated sentence (`championSummary`) assembled from what actually happened. Returns `null` rather than filler when nothing specific is true; an empty line reads better than "had a good session".
-2. **Runners-up** — outlined in the same blue, roughly a third of the champion's presence, flanking it at `md:` and paired beneath on mobile.
-3. **Awards** — neutral, quietest. Podium winners wear theirs as a tag on their own card; only non-podium winners get a card here. An award recognises a moment, not a placing.
+1. **Champion**: one full-width slanted bar in brand blue, with a gold rank tab, the name, record and form, and the points in gold.
+2. **Runners-up**: lighter slanted bars beneath, side by side from `sm:`, with silver and bronze tabs. Second stands a little taller than third.
+3. **Awards**: one row of coloured tags under the podium, each naming its winner.
 
-**Places 1–2–3 show medals (🥇 🥈 🥉) in place of their numerals**, on the podium cards, in the field table and on the export sheet (shared via `medals.tsx`). Frames and fills still never go gold, silver or bronze. `SkillBadge` runs Bronze → Platinum for Casual → Advanced inside these same slots, so a gold *frame* would read as a tier. An emoji medal reads as placing. Ranks 4 and down keep plain numerals. Each medal carries `role="img"` with a spoken place ("1st place"), because emoji names are announced inconsistently.
+**Places 1–2–3 get gold, silver and bronze rank tabs**, on the podium, in the field table and on both exports. Ranks 4 and down keep plain numerals. The podium shows no skill badges, so the metals mean placing only. That is the trade that let the old "frames never go gold" rule go: `SkillBadge` uses metals for skill tiers, and the two can't share one space. Each tab carries an `aria-label` with its place ("1st place").
 
-**Awards share one ⭐ emblem** in place of the earlier per-kind icons, so special awards read as their own family, separate from the podium's medals.
+**Each award has its own colour and icon**: On Fire orange 🔥, Giant Killer red ⚡, The Android cyan ⏱️, The Carry green 🤝, The Duo violet 👥. Over a few sessions people learn which award someone won from the colour alone. These colours are used on results surfaces only, since they sit close to the status colours.
 
 ### Awards (`selectHonors`)
 
@@ -132,17 +132,16 @@ Up to **three** awards are computed. Five candidate kinds made two too few: the 
 
 #### Where an award is displayed
 
-- **A podium winner wears theirs as a tag on their own card.** The podium card is where that person is already being recognised; a second card carrying the same name reads as a duplicate rather than a second honour.
-- **Only awards won from outside the top three become separate cards**, and when there are none the strip is not rendered at all rather than left as an empty row.
-- **One award per player.** Two adjacent tags or cards on one name looks like a rendering fault.
+- **Every award is one tag in a single row under the podium**, podium winners included. This replaced tags on podium cards plus separate cards for everyone else, and most of the space the Broadcast redesign saved came from it. With no awards, the row is not rendered.
+- **One award per player.** Two tags naming the same person looks like a rendering fault.
 - **The podium is eligible.** These were once excluded, on the reasoning that a 5–0 champion owns the longest streak by construction, so awarding it to them recognises four people where the layout has room for five. That was reversed: handing "longest streak" to the second-longest run in the room while the actual holder stands on the podium is a worse thing to print than a shorter list.
-- **The champion's summary line suppresses whatever their own tag says** — `championSummary(row, { suppressUpset, suppressStreak })`. `suppressStreak` covers "Won all N" too, not just the obviously streak-shaped clause: "Won all N" requires zero losses and zero draws, so the record and the longest streak are the same number. Beside a tag reading "5 wins in a row" it is the identical fact in different words. With everything suppressed the line goes silent rather than inventing filler; the tag is saying it instead.
+- **The champion bar has no summary sentence.** `championSummary` is still in `leaderboard.ts` and tested, but the Broadcast bar shows record and form instead. The award row already says what was unusual, and a sentence would undo the density the redesign was for.
 
 ### The crowning
 
 The champion card's entrance, and the app's only one.
 
-A white sheet over the blue ground retreats to the right, so the card begins as a runner-up and the brand colour arrives. Runners-up rise with it; the champion's content fades in behind the sheet so near-white text never sits on near-white ground.
+A sheet in the runners-up's tint over the champion's blue bar retreats to the right, so the bar begins as a runner-up and the brand colour arrives. Runners-up rise with it, the champion's content fades in behind the sheet so near-white text never sits on near-white ground, and the gold rank tab flares and settles.
 
 **It fires only when the set of rank-1 players changes**, tracked per session under `topseed:crowned:<sessionId>` in `localStorage` and read in an effect rather than during render (touching storage while rendering desyncs server and client markup). Tied champions are keyed as a sorted join, so a shared first place counts as one champion — the lead has changed only when the *set* changes. Storage access is wrapped: it throws in some privacy modes, and the right fallback there is no animation at all.
 
@@ -158,8 +157,8 @@ Two invariants, both load-bearing:
 All players retained, compressed. `Rank · Player · W–D–L · Matches (md:) · Form (sm:) · Points`. The eight near-duplicate stat columns collapsed: Wins/Draws/Losses into one record cell, Win Rate and Rating into Points and Form.
 
 Narrative chips ride beside the name and appear **only when true**, so a row without them reads as ordinary rather than as missing data:
-- `W{n}` flame chip at a current streak of 2+
-- A bolt glyph when the player has beaten stronger opposition
+- `W{n}` flame chip in fire orange at a current streak of 3+
+- A bolt glyph in giant red when the player has beaten stronger opposition
 
 The Points cell carries its own breakdown on hover (`12 = 9 from results + 3 bonus`) so the number is never a black box.
 
@@ -190,5 +189,10 @@ The `<thead>` sticky offsets track the header stack, not the apex — the apex s
 ---
 
 ## Export
+
+**Share results** (the Export button) previews one of two layouts, chosen with a Story / Sheet toggle:
+
+- **Story** (default): a 1080 × 1920 PNG for Instagram stories (`StoryCard.tsx`). It shows the champion, the next places and every award, all inside Instagram's safe area. Each award beyond two drops one place, down to the podium, so the content never runs under the reply box.
+- **Sheet**: the A4 sheet (`ShareSheet.tsx`). It downloads as a 2× PNG of the top ten, or prints with the full field via Print / Save as PDF.
 
 `export-session.ts` calls the same `computeLeaderboard`, ordered by Points, so the Excel sheet and the app can never disagree. Result and bonus points are exported as separate columns alongside the total, so a reader can reconstruct it rather than trust it.

@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { Space_Grotesk, JetBrains_Mono } from "next/font/google";
+import { Space_Grotesk, JetBrains_Mono, Barlow_Condensed } from "next/font/google";
 import "./globals.css";
 import { AppShell } from "@/components/layout/AppShell";
 import { THEME_COLOR } from "@/lib/utils";
@@ -14,7 +14,20 @@ const spaceGrotesk = Space_Grotesk({
 const jetbrainsMono = JetBrains_Mono({
   subsets: ["latin"],
   variable: "--font-jetbrains-mono",
-  weight: ["400", "500"],
+  // 700 for the court card's scoreboard number, which the browser was
+  // synthesising as a smeared faux-bold from the 500 weight.
+  weight: ["400", "500", "700"],
+  display: "swap",
+});
+
+// Broadcast display face, for the leaderboard podium and the shareable story
+// only. A condensed italic in capitals is the visual language of TV sports
+// graphics; the rest of the app stays in Space Grotesk.
+const barlowCondensed = Barlow_Condensed({
+  subsets: ["latin"],
+  variable: "--font-barlow-condensed",
+  weight: ["600", "700", "800"],
+  style: ["normal", "italic"],
   display: "swap",
 });
 
@@ -54,7 +67,7 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${spaceGrotesk.variable} ${jetbrainsMono.variable}`}
+      className={`${spaceGrotesk.variable} ${jetbrainsMono.variable} ${barlowCondensed.variable}`}
     >
       <body className="antialiased">
         <AppShell>{children}</AppShell>
